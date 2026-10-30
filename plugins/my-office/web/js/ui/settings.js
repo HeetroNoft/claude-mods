@@ -46,6 +46,7 @@ function prefsTabHtml(){
     return `<section><h3>Shortcuts</h3><dl>${keys.map(([k,t])=>`<div><dt>${k}</dt><dd>${t}</dd></div>`).join('')}</dl></section>`;}
   return `<section><h3>Room</h3><div class="rooms" role="radiogroup" aria-label="Room">${THEME_KEYS.map(k=>{const t=THEMES[k],on=k===themeKey;return `<button type="button" role="radio" class="${on?'on':''}" aria-checked="${on}" tabindex="${on?0:-1}" data-room="${k}"><span class="sw">${t.swatch.map(c=>`<i style="background:${c}"></i>`).join('')}</span><span class="nm">${esc(t.name)}</span></button>`;}).join('')}</div></section>
 <section><h3>Outside</h3>${seg('time','Time of day',[['auto','Live'],['day','Day'],['night','Night']])}${seg('season','Season',[['auto','Live'],['spring','Spring'],['summer','Summer'],['autumn','Autumn'],['winter','Winter']])}${seg('hemi','Hemisphere',[['north','North'],['south','South']])}</section>
+<section><h3>Office</h3><div class="row"><label for="poffice">Name</label><input id="poffice" type="text" maxlength="${OFFICE_NAME_MAX}" placeholder="${esc(BASE_TITLE)}" spellcheck="false" autocomplete="off" value="${esc(officeName)}"></div></section>
 <section><h3>Cat</h3><div class="row"><label for="pcat">Name</label><input id="pcat" type="text" maxlength="${CAT_NAME_MAX}" placeholder="No name yet" spellcheck="false" autocomplete="off" value="${esc(catName)}"></div></section>`;
 }
 function prefsHtml(){
@@ -96,14 +97,15 @@ prefsEl.addEventListener('keydown',e=>{
 });
 prefsEl.addEventListener('input',e=>{
   if(e.target.id==='pcat')setCatName(e.target.value);
+  if(e.target.id==='poffice')setOfficeName(e.target.value);
   if(e.target.id==='pvol'){setVolume(+e.target.value);document.getElementById('pvolv').textContent=volume+'%';}
 });
 prefsEl.addEventListener('change',e=>{
   if(e.target.id==='pvol'&&soundOn)blip(660,.04,'triangle'); // a tick at the chosen level
   if(e.target.id==='pcat'&&catName)catMeow(performance.now()); // it answers to its name
 });
-// typing the cat's name must not change the room or mute the sound; Esc still closes
-window.addEventListener('keydown',e=>{if(e.target.id==='pcat'&&e.key!=='Escape')e.stopImmediatePropagation();},true);
+// typing a name must not change the room or mute the sound; Esc still closes
+window.addEventListener('keydown',e=>{if((e.target.id==='pcat'||e.target.id==='poffice')&&e.key!=='Escape')e.stopImmediatePropagation();},true);
 window.addEventListener('keydown',e=>{
   if(e.key==='Escape'){openPrefs(false);return;}
   if(e.ctrlKey||e.metaKey||e.altKey||(e.target.matches&&e.target.matches('input,textarea')))return;
