@@ -6,7 +6,8 @@ A pixel-art office in a local web page. Every Claude Code session running this m
 
 - `/my-office` prints the page's address (`file:///…/.claude/my-office/index.html`); open it in a browser.
 - `/my-office-desk Writer` names your desk; `/my-office-leave` sends a session home and frees its desk, `/my-office-leave <name or id>` another one, `/my-office-leave others` everyone but you (for desks left behind by a crashed session).
-- `/my-office-who` lists who is in the office, what each one does and the usage left; `/my-office-who <name>` shows that desk's plan.
+- `/my-office-clear` deletes the desk files of sessions that ended or have written nothing for 30 minutes, except yours. A session waiting for you or for its usage stays, and a session still open comes back at its next activity.
+- `/my-office-who` lists the sessions in the office, what each one does and the usage left; `/my-office-who <name>` shows that desk's plan.
 - `/my-office-board` shows your plan; `/my-office-board clear` takes it off your board.
 - `/my-office-theme neon` changes the room on the page from the terminal; `/my-office-theme` lists the rooms.
 - `/my-office-quiet` switches the sound at the end of a turn off or on (`/my-office-quiet on`, `/my-office-quiet off`), for every session.

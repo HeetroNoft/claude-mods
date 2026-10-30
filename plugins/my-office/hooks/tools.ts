@@ -37,6 +37,7 @@ export const COMMANDS = [
   { name: 'my-office-desk', description: 'Name your desk in the office, for example /my-office-desk Writer', argumentHint: '[name]' },
   { name: 'my-office', description: 'Show where the office page is', immediate: true },
   { name: 'my-office-leave', description: 'Send a session home to free its desk: /my-office-leave for this one, /my-office-leave <name or id> for another, /my-office-leave others for all but this one', argumentHint: '[name, id or others]' },
+  { name: 'my-office-clear', description: 'Delete the desks of sessions that ended or have been silent for 30 minutes; a session waiting for you or for its usage stays' },
   { name: 'my-office-who', description: 'Who is in the office, what each one does, and the usage left; /my-office-who <name> shows a plan', argumentHint: '[name]', immediate: true },
   { name: 'my-office-board', description: 'Show your plan; /my-office-board clear takes it off your board', argumentHint: '[clear]', immediate: true },
   { name: 'my-office-quiet', description: 'Turn the sound at the end of a turn on or off, for every session', argumentHint: '[on|off]' },

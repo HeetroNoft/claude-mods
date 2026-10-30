@@ -4,7 +4,7 @@ import {
   activityOf, applyTool, clean, clearPlan, type Desk, eta, finishStep, firstWords, hhmm, lastQuestion, msgKey, newDesk,
   parseReceived, pausePlan, peerName, planLines, planSteps, push, rateOf, resumePlan, todoSteps, usageLine, whoLine,
 } from './core'
-import { deskList, installPage, LIVE_MS, carryOver, officeDir, pageInTest, presentDesks, publish, readDesk, readLeft, themeKeys, writeDesk, writeLeft, writeRoom } from './room'
+import { deskList, installPage, LIVE_MS, carryOver, officeDesks, officeDir, pageInTest, presentDesks, publish, readDesk, readLeft, removeDesk, themeKeys, uselessDesks, writeDesk, writeLeft, writeRoom } from './room'
 import { COMMANDS, PROMPT_HINT, TOOLS } from './tools'
 
 // The office: every session that runs this mod gets a desk in one shared pixel-art room.
@@ -163,6 +163,25 @@ export const register: Register = on => {
     return { text: `${gone.name} went home and freed a desk.${mine ? ' This session comes back on its next prompt or when it is opened again.' : ' It comes back when that session gets a new prompt or is opened again.'}` }
   })
 
+  on('command.run', { command: 'my-office-clear' }, async $ => {
+    await setup($)
+    await ensure($)
+    const now = await $.clock.now()
+    const useless = await uselessDesks($, dir, now, desk?.id)
+    if (!useless.length) return { text: 'Nothing to clear.' }
+    const done = new Map<string, boolean>()
+    for (const d of useless) done.set(d.id, await removeDesk($, dir, d.id))
+    const cleared = useless.filter(d => done.get(d.id))
+    const stuck = useless.filter(d => !done.get(d.id))
+    // who left long ago is off the board anyway, and a cleared desk needs no entry
+    await writeLeft($, dir, Object.fromEntries(Object.entries(await readLeft($, dir)).filter(([id, ms]) => now - ms < LIVE_MS && !done.get(id))))
+    await save($, () => undefined)
+    return { text: [
+      cleared.length ? `Cleared ${deskList(cleared)}. A session that is still open comes back at its next activity.` : '',
+      stuck.length ? `Could not delete ${deskList(stuck)}.` : '',
+    ].filter(Boolean).join('\n') }
+  })
+
   on('command.run', { command: 'my-office' }, async $ => {
     await ensure($)
     return { text: `Open this page in your browser: file:///${dir.replace(/^\//, '')}/index.html\nEvery session with the my-office mod gets a desk there. Rename yours with /my-office-desk <name>.` }
@@ -171,7 +190,7 @@ export const register: Register = on => {
   on('command.run', { command: 'my-office-who' }, async ($, e: any) => {
     await ensure($)
     const now = await $.clock.now()
-    const here = await presentDesks($, dir, now)
+    const here = await officeDesks($, dir, now)
     const arg = String(e.args ?? '').trim().toLowerCase()
     if (arg) {
       const d = here.find(x => x.name.toLowerCase() === arg || x.id.startsWith(arg))
