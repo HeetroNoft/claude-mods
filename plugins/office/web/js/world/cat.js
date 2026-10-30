@@ -50,15 +50,21 @@ function catGo(x,y,run){
   cat.path=cat.z>0?[t]:avoidFurniture({x:cat.x,y:cat.y},[t]);cat.speed=run?34:16;
 }
 // a leap to (x, y) at height z, over dur ms, arcing h px above the straight line
-function catJump(x,y,z,dur,h){cat.path=[];cat.air={x0:cat.x,y0:cat.y,z0:cat.z,x1:x,y1:y,z1:z,t0:performance.now(),dur:dur||420,h:h==null?6:h};
+// it crouches first (CAT_CROUCH ms) and lands in a short crouch too (CAT_LAND ms)
+const CAT_CROUCH=110,CAT_LAND=170,CAT_ACCEL=110;
+function catJump(x,y,z,dur,h){cat.path=[];cat.air={x0:cat.x,y0:cat.y,z0:cat.z,x1:x,y1:y,z1:z,t0:performance.now()+CAT_CROUCH,dur:dur||420,h:h==null?6:h};
   if(Math.abs(x-cat.x)>.5)cat.face=x>cat.x?1:-1;}
 function stepCat(dt,tp){
-  if(cat.air){const A=cat.air,u=Math.min(1,(tp-A.t0)/A.dur);
+  if(cat.air){const A=cat.air,u=Math.max(0,Math.min(1,(tp-A.t0)/A.dur));
     cat.x=A.x0+(A.x1-A.x0)*u;cat.y=A.y0+(A.y1-A.y0)*u;cat.z=A.z0+(A.z1-A.z0)*u+Math.sin(Math.PI*u)*A.h;
-    if(u>=1){cat.air=null;cat.z=A.z1;}return;}
-  if(!cat.path.length)return;
-  const p=cat.path[0],dx=p.x-cat.x,dy=p.y-cat.y,d=Math.hypot(dx,dy),s=cat.speed*dt;
-  if(Math.abs(dx)>.1)cat.face=dx>0?1:-1;
+    if(u>=1){cat.air=null;cat.z=A.z1;cat.land=tp+CAT_LAND;}return;}
+  if(!cat.path.length){cat.v=0;return;}
+  if(tp<(cat.land||0))return;
+  let left=0,from=cat;cat.path.forEach(q=>{left+=Math.hypot(q.x-from.x,q.y-from.y);from=q;});
+  cat.v=Math.min(cat.speed,(cat.v||0)+CAT_ACCEL*dt,Math.max(6,Math.sqrt(2*CAT_ACCEL*left)));
+  const p=cat.path[0],dx=p.x-cat.x,dy=p.y-cat.y,d=Math.hypot(dx,dy),s=cat.v*dt;
+  cat.stride=(cat.stride||0)+s;
+  if(Math.abs(dx)>.6)cat.face=dx>0?1:-1;
   if(d<=s){cat.x=p.x;cat.y=p.y;cat.path.shift();}else{cat.x+=dx/d*s;cat.y+=dy/d*s;}
 }
 const catMoving=()=>cat.path.length>0||!!cat.air;
@@ -268,6 +274,7 @@ function updateCat(dt,tp){
   if(cat.job){runJob(tp);return;}
   if(catMoving()){cat.state='walk';return;}
   if(cat.state==='walk'){cat.state=cat.restState||'sit';cat.until=tp+7000+Math.random()*12000;}
+  if(cat.state==='sit')catFidget(tp);
   // its next doing, now and then; if nothing fits right now, it looks again a little later
   if(tp>cat.nextJob&&!catPetted()){
     const keys=Object.keys(CAT_JOBS).sort(()=>Math.random()-.5);
@@ -275,10 +282,21 @@ function updateCat(dt,tp){
     cat.nextJob=tp+(ok?CAT_REST[0]+Math.random()*(CAT_REST[1]-CAT_REST[0]):20000);
     if(ok)return;
   }
-  if(tp>cat.until&&!catPetted()){const p=restSpot();catGo(p.x,p.y);cat.restState=p.sleep||Math.random()<.45?'sleep':'sit';cat.state='walk';}
+  if(tp>cat.until&&!catPetted()){
+    if(cat.state==='sleep'){cat.state='stretch';cat.until=tp+1300;return;} // a good stretch before it gets up
+    const p=restSpot();catGo(p.x,p.y);cat.restState=p.sleep||Math.random()<.45?'sleep':'sit';cat.state='walk';
+  }
+}
+// Sitting about: it turns to a moving cursor, and now and then washes, yawns, looks round or flicks an ear.
+const FIDGETS={groom:2000,look:1400,ear:300,yawn:900};
+function catFidget(tp){
+  if(ptr.in&&tp-(ptr.movedAt||0)<800){const d=ptr.x-cat.x;if(Math.abs(d)>3&&Math.abs(d)<60&&Math.abs(ptr.y-cat.y)<40){cat.face=d>0?1:-1;cat.watchUntil=tp+900;}}
+  if(tp<(cat.nextFid||0)||tp<(cat.watchUntil||0))return;
+  const k=Object.keys(FIDGETS)[(Math.random()*4)|0];cat.fid={k,until:tp+FIDGETS[k]};cat.nextFid=tp+4000+Math.random()*7000;
 }
 // a Claude petting it holds it in place
 const catPetted=()=>[...chars.values()].some(c=>c.idle&&c.idle.act==='catpet'&&c.idle.phase!=='pick');
+const catPurring=()=>cat.pet>4||[...chars.values()].some(c=>c.idle&&c.idle.act==='catpet'&&c.idle.phase==='do');
 // where it goes to rest: a patch of sun under the window by day, by a lit desk lamp at night, or anywhere
 function restSpot(){
   const n=nightness(Date.now());
@@ -300,34 +318,66 @@ function catMeow(tp){cat.hop=tp+420;cat.hopH=4;if(cat.state==='sleep'&&!cat.job)
 
 /* ---------- drawing ---------- */
 function drawCat(g,tp){
-  const L=lookOf(),f=cat.face,bx=Math.round(cat.x),dur=L.float?900:420,H=L.float?Math.max(cat.hopH,8):cat.hopH;
-  const hop=tp<cat.hop?Math.round(Math.sin((cat.hop-tp)/dur*Math.PI)*H):0,by=Math.round(cat.y-cat.z)-hop;
-  const C=L.fur,Hi=L.hi,EY=L.eye,TL=L.tail||C,LG=L.legs||C,tail=Math.round(Math.sin(tp/350));
+  const L=lookOf(),f=cat.face,dur=L.float?900:420,H=L.float?Math.max(cat.hopH,8):cat.hopH,A=cat.air;
+  const hop=tp<cat.hop?Math.round(Math.sin((cat.hop-tp)/dur*Math.PI)*H):0;
+  const st=A?(tp<A.t0?'crouch':'jump'):tp<(cat.land||0)?'crouch':cat.path.length?'walk':cat.state;
+  const C=L.fur,Hi=L.hi,EY=L.eye,TL=L.tail||C,LG=L.legs||C,PAW=L.legs||Hi,tail=Math.round(Math.sin(tp/350));
+  const under=shade(C,-.16),lid=L===CAT_LOOKS.black?Hi:shade(C,-.38),NOSE=L.holo?Hi:'#E08F8F';
+  const blink=((tp/1000)%5)<=.15,purring=catPurring(),breath=((tp/1000)%3)>=1.5,buzz=purring&&Math.floor(tp/80)%2;
+  const fid=st==='sit'&&cat.fid&&tp<cat.fid.until?cat.fid.k:null,running=st==='walk'&&cat.speed>20&&(cat.v||0)>20;
+  const sr=cat.stride||0,gallop=running?Math.floor(sr/4)%2:0;
+  let bx=Math.round(cat.x),by=Math.round(cat.y-cat.z)-hop-(running&&gallop?1:0);
+  if(st==='rub')bx+=Math.round(Math.sin(tp/225)); // it leans into the legs it rubs
   const p=(dx,dy,w,h,col)=>R(g,f>0?bx+dx:bx-dx-w+1,by+dy,w,h,col);
-  if(cat.z<1&&!cat.air){g.fillStyle='rgba(0,0,0,.22)';g.fillRect(bx-5,Math.round(cat.y),10,1);}
+  if(A?!A.z0&&!A.z1:cat.z<1){const w=Math.max(4,10-Math.round(cat.z*.4));g.fillStyle='rgba(0,0,0,.22)';g.fillRect(bx-1-Math.ceil(w/2),Math.round(cat.y),w,1);}
   if(L.holo)g.globalAlpha=.62;
-  const st=cat.air?'jump':cat.path.length?'walk':cat.state,blink=((tp/1000)%5)<=.15;
-  let pose='sit';
+  // the eyes last, over the face marks; every pose below sets what its face is once the marks are on
+  let pose='sit',face=null;
   if(st==='sleep'){pose='sleep';
-    p(-4,-3,8,3,C);p(-3,-4,6,1,C);p(1,-5,3,2,C);p(1,-6,1,1,C);p(3,-6,1,1,C);p(2,-4,2,1,Hi);if(L.bob)p(-5,-2,2,1,TL);else p(-5,-1,4,1,TL);
+    p(-4,-3,8,3,C);p(-3,-4,6,1,C);if(breath)p(-2,-5,3,1,C);p(1,-5,3,2,C);p(1,-6,1,1,C);p(3,-6,1,1,C);p(2,-4,2,1,Hi);p(-4,-1,8,1,under);
+    if(L.bob)p(-5,-2,2,1,TL);else{p(-5,-1,4,1,TL);if((tp/1000)%7<.35)p(-5,-2,1,1,TL);} // the tail tip stirs in its sleep
+    face=()=>p(2,-5,1,1,lid);
+  }else if(st==='stretch'){pose='stretch'; // rear up, chest down, front paws reaching
+    p(-4,-6,4,3,C);p(0,-5,4,3,C);p(-3,-6,3,1,Hi);p(3,-5,3,3,C);p(3,-6,1,1,C);p(5,-6,1,1,C);
+    p(-3,-3,1,3,LG);p(-1,-3,1,3,LG);p(3,-2,2,1,LG);p(3,-1,4,1,LG);p(6,-1,1,1,PAW);
+    if(L.bob)p(-5,-7,2,2,TL);else p(-5,-9,1,4,TL);
+    face=()=>{p(4,-4,1,1,lid);p(5,-3,1,1,NOSE);};
   }else if(st==='walk'||st==='rub'||st==='jump'){pose='walk';
-    const k=st==='walk'?Math.floor(tp/150)%2:0,air=st==='jump';
-    p(-4,-5,8,air?2:3,C);p(3,-7,3,3,C);p(3,-8,1,1,C);p(5,-8,1,1,C);
-    if(st==='rub')p(4,-6,1,1,shade(C,-.35));else p(4,-6,1,1,EY);
-    if(air){p(4,-3,2,1,LG);p(-5,-3,2,1,LG);}else{p(-3,-2,1,2-k,LG);p(-1,-2,1,1+k,LG);p(1,-2,1,2-k,LG);p(3,-2,1,1+k,LG);}
-    if(L.bob)p(-5,-6,2,2,TL);else if(st==='rub')p(-5,-10,1,5,TL);else if(air)p(-6,-6,2,1,TL);else p(-5,-7+tail,1,3,TL);
+    const air=st==='jump',u=air?(tp-A.t0)/A.dur:0;
+    p(-4,-5,8,air?2:3,C);p(-3,-5,5,1,Hi);if(!air)p(-4,-3,8,1,under);p(3,-7,3,3,C);p(3,-8,1,1,C);p(5,-8,1,1,C);
+    if(air&&u<.5){p(4,-3,3,1,LG);p(-6,-3,3,1,LG);}        // going up: stretched out long
+    else if(air){p(3,-3,1,2,LG);p(5,-3,1,2,LG);p(-4,-3,2,1,LG);} // coming down: front paws reaching for the ground
+    else if(running){if(gallop){p(-5,-2,2,1,LG);p(4,-2,2,1,LG);}else{p(-1,-2,1,2,LG);p(1,-2,1,2,LG);p(-2,-2,1,1,LG);p(2,-2,1,1,LG);}}
+    else{const k=Math.floor(sr/2.4)%4,a=k===0?1:2,b=k===2?1:2;p(-3,-2,1,a,LG);p(-1,-2,1,b,LG);p(1,-2,1,a,LG);p(3,-2,1,b,LG);}
+    const ts=Math.round(Math.sin(sr/5));
+    if(L.bob)p(-5,-6,2,2,TL);else if(st==='rub')p(-5,-10,1,5,TL);else if(air&&u>=.5)p(-6,-7,1,2,TL);else if(air||running)p(-6,-6,2,1,TL);
+    else{p(-5,-6,1,2,TL);p(-5+ts,-7,1,1,TL);}
+    face=()=>{p(4,-6,1,1,st==='rub'?lid:EY);p(5,-5,1,1,NOSE);};
   }else if(st==='crouch'){pose='sleep';
-    p(-4,-3,8,3,C);p(2,-5,3,3,C);p(2,-6,1,1,C);p(4,-6,1,1,C);p(3,-4,1,1,EY);if(L.bob)p(-5,-3,2,2,TL);else p(-5,-3+tail,1,1,TL);
+    p(-4,-3,8,3,C);p(-3,-4,5,1,Hi);p(-4,-1,8,1,under);p(2,-5,3,3,C);p(2,-6,1,1,C);p(4,-6,1,1,C);if(L.bob)p(-5,-3,2,2,TL);else p(-5,-3+tail,1,1,TL);
+    face=()=>{p(3,-4,1,1,EY);p(4,-3,1,1,NOSE);};
   }else{
-    p(-3,-4,6,4,C);p(-2,-5,4,1,Hi);p(1,-8,4,3,C);p(1,-9,1,1,C);p(4,-9,1,1,C);
-    if(!blink){p(2,-7,1,1,EY);p(4,-7,1,1,EY);}
-    p(-4,-2,1,2,LG);if(L.bob)p(-5,-3,2,2,TL);else p(-5,-4+tail,1,2,TL);
-    // a raised paw: swiping at something, or now and then the beckoning-cat wave
-    if(st==='swipe'){const u=Math.floor((tp-(cat.swipe||0))/120)%2;p(5,-6+u,2,1,LG);}
+    const ear=fid==='ear'&&Math.floor(tp/90)%2,happy=purring||fid==='groom'||fid==='yawn';
+    p(-3,-4,6,4,C);p(-2+(buzz?1:0),-5,4,1,Hi);if(breath)p(-1,-4,3,1,Hi);p(-3,-1,6,1,under);p(1,-1,2,1,PAW);
+    p(1,-8,4,3,C);p(1,-9,1,1,C);if(!ear)p(4,-9,1,1,C);
+    p(-4,-2,1,2,LG);
+    if(L.bob)p(-5,-3,2,2,TL);
+    else if(purring){p(-5,-7,1,5,TL);if(buzz)p(-6,-7,1,1,TL);} // a happy cat's tail stands up and quivers
+    else{p(-5,-3,1,2,TL);p(-5+tail,-4,1,1,TL);}
+    // a paw up: swiping at something (wound up, then a strike), washing, or the beckoning-cat wave
+    if(st==='swipe'){if((tp-(cat.swipe||0))<200)p(5,-8,1,2,PAW);else{p(5,-5,3,1,PAW);p(8,-5,1,1,LG);}}
+    else if(fid==='groom')p(4,-6+Math.floor(tp/170)%2,2,2,PAW);
     else if(L.wave&&((tp/1000)%11)<1.8){p(5,-10+Math.floor(tp/220)%2,1,3,C);}
+    const away=fid==='look'?Math.floor(tp/500)%2:0,toward=tp<(cat.watchUntil||0)||(fid==='look'&&!away);
+    face=()=>{
+      if(happy){p(2,-7,1,1,lid);p(4,-7,1,1,lid);}
+      else if(!blink){p(away?3:toward?3:2,-7,1,1,EY);p(away?2:4,-7,1,1,EY);}
+      if(fid==='yawn'){p(2,-6,3,1,'#7A2E3A');p(3,-6,1,1,NOSE);}else p(3,-6,1,1,NOSE);
+    };
   }
-  (L.marks&&L.marks[pose]||[]).forEach(m=>p(m[0],m[1],m[2],m[3],m[4]));
-  if(pose==='sit'&&!blink&&L.marks&&(st==='sit'||st==='swipe')){p(2,-7,1,1,EY);p(4,-7,1,1,EY);} // eyes stay on top of the face marks
+  const marks=(L.marks&&L.marks[pose==='stretch'?'walk':pose]||[]).filter(m=>pose!=='stretch'||m[1]>=-6); // stretching, its head is low: only the body marks
+  marks.forEach(m=>p(m[0],m[1],m[2],m[3],m[4]));
+  if(face)face();
   if(L.acc)L.acc(p,pose,tp);
   if(L.holo){
     g.globalAlpha=1;g.globalCompositeOperation='destination-out';g.fillStyle='rgba(0,0,0,.45)';

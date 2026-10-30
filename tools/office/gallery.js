@@ -22,7 +22,18 @@ const STATES=[{},{dir:-1},{pose:'look'},{mood:'surprised'},{pose:'sleep'},{mood:
 const hop=t=>[0,t>.1&&t<.45?-Math.round(Math.sin((t-.1)/.35*Math.PI)*6):0],stop=t=>[Math.round(Math.min(t,.2)*60),0],still=()=>[0,0];
 const FILMS=[[7,'cheer',hop,0,0],[3,'cheer',hop,0,0],[9,'stand',still,0,0,null,t=>t>.1?'surprised':null],[2,'stand',stop,0,0],[6,'stand',stop,0,0],
   [4,'sip',still,1,0,{kind:'mug',fill:.6}],[5,'eat',still,1,0,{kind:'cookie',bites:1}],[6,'hold',still,0,4,{kind:'flower'}]];
-if(SET==='motion'){gx.fillStyle='#E8DCC8';gx.fillRect(0,0,W,H);
+// every cat state (columns) in every room's look (rows): run.sh gallery cat
+const CAT_SHOTS=[['sit',{}],['groom',{fid:{k:'groom',until:1e12}}],['yawn',{fid:{k:'yawn',until:1e12}}],['look',{watchUntil:1e12}],['purr',{pet:9}],['sleep',{state:'sleep'}],['stretch',{state:'stretch'}],
+  ['walk',{path:[{x:0,y:0}],stride:2.6,state:'walk'}],['walk',{path:[{x:0,y:0}],stride:7.3,state:'walk'}],['run',{path:[{x:0,y:0}],speed:34,v:34,stride:1}],['run',{path:[{x:0,y:0}],speed:34,v:34,stride:5}],
+  ['crouch',{state:'crouch'}],['up',{air:{t0:-1000,dur:2000,z0:0,z1:0}}],['down',{air:{t0:-3000,dur:4000,z0:0,z1:0},z:3}],['swipe',{state:'swipe',swipe:9e9}]];
+if(SET==='cat'){gx.fillStyle='#C08A5C';gx.fillRect(0,0,W,H);const tp=performance.now();
+  THEME_KEYS.forEach((k,j)=>{themeKey=k;TH=THEMES[k];CAT_SHOTS.forEach(([,o],i)=>{
+    gx.fillStyle=(i+j)%2?'#B57F52':'#C08A5C';gx.fillRect(i*21,j*22,21,22);
+    const t=o.air?tp:tp;cat=Object.assign(newCat(0),{x:10+i*21,y:19+j*22,state:'sit',hop:0,z:0},JSON.parse(JSON.stringify(o)));
+    if(o.air){cat.air.t0=tp-(o.z?3000:1000);cat.air.dur=o.z?4000:2000;}
+    if(o.state==='swipe')cat.swipe=tp-(i%2?300:50);
+    drawCat(gx,t);});});}
+else if(SET==='motion'){gx.fillStyle='#E8DCC8';gx.fillRect(0,0,W,H);
   FILMS.forEach(([style,pose,path,raise,lift,held,mood],j)=>{const ch={},look=LOOKS.find(l=>l.style===style);
     for(let i=0;i<13;i++){const t=i*.05;let tr;for(let k=0;k<5;k++){const q=t+k*.01,[dx,dy]=path(q);tr=trailOf(ch,50+dx,50+dy,pose,mood&&mood(q),q>.1?raise:0,q>.1?lift:0,1000+q*1000);}
       const [dx,dy]=path(t);drawPerson(gx,12+i*24+dx/4,27+j*22+dy,{look,pose,dir:1,frame:1,sway:Math.round(tr.x),pop:Math.round(-tr.y),raise:tr.raise,lift:Math.round(tr.lift),mood:mood&&mood(t),held:held?{...held}:null});}});}

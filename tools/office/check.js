@@ -66,6 +66,21 @@
     log(min>=6,'walkers meet at '+min.toFixed(1)+' px');log(!a.path.length&&!b.path.length,'walkers never arrived');
     const c=mk('c',200,150,100);stepEntity(c,1/60);log(dirOf(c)===-1,'a walker going left faces '+dirOf(c));
     chars.clear();live.forEach(([k,v])=>chars.set(k,v));}
+  // 9. the cat: every state stays inside the box its outline is drawn from, in every look and both ways
+  {const keepCat=cat,tp=performance.now(),big=document.createElement('canvas');big.width=120;big.height=120;const b=big.getContext('2d',{willReadFrequently:true});
+    const shots=[{state:'sit'},{state:'sleep'},{state:'stretch'},{state:'crouch'},{state:'rub'},{state:'swipe',swipe:tp},{state:'swipe',swipe:tp-400},{state:'sit',pet:9},{state:'sit',fid:{k:'groom',until:1e12}},{state:'sit',fid:{k:'yawn',until:1e12}},
+      {state:'walk',path:[{x:0,y:0}]},{state:'walk',path:[{x:0,y:0}],speed:34,v:34,stride:5},{air:{t0:tp-100,dur:400,z0:0,z1:0}},{air:{t0:tp-300,dur:400,z0:0,z1:0}},{land:tp+1e4}];
+    for(const k of THEME_KEYS){themeKey=k;TH=THEMES[k];shots.forEach((o,i)=>[1,-1].forEach(face=>{
+      cat=Object.assign(newCat(0),{x:60,y:70,face,hop:0},o);b.clearRect(0,0,120,120);drawCat(b,tp);
+      const d=b.getImageData(0,0,120,120).data;let out=0;for(let y=0;y<120;y++)for(let x=0;x<120;x++)if(d[(y*120+x)*4+3]&&(x<50||x>70||y<50||y>73))out++;
+      log(!out,`${k}: cat shot ${i} face ${face} has ${out} px outside its box`);}));}
+    // it speeds up and brakes, jumps through a crouch and lands in one, and gets where it was going
+    themeKey=keep;TH=THEMES[keep];cat=newCat(0);cat.x=100;cat.y=150;catGo(180,150,true);let t=performance.now(),top=0,first=0,last=1e9;
+    for(let i=0;i<300&&cat.path.length;i++){t+=16;stepCat(.016,t);if(!i)first=cat.v;top=Math.max(top,cat.v);if(cat.path.length)last=cat.v;}
+    log(!cat.path.length&&cat.x===180,'cat never reached its spot');log(first<10&&top===34,`cat speed ${first.toFixed(1)} to ${top.toFixed(1)}`);log(last<14,'cat ends at speed '+last.toFixed(1));
+    catJump(190,150,14,300,6);t=cat.air.t0-50;stepCat(.016,t);log(cat.z===0&&cat.x===180,'cat left before its crouch ended');t+=500;stepCat(.016,t);
+    log(!cat.air&&cat.z===14&&cat.land>t,'cat did not land in a crouch');
+    cat=keepCat;}
   themeKey=keep;TH=THEMES[keep];desks=keepDesks;
   // one line per failure: the browser log keeps only the first line of a message
   if(!fails.length)console.log('CHECK OK all layout checks passed');
