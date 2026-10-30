@@ -107,19 +107,23 @@ function drawPerson(g,cx,fy,o){
   return drawAccessory(g,o,{L,T,bw,ol,side,back})-2;
 }
 // Accessory sprites: rows of palette letters, '.' for nothing.
-const ACC_BOW=['bb...bb','bhbkbhb','bbbkbbb','bd...db'],ACC_POM=['.w.','whw','.w.'],ACC_POM_LOW=['ww.','whw'];
-const ACC_BULB=['.a.','hay','.y.'],ACC_LEAVES=['...ll','ll.lL','lL...'],ACC_LEAVES_LOW=['.l.l.','l...l'];
-const ACC_CHEF=['..WW..WW..','.WWWWWWWW.','WWWWWWWWWW','.WsWWsWWs.','.WWWWWWWW.','.gggggggg.'];
+const ACC_BOW=['bb...bb','bhb.bhb','bbbkbbb','bdb.bdb','dd...dd'];
+const ACC_POM=['.ww.','wxww','.ss.'],ACC_BULB=['.aa.','ahaa','aaay','.yy.'];
+const ACC_STEM=['.s.','.s.','ccc'],ACC_STEM_LOW=['..s','.s.','ccc'];
+const ACC_LEAVES=['.....ll.','.ll.lLLl','lLLlsll.','.llls...'],ACC_LEAVES_LOW=['..lsl..','.lLsLl.','lL.s.Ll','l..s..l'];
+const ACC_CHEF=['..WWW..WWW..','.WWWWWWWWWW.','WWWWWWWWWWWs','WWWWsWWWWsWs','.WWWsWWWsWs.','.WWWsWWWsWs.','.gggggggggg.'];
+const ACC_CUPS=['.pp','pPc','pPc','.pp'];
 const ACC_PAL={
-  1:{h:'#6B7488',b:'#3A4052',p:'#FF7A59',P:'#FFB199'},
-  2:{a:'#FFD84A',h:'#FFF8D0',y:'#E8A92E',s:'#8A8FA0'},
-  3:{r:'#C8485A',h:'#E5707E',c:'#EFE7D6',C:'#CFC6B2',w:'#FFFFFF',h2:'#E6E0D0'},
+  1:{h:'#8C96AC',b:'#4A5266',p:'#FF7A59',P:'#FFB199',c:'#2B2F3A'},
+  2:{a:'#FFD84A',h:'#FFF8D0',y:'#E8A92E',s:'#C2C7D4',c:'#6B7488'},
+  3:{r:'#C8485A',R:'#A83444',h:'#E5707E',c:'#EFE7D6',C:'#CFC6B2',D:'#B5AC98',w:'#FFFFFF',x:'#FFFFFF',s:'#D5CFC0'},
   5:{b:'#E0266E',h:'#FF7FAE',d:'#A81650',k:'#7E0F3B'},
-  6:{s:'#3E7A2E',l:'#8BD46A',L:'#5FAE4E'},
-  7:{c:'#2E3347',h:'#565F80',d:'#20243A',o:ORANGE,O:'#F0A080',b:'#3A4058',B:'#6A7490'},
-  8:{b:'#3558C8',h:'#5C80E8',d:'#263F96',w:'#FFFFFF',k:'#1E2230'},
+  6:{s:'#4E9A3A',l:'#8BD46A',L:'#BDF0A0'},
+  7:{c:'#2E3347',h:'#565F80',d:'#20243A',o:ORANGE,O:'#F0A080',g:'#FFD84A',b:'#3A4058',B:'#6A7490'},
+  8:{b:'#3558C8',h:'#5C80E8',d:'#263F96',w:'#FFFFFF',k:'#1E2230',t:'#7FA0F0'},
   9:{W:'#FFFFFF',s:'#C9CFDA',g:'#AEB6C4'}
 };
+const ribs=n=>{let s='';for(let i=0;i<n;i++)s+=i%3===2?'R':'r';return s;};
 const centred=(s,n)=>{const p=(n-s.length)>>1;return '.'.repeat(p)+s+'.'.repeat(n-s.length-p);};
 // A sprite with a dark rim round it, except where it sits on the body (a hat's edge stays clean).
 function drawAcc(g,rows,pal,x,y,b,flip){
@@ -131,8 +135,8 @@ function drawAcc(g,rows,pal,x,y,b,flip){
 }
 // Round frames around the eyes, over the face: every mood still reads through the lenses.
 function drawGlasses(g,ex1,ex2,ey){
-  const F='#1E2230';
-  [ex1,ex2].forEach(ex=>{R(g,ex-1,ey-1,3,3,'rgba(190,230,255,.3)');R(g,ex-1,ey-2,3,1,F);R(g,ex-1,ey+2,3,1,F);R(g,ex-2,ey-1,1,3,F);R(g,ex+2,ey-1,1,3,F);R(g,ex+1,ey-1,1,1,'rgba(255,255,255,.75)');});
+  const F='#F2C14E',U='#B8862E';
+  [ex1,ex2].forEach(ex=>{R(g,ex-1,ey-1,3,3,'rgba(190,230,255,.3)');R(g,ex-1,ey-2,3,1,F);R(g,ex-1,ey+2,3,1,U);R(g,ex-2,ey-1,1,3,F);R(g,ex+2,ey-1,1,3,U);R(g,ex+1,ey-1,1,1,'rgba(255,255,255,.75)');});
   if(ex2-ex1>5)R(g,ex1+3,ey-1,ex2-ex1-5,1,F);
 }
 // What the look wears on its head, returns how high it reaches. o.wob sways what hangs loose, a hat
@@ -144,26 +148,25 @@ function drawAccessory(g,o,b){
   const pop=(st===3||st>=7)?(o.mood==='surprised'?2:o.pose==='cheer'&&o.frame?1:0):0,y=T-pop;
   switch(st){
     case 1:{const n=bw-4;
-      drawAcc(g,['..'+'h'.repeat(n)+'..','.b'+'.'.repeat(n)+'b.','b.'+'.'.repeat(n)+'.b'],pal,L,T-2,b);
-      [L-2,L+bw].forEach((x,i)=>drawAcc(g,i?['bp','bP','bP','bp']:['pb','Pb','Pb','pb'],pal,x,T,b));return T-2;}
-    case 2:{if(out){R(g,mid,T-2,1,2,pal.s);R(g,mid+1,T-3,1,1,pal.s);drawAcc(g,ACC_BULB,pal,mid+1,T-5,b);return T-5;}
-      R(g,mid,T-3,1,3,pal.s);R(g,mid+w,T-3,1,1,pal.s);drawAcc(g,ACC_BULB,o.glow?{a:'#FFF3A0',h:'#FFFFFF',y:'#FFD84A'}:pal,mid-1+w,T-6,b);return T-6;}
-    case 3:{const rows=[centred('h'+'r'.repeat(bw-7),bw),centred('hh'+'r'.repeat(bw-6),bw),centred('h'+'r'.repeat(bw-3),bw),'cC'.repeat(bw).slice(0,bw)];
-      if(out)drawAcc(g,ACC_POM_LOW,{w:'#FFFFFF',h:pal.h2},mid+3,y-4,b);else drawAcc(g,ACC_POM,{w:'#FFFFFF',h:pal.h2},mid-1+w,y-5,b);
-      drawAcc(g,rows,pal,L,y-3,b);return y-5;}
+      drawAcc(g,['...'+'h'.repeat(n)+'...','..h'+'b'.repeat(n)+'b..','.b'+'.'.repeat(n+2)+'b.'],pal,L-1,T-3,b);
+      [L-3,L+bw].forEach((x,i)=>drawAcc(g,ACC_CUPS,pal,x,T,b,i>0));return T-3;}
+    case 2:{if(out){drawAcc(g,ACC_STEM_LOW,pal,mid-1,T-3,b);drawAcc(g,ACC_BULB,pal,mid,T-7,b);return T-7;}
+      drawAcc(g,ACC_STEM,pal,mid-1,T-3,b);drawAcc(g,ACC_BULB,o.glow?{a:'#FFF3A0',h:'#FFFFFF',y:'#FFD84A'}:pal,mid-1+w,T-7,b);return T-7;}
+    case 3:{const rows=[centred('h'+ribs(bw-7),bw),centred('hh'+ribs(bw-6),bw),centred('h'+ribs(bw-3),bw),'cC'.repeat(bw).slice(0,bw),'CD'.repeat(bw).slice(0,bw)];
+      drawAcc(g,ACC_POM,pal,out?mid+3:mid-2+w,out?y-7:y-8,b);
+      drawAcc(g,rows,pal,L,y-4,b);return y-8;}
     case 5:drawAcc(g,ACC_BOW,pal,flip?L:L+bw-7,T-3,b,flip);return T-3;
-    case 6:{const px=mid-2;
-      if(out){drawAcc(g,ACC_LEAVES_LOW,pal,px,T-3,b);R(g,mid,T-3,1,3,pal.s);return T-3;}
-      drawAcc(g,ACC_LEAVES,pal,px+w,T-5,b);R(g,mid,T-3,1,3,pal.s);
-      if(o.mood==='happy'||o.mood==='love'){R(g,mid+w,T-6,1,1,'#FF8FB8');return T-6;}
-      return T-5;}
-    case 7:{const c=bw-6,r='h'+'c'.repeat(c-2)+'d';
-      drawAcc(g,[centred(r,bw),centred(r,bw),centred(r,bw),centred(r,bw),centred('O'+'o'.repeat(c-1),bw),'.'+'B'.repeat(3)+'b'.repeat(bw-5)+'.'],pal,L,y-6,b);return y-6;}
+    case 6:{if(out){drawAcc(g,ACC_LEAVES_LOW,pal,mid-3,T-4,b);return T-4;}
+      drawAcc(g,['s','s','s'],pal,mid,T-3,b);drawAcc(g,ACC_LEAVES,pal,mid-4+w,T-7,b);
+      if(o.mood==='happy'||o.mood==='love'){R(g,mid+1+w,T-8,2,1,'#FF8FB8');return T-8;}
+      return T-7;}
+    case 7:{const c=bw-6,W=bw+2,r='h'+'c'.repeat(c-2)+'d',l=(c-2)>>1;
+      drawAcc(g,[centred('B'.repeat(c+2),W),centred(r,W),centred(r,W),centred(r,W),centred('O'+'o'.repeat(c-1),W),centred('O'+'o'.repeat(l-1)+'gg'+'o'.repeat(c-2-l),W),'BBB'+'b'.repeat(W-5)+'dd'],pal,L-1,y-7,b);return y-7;}
     case 8:{const n=bw-2;
-      if(back){drawAcc(g,[centred('bbbb',n),centred('h'+'b'.repeat(n-3),n),'b'.repeat(n>>1)+'k'+'b'.repeat(n-(n>>1)-1)],pal,L+1,y-3,b);return y-3;}
-      const rows=[centred('bbbb',n)+'...',centred('h'+'b'.repeat(n-5)+'ww',n)+'...','b'.repeat(n-2)+'ddddd'];
-      drawAcc(g,rows,pal,flip?L-2:L+1,y-3,b,flip);return y-3;}
-    case 9:drawAcc(g,ACC_CHEF,pal,mid-5,y-6,b);return y-6;
+      if(back){drawAcc(g,[centred('hbbbbb',n),centred('h'+'b'.repeat(n-5),n),centred('h'+'b'.repeat(n-3),n),'b'.repeat(n>>1)+'k'+'b'.repeat(n-(n>>1)-1)],pal,L+1,y-4,b);return y-4;}
+      const rows=[centred('h'+'b'.repeat(n-7),n)+'....',centred('h'+'b'.repeat(n-6)+'wwb',n)+'....','h'+'b'.repeat(n-4)+'wwb'+'....','b'.repeat(n-2)+'tttttd','.'.repeat(n-1)+'ddddd'];
+      drawAcc(g,rows,pal,flip?L-3:L+1,y-4,b,flip);return y-4;}
+    case 9:drawAcc(g,ACC_CHEF,pal,mid-6,y-7,b);return y-7;
   }
   return T;
 }
