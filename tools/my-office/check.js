@@ -152,6 +152,18 @@
       standingBoxes(TH).forEach(([x,y,w,h,d])=>{const b=bottom(g=>g.drawImage(standing,x,y,w,h,x,y,w,h));log(b<=d,`${k}: what is painted at ${x},${y} reaches ${b} but sorts at ${d}`);});
       [['cabinet',g=>drawCabinet(g,0,0)],['machine',g=>drawMachine(g,0,'idle')]].forEach(([n,f])=>{const b=bottom(f);log(b<=FRONT[n]&&FRONT[n]>=179,`${k}: the ${n} reaches ${b} but sorts at ${FRONT[n]}`);});}
     themeKey=keep;TH=THEMES[keep];buildBg();
+    // 20. a Claude pets a cat that waits for it, within reach, or gives up: never a stroke from afar
+    {cat=cat||newCat(performance.now());const live=[...chars.entries()],was={...cat},mk=(id,x,y)=>{const e={...newChar(id,{c:'#fff'}),hidden:false,x,y,path:[],tgt:{x,y},arrived:true,idle:{phase:'pick',t:0}};chars.set(id,e);return e;};
+      const walking=()=>Object.assign(cat,{away:false,job:null,z:0,air:null,x:200,y:150,path:[{x:60,y:150}]});
+      chars.clear();const me=mk('pet',120,150);walking();startIdle(me,'catpet');
+      log(!cat.path.length&&catReach(me.tgt),'a Claude walks to a cat still on its way somewhere else');
+      decor.push({x:200,y:120,vx:1,vy:0,life:2});cat.planeCD=0;watchPlanes(performance.now());decor.pop();
+      log(!cat.job,'a plane draws off the cat a Claude came to pet');
+      mk('side',190,151);me.tgt=null;me.idle={phase:'pick',t:0};walking();startIdle(me,'catpet');
+      log(me.idle.phase==='pick'&&cat.path.length===1,'no room by the cat, yet a Claude goes to pet it');
+      Object.assign(cat,{x:60,y:150,path:[]});me.idle={act:'catpet',phase:'do',until:performance.now()+5000};idleTick(me,me.idle,performance.now());
+      log(me.idle.until===0,'a Claude goes on petting a cat out of reach');
+      chars.clear();live.forEach(([k,v])=>chars.set(k,v));Object.assign(cat,was);}
     // 14. the cat's name: kept clean, remembered, and typing it presses no shortcut
     showTab('room');const room=themeKey,cn=on('#pcat');cn.value='Mïmi! the great';cn.dispatchEvent(new Event('input',{bubbles:true}));
     log(catName==='Mimi the g'&&localStorage.getItem('office.catName')===catName,'cat name not cleaned or kept: '+catName);
