@@ -19,7 +19,10 @@ Several sessions may be editing this repository at the same time. To stay out of
 2. **Only edit files inside your area.** The areas are listed below; each file starts with a one-line comment saying what it owns.
 3. **Shared files** are edited by several areas: the `<script>` list in `plugins/office/web/index.html`, `plugins/office/web/office.css`, both `plugin.json` files and `.claude-plugin/marketplace.json`. Re-read one right before you change it, change only your lines with a targeted edit, and never rewrite it whole.
 4. **Version bumps**: bump a plugin's version in its `plugin.json` **and** in `marketplace.json` once, when your work is finished and checked, not per edit.
-5. **Git** (when the repository is a git repository): give each session its own worktree and branch, `git worktree add ../claude-mods-<task> -b <task>`, and merge when its checks pass. Commit only when Heet asks.
+5. **Git** (when the repository is a git repository): give each session its own worktree and branch, `git worktree add ../claude-mods-<task> -b <task>`.
+6. **Test on a copy**: when its checks pass, every branch asks Heet for a test before committing. Copy the branch's `plugins/office/web/.` and `~/.claude/office/data.js` to a separate folder, `~/.claude/office-test-<task>/`, never over `~/.claude/office/`, and give Heet the `file://` address. If the branch changes nothing on the page, ask Heet how to test it. Commit once Heet confirms the test, then delete the copy.
+7. **Merge**: the Manager merges everything. There is a Manager when a desk named Manager is present and not `gone` in `~/.claude/office/desks/`. With no Manager, the session merges its own branch into `main`.
+8. **After a merge**, whoever merged pushes `main`, then deletes the branch and its worktree: `git push`, `git worktree remove ../claude-mods-<task>`, `git branch -d <task>`.
 
 ### office: areas and files (`plugins/office/`)
 
