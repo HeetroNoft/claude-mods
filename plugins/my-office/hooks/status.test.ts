@@ -1,13 +1,14 @@
 import { expect, test } from 'claude-code/testing'
 
 import { bashTask, branchOf, lastQuestion, pausePlan, rateOf, resumePlan, todoSteps, newDesk } from './core'
-import { register } from './register'
+import { register, resetCheck } from './register'
 import { toolFlash } from './core'
 
 // A tiny in-memory engine: enough of the engine to run one session's hooks and read its desk file back.
 // The module keeps its desk and its setup across tests (as across a session), so each test sets up
 // what it relies on instead of counting on the order the tests run in.
 function engine(files = new Map<string, string>()) {
+  const submitted: string[] = []
   const handlers: { ev: string, filter?: any, fn: any }[] = []
   let now = 1_000_000
   const $: any = {
@@ -19,6 +20,7 @@ function engine(files = new Map<string, string>()) {
     command: { register: async () => undefined },
     plugin: { root: '/plugin' },
     audio: { play: async () => undefined },
+    prompt: { submit: async (x: any) => { submitted.push(x.text) } },
     fs: {
       read: async (p: string) => { if (!files.has(p)) throw new Error('missing'); return files.get(p) },
       write: async (p: string, s: string) => { files.set(p, s) },
@@ -33,7 +35,7 @@ function engine(files = new Map<string, string>()) {
     return run(0, e)
   }
   const deskNow = () => JSON.parse(files.get('/home/.claude/my-office/desks/s1.json') ?? '{}')
-  return { fire, deskNow }
+  return { fire, deskNow, $, submitted }
 }
 
 test('a question keeps the Claude waiting at its desk until it is answered', async () => {
@@ -161,6 +163,40 @@ test('a named error shows even with no plan, and compacting comes and goes', asy
   await o.fire('session.compact', { trigger: 'auto' })
   expect(o.deskNow().task).toBeUndefined()
   expect(o.deskNow().log.some((l: any) => l.kind === 'compact')).toBe(true)
+})
+
+const limitedDesk = async (rateLimits: any[]) => {
+  const o = engine()
+  await o.fire('session.start', {})
+  await o.fire('prompt.submit', {})
+  await o.fire('session.measure', { changed: ['rateLimits'], rateLimits })
+  await o.fire('turn.start', {})
+  await o.fire('classic.StopFailure', { error: 'rate_limit' })
+  await o.fire('turn.complete', { answer: '', isAborted: false })
+  return o
+}
+const PAST = '1970-01-01T00:00:01Z', LATER = '2999-01-01T00:00:00Z'
+
+test('at the reset a session the limit stopped takes up its work by itself', async () => {
+  const o = await limitedDesk([{ kind: 'five_hour', percentUsed: 100, resetsAt: PAST }])
+  expect(o.deskNow().limited.resetsAt).toBe(PAST)
+  o.$.session.usage = async () => ({ rateLimits: [{ kind: 'five_hour', percentUsed: 100, resetsAt: PAST }] })
+  await resetCheck(o.$)
+  expect(o.deskNow().limited).toBeUndefined()
+  expect(o.submitted.length).toBe(1)
+  expect(o.deskNow().rate.fiveHour).toBe(0)
+  await resetCheck(o.$)
+  expect(o.submitted.length).toBe(1)
+})
+
+test('a session stays stopped while the week is empty, whatever the five hours do', async () => {
+  const limits = [{ kind: 'five_hour', percentUsed: 30, resetsAt: PAST }, { kind: 'seven_day', percentUsed: 100, resetsAt: LATER }]
+  const o = await limitedDesk(limits)
+  expect(o.deskNow().limited.resetsAt).toBe(LATER)
+  o.$.session.usage = async () => ({ rateLimits: limits })
+  await resetCheck(o.$)
+  expect(o.deskNow().limited.resetsAt).toBe(LATER)
+  expect(o.submitted.length).toBe(0)
 })
 
 test('the usage limit knocks the session out until its next prompt or restart', async () => {

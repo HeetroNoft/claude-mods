@@ -309,6 +309,34 @@ export function rateOf(windows: unknown, now: number): Rate | undefined {
   return r.fiveHour == null && r.sevenDay == null ? undefined : r
 }
 
+// Usage windows and their resets. A date in the past means that window has started again.
+export const passed = (iso: string | undefined, now: number) => { const t = Date.parse(iso ?? ''); return !isNaN(t) && t <= now }
+const windowsOf = (r?: Rate) => (r ? [[r.fiveHour, r.fiveResets], [r.sevenDay, r.sevenResets]] as [number | undefined, string | undefined][] : [])
+// The reading was taken before a reset that has since gone by: it says nothing about now.
+export const rateStale = (d: Desk, now: number) => windowsOf(d.rate).some(([, at]) => passed(at, now) && Date.parse(at ?? '') > (d.rate?.ms ?? 0))
+// A reading can lag behind a reset: a window past its reset date is empty again, whatever it still says.
+export function freshRate(r: Rate, now: number): Rate {
+  const out = { ...r }
+  if (passed(r.fiveResets, now)) { out.fiveHour = 0; out.fiveResets = undefined }
+  if (passed(r.sevenResets, now)) { out.sevenDay = 0; out.sevenResets = undefined }
+  return out
+}
+// When a session stopped by the limit can go on: at the reset of the window that is empty, not of the
+// nearest one (a full week's limit outlasts the five hours); the nearest only when none reads as empty.
+export function limitReset(r?: Rate) {
+  const w = windowsOf(r).filter(([, at]) => at)
+  const full = w.filter(([used]) => (used ?? 0) >= 100).map(([, at]) => at as string).sort()
+  return full[full.length - 1] ?? w.map(([, at]) => at as string).sort()[0]
+}
+// Called once the reset has gone by, with what the usage reads now: true when the session can resume.
+// Still empty, it waits for that window's own reset.
+export function limitOver(d: Desk, fresh: Rate | undefined, now: number) {
+  if (!d.limited || !passed(d.limited.resetsAt, now)) return false
+  const still = fresh ? limitReset(freshRate(fresh, now)) : undefined
+  if (fresh && windowsOf(freshRate(fresh, now)).some(([used]) => (used ?? 0) >= 100) && still) { d.limited = { ...d.limited, resetsAt: still }; return false }
+  return true
+}
+
 // A turn that ends normally finishes its plan: every step left is ticked.
 export function finishPlan(d: Desk, now: number) {
   d.steps = d.steps.map(s => (s.doneMs ? s : { ...s, startMs: s.startMs ?? now, doneMs: now }))

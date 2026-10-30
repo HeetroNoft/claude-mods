@@ -51,6 +51,10 @@ setTimeout(()=>{
   const fx=sc.x;flingClaude(sc,200,60,0);for(let i=0;i<400&&sc.fly;i++)flyTick(sc,.02,i);ok(!sc.fly&&sc.x>=8&&sc.x<=312,'the throw never landed');ok(sc.mood==='dizzy','the thrown Claude is not dizzy');sc.x=fx;sc.resumeAt=0;
   const realRandom=Math.random;Math.random=()=>.9;shaken=[];floorTap({x:150,y:150},performance.now());ok(!shaken.some(x=>x.kind==='paper'),'a sheet fell on every tremble');Math.random=()=>.1;floorTap({x:150,y:150},performance.now());const sheets=shaken.filter(x=>x.kind==='paper').length;floorTap({x:150,y:150},performance.now());ok(shaken.filter(x=>x.kind==='paper').length===sheets,'a desk lost a second sheet');Math.random=realRandom;ok(shaken.some(x=>x.kind==='paper')&&shaken.some(x=>x.kind==='leaf'),'the tremble shook nothing loose');leafGust();ok(shaken.some(x=>x.kind==='tree'),'no gust of leaves');const itF=[];roomItems(itF,wx);itF.forEach(i=>i.f());shaken=[];
   callCleaner.at=0;
+  // at the reset: the gauge is full again and a knocked-out desk gets up, before any session has said so
+  const gd=everyDesk[0],keepRate=gd.rate,past=new Date(Date.now()-1000).toISOString();gd.rate={fiveHour:100,fiveResets:past,ms:Date.now()-60000};
+  everyDesk.forEach(x=>{if(x!==gd&&x.rate)x.rate=null;});ok(gaugeWindows()[0].left===100&&!gaugeEmpty(),'the gauge stays empty past its reset');gd.rate=keepRate;
+  const kd=JSON.parse(JSON.stringify(lastData));kd.desks[0].limited={since:1,resetsAt:past};ingest(kd,true);ok(!kd.desks[0].limited&&kd.desks[0].activity==='idle','a desk stays knocked out past its reset');ingest(lastData,true);
   // what the window lets in follows the season, in every room with an outside, and is never the old green
   const rndW=Math.random,keepTheme=themeKey;Math.random=()=>0;leaves=[];
   ['pixel','cosy','japan','neon','paper','claude'].forEach(k=>{TH=THEMES[k];SEASONS.forEach(s=>{SEASON=s;leaves=[];windowDrift(true,0,296,14,50);ok(leaves.length===1&&SEASON_DRIFT[s].cols(0).includes(leaves[0].c),k+' in '+s+': '+(leaves[0]||{}).c);});});

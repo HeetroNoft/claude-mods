@@ -1,6 +1,7 @@
 import type { Register } from 'claude-code'
 
 import {
+  freshRate, limitOver, limitReset, passed, rateStale,
   activityOf, applyTool, baseName, clean, clearPlan, note, toolFlash, type Desk, eta, finishStep, firstWords, hhmm, lastQuestion, msgKey, newDesk,
   finishPlan, parseReceived, pausePlan, peerName, planLines, planSteps, push, rateOf, resumePlan, stopPlan, todoSteps, usageLine, whoLine,
 } from './core'
@@ -100,6 +101,28 @@ function startTicker($: any) {
   })
 }
 
+// At a reset the desk reads the usage again, and a session the limit stopped takes up its work by itself.
+const RESUME_TEXT = 'The usage limit has reset. Carry on with what you were doing.'
+let resetWatch: { cancel: () => void } | undefined
+let checking = false
+export async function resetCheck($: any) {
+  if (!desk || checking) return
+  const now = await $.clock.now()
+  if (!rateStale(desk, now) && !passed(desk.limited?.resetsAt, now)) return
+  checking = true
+  const usage = await Promise.resolve().then(() => $.session.usage()).catch(() => undefined)
+  const fresh = rateOf(usage?.rateLimits, now)
+  let resume = false
+  await save($, (d, at) => {
+    if (fresh) d.rate = freshRate(fresh, at)
+    else if (d.rate) d.rate = { ...freshRate(d.rate, at), ms: at }
+    resume = limitOver(d, fresh, at)
+    if (resume) { d.limited = undefined; d.activity = 'think'; d.detail = 'Back to work'; d.activityMs = at; note(d, 'limit', 'Usage back: resuming', at) }
+  })
+  checking = false
+  if (resume) await Promise.resolve().then(() => $.prompt.submit({ text: RESUME_TEXT })).catch(() => undefined)
+}
+
 // Setup runs once: at session start or, after /reload-plugins (which does not fire
 // session.start), on the first prompt or tool call.
 let ready: Promise<void> | undefined
@@ -123,6 +146,8 @@ async function doSetup($: any) {
     if (d.limited) { d.limited = undefined; d.activity = 'idle'; d.detail = 'Coffee' }
   })
   if (desk?.eta && !desk.eta.allDone) startTicker($)
+  resetWatch?.cancel()
+  resetWatch = $.clock.every(30_000, () => { void resetCheck($) })
 }
 
 // A session that starts again (VS Code reopened, a resumed conversation, after /my-office-leave) walks back
@@ -392,7 +417,7 @@ export const register: Register = on => {
   on('classic.StopFailure', async ($, e: any, next) => {
     if (e.error === 'rate_limit') {
       await save($, (d, now) => {
-        const resets = [d.rate?.fiveResets, d.rate?.sevenResets].filter(Boolean).sort()[0]
+        const resets = limitReset(d.rate)
         d.limited = { since: now, resetsAt: resets }; d.waiting = undefined
         d.activity = 'limit'; d.detail = 'Out of usage'; d.activityMs = now
       })
@@ -455,6 +480,7 @@ export const register: Register = on => {
 
   on('session.end', async ($, e, next) => {
     ticker?.cancel()
+    resetWatch?.cancel()
     await save($, (d, now) => { if ((e as any).reason === 'clear') clearPlan(d); d.endedMs = now; d.activity = 'gone'; d.detail = 'Gone home' })
     return next(e)
   })

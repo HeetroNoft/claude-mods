@@ -227,6 +227,8 @@ function ingest(d,synthetic){
   const now=Date.now();
   if(!synthetic)lastData=d;
   const real=(d&&Array.isArray(d.desks)?d.desks:[]).filter(x=>x&&x.id!=null);
+  // past its reset a desk is no longer knocked out, even if its session is closed and cannot say so
+  real.forEach(x=>{if(x.limited&&Date.parse(x.limited.resetsAt)<=now){x.limited=undefined;x.activity='idle';x.detail='Coffee';}});
   // A teammate a Claude has named (CEO, Writer) but who has no desk yet sleeps at an empty desk.
   const have=new Set(real.map(x=>String(x.name||'').toLowerCase()));
   const sleepers=[];

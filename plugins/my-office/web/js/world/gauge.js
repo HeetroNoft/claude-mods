@@ -18,8 +18,9 @@ function gaugeWindows(){
   const r=latestRate();
   return GAUGE_WIN.map(([label,k,rk])=>{
     const used=r&&r[k];if(used==null)return {label,left:null,level:0,reset:NaN};
-    const left=Math.max(0,Math.min(100,100-used));
-    return {label,left,level:usageLevel(left),reset:r[rk]?Date.parse(r[rk]):NaN};
+    const left=Math.max(0,Math.min(100,100-used)),reset=r[rk]?Date.parse(r[rk]):NaN;
+    if(reset<=Date.now()&&r.ms<reset)return {label,left:100,level:0,reset:NaN}; // reset since this reading: full again, until a session reads it
+    return {label,left,level:usageLevel(left),reset};
   });
 }
 function gaugeEmpty(){return gaugeWindows().some(w=>w.level===3);}
