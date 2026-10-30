@@ -14,7 +14,9 @@ A pixel-art office in a local web page. Every Claude Code session running this m
 
 The board follows what the session really does: the `plan` tool when Claude gives one (it has estimates), otherwise mission-control's plan or Claude Code's own task list. While a session waits for you (a question, a permission, a turn that ends on a question) its plan pauses, so waiting never shows as running late, and its Claude stays at its desk hopping and waving, a **?** over its head and its lamp blinking. A session stopped by the usage limit sits knocked out (crossed eyes, a skull instead of its icon, a red bar) until its next prompt or restart. The gauge top left shows the usage left in the 5-hour and weekly windows and when each resets. It turns amber at 20% left and blinks red at 5%; an empty window shows a skull and dims the room. Each threshold shakes the gauge and, with the sound on, plays a short alarm.
 
-In the page: **T** changes the room (8 themes, each with day and night following your local time), **L** shows labels, **I** shows or hides the item bar. Drag a Claude to move it, drag a board onto another desk's place to move that desk there (the order lasts as long as the sessions do), drag an item from the bar onto a Claude to give it, click a Claude for its card.
+Four desks fit on a floor. With more sessions the office opens more floors, and floors that fit on one merge again (a desk you placed by hand stays where you put it): the panel by the item bar has a light per desk, blinking when a Claude waits for you and red when one is out of usage, and the tab title counts who is waiting. Click a floor or press **1**-**9**, **Page Up** or **Page Down** to go there.
+
+In the page: **T** changes the room (8 themes, each with day and night following your local time), **L** shows labels, **I** shows or hides the item bar. Drag a Claude to move it, drag a board onto another desk's place to move that desk there, or onto the floor panel to send it to that floor (order and floors last as long as the sessions do), drag an item from the bar onto a Claude to give it, click a Claude for its card.
 
 ## Layout
 
