@@ -87,6 +87,11 @@
     [s,o].forEach(c=>log(!hit(rimmed,box('badge',c.x-7,t-26,14,26)),`chat bubble ${i} on the badge at ${c.x}`));
     log(!hit(rimmed,box('head',o.x-8,t,16,15)),`chat bubble ${i} on the other Claude`);});
   themeKey=keep;TH=THEMES[keep];desks=keepDesks;
+  // 10. the page follows a /office-theme once, and T stays free to change it afterwards
+  {const k=THEME_KEYS.find(x=>x!==keep),other=THEME_KEYS.find(x=>x!==keep&&x!==k),ms=Date.now()+1e9;
+    followRoom({theme:k,ms});log(themeKey===k,'/office-theme not followed: '+themeKey);
+    setTheme(other);followRoom({theme:k,ms});log(themeKey===other,'/office-theme applied twice');
+    setTheme(keep);}
   // one line per failure: the browser log keeps only the first line of a message
   if(!fails.length)console.log('CHECK OK all layout checks passed');
   else{console.log('CHECK FAIL '+fails.length);fails.slice(0,40).forEach(m=>console.log('CHECK FAIL: '+m));}

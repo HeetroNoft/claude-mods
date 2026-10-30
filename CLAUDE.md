@@ -15,7 +15,7 @@ Heet's Claude Code mods, published as the `heet-mods` marketplace (`.claude-plug
 
 Several sessions may be editing this repository at the same time. To stay out of each other's way:
 
-1. **Claim one area per session**, the narrower the better (one theme file, one hooks module), and name your desk after it: `/desk Themes` or the `mcp__office__name_desk` tool. The office page then shows who works on what.
+1. **Claim one area per session**, the narrower the better (one theme file, one hooks module), and name your desk after it: `/office-desk Themes` or the `mcp__office__name_desk` tool. The office page then shows who works on what.
 2. **Only edit files inside your area.** The areas are listed below; each file starts with a one-line comment saying what it owns.
 3. **Shared files** are edited by several areas: the `<script>` list in `plugins/office/web/index.html`, `plugins/office/web/office.css`, both `plugin.json` files and `.claude-plugin/marketplace.json`. Re-read one right before you change it, change only your lines with a targeted edit, and never rewrite it whole.
 4. **Version bumps**: bump a plugin's version in its `plugin.json` **and** in `marketplace.json` once, when your work is finished and checked, not per edit.
@@ -63,7 +63,8 @@ claude plugin test plugins/office          # hooks unit tests (*.test.ts)
 tools/office/run.sh check                  # page: layout checks, break activities, a screenshot per theme
 tools/office/run.sh shot japan 22          # one screenshot (theme, hour of day)
 tools/office/run.sh gallery                # every mascot pose
-cp -r plugins/office/web/. ~/.claude/office/   # preview the page live (reload it in the browser)
+tools/office/run.sh preview                # preview the page live (reload it in the browser); sessions starting leave it alone
+tools/office/run.sh preview off            # back to the installed page at the next session start
 ```
 
 The fake data (`tools/office/mkdata.js`) covers every board state: on time, late, finished, no plan, waiting for the user, knocked out by the usage limit, and a usage reading for the gauge. `run.sh` exits non-zero on any JS error or failed layout check; screenshots land in `$OUT` (default `$TMPDIR/office-shots`). Run `/reload-plugins` in a session to load changed hooks.

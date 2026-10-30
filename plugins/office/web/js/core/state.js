@@ -125,7 +125,7 @@ function setTarget(e,t,instant){
 }
 
 /* ---------- ingest ---------- */
-window.__office=function(d){try{misses=0;lastCall=Date.now();ingest(d,false);}catch(err){console.error('office ingest',err);}};
+window.__office=function(d){try{misses=0;lastCall=Date.now();followRoom(d.room);ingest(d,false);}catch(err){console.error('office ingest',err);}};
 
 // The order the desks were dragged into (ui/boards.js), by desk id. An id lasts as long as its
 // session, so a new session simply joins at the end of the row.

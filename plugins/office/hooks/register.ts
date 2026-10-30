@@ -1,10 +1,10 @@
 import type { Register } from 'claude-code'
 
 import {
-  activityOf, applyTool, clean, type Desk, eta, finishStep, firstWords, hhmm, lastQuestion, msgKey, newDesk,
-  parseReceived, pausePlan, peerName, planSteps, push, rateOf, resumePlan, todoSteps,
+  activityOf, applyTool, clean, clearPlan, type Desk, eta, finishStep, firstWords, hhmm, lastQuestion, msgKey, newDesk,
+  parseReceived, pausePlan, peerName, planLines, planSteps, push, rateOf, resumePlan, todoSteps, usageLine, whoLine,
 } from './core'
-import { deskList, installPage, officeDir, presentDesks, publish, readDesk, readLeft, writeDesk, writeLeft } from './room'
+import { deskList, installPage, LIVE_MS, officeDir, pageInTest, presentDesks, publish, readDesk, readLeft, themeKeys, writeDesk, writeLeft, writeRoom } from './room'
 import { COMMANDS, PROMPT_HINT, TOOLS } from './tools'
 
 // The office: every session that runs this mod gets a desk in one shared pixel-art room.
@@ -45,6 +45,7 @@ function save($: any, change: (d: Desk, now: number) => void) {
 }
 
 const rename = async ($: any, name: string) => {
+  await ensure($)
   await $.store.set(`name:${desk?.id}`, name)
   await save($, d => { d.name = name })
 }
@@ -102,7 +103,7 @@ async function doSetup($: any) {
   for (const t of TOOLS) await $.tool.register(t)
   for (const c of COMMANDS) await $.command.register(c)
   await ensure($)
-  if (dir) await installPage($, `${$.plugin.root}/web`, dir).catch(() => undefined) // the page copy is best effort
+  if (dir && !(await pageInTest($, dir))) await installPage($, `${$.plugin.root}/web`, dir).catch(() => undefined) // the page copy is best effort
   // usage is best effort: an engine without it (or a failing call) must not stop the setup
   const usage = await Promise.resolve().then(() => $.session.usage()).catch(() => undefined)
   await save($, (d, now) => {
@@ -114,7 +115,7 @@ async function doSetup($: any) {
   if (desk?.eta && !desk.eta.allDone) startTicker($)
 }
 
-// A session that starts again (VS Code reopened, a resumed conversation, after /leave) walks back
+// A session that starts again (VS Code reopened, a resumed conversation, after /office-leave) walks back
 // to its desk. The desk is read again: the module may outlive a session (after /clear the id changes).
 async function comeBack($: any) {
   await chain
@@ -133,32 +134,78 @@ export const register: Register = on => {
     return next(e)
   })
 
-  on('command.run', { command: 'desk' }, async ($, e: any) => {
+  on('command.run', { command: 'office-desk' }, async ($, e: any) => {
     const name = clean(String(e.args ?? e.text ?? '').trim(), 14)
-    if (!name) return { text: `Your desk is called ${desk?.name ?? 'Claude'}. Rename it with /desk <name>.` }
+    if (!name) return { text: `Your desk is called ${desk?.name ?? 'Claude'}. Rename it with /office-desk <name>.` }
     await rename($, name)
     return { text: `Your desk is now called ${name}.` }
   })
 
-  on('command.run', { command: 'leave' }, async ($, e: any) => {
+  on('command.run', { command: 'office-leave' }, async ($, e: any) => {
     await setup($)
     await ensure($)
     const arg = String(e.args ?? e.text ?? '').trim().toLowerCase()
     const now = await $.clock.now()
     const here = await presentDesks($, dir, now)
-    const hits = arg ? here.filter(d => d.name.toLowerCase() === arg || d.id.startsWith(arg)) : here.filter(d => d.id === desk?.id)
+    const others = arg === 'others'
+    const hits = others ? here.filter(d => d.id !== desk?.id) : arg ? here.filter(d => d.name.toLowerCase() === arg || d.id.startsWith(arg)) : here.filter(d => d.id === desk?.id)
+    if (others && !hits.length) return { text: 'Nobody else is in the office.' }
     if (!hits.length) return { text: arg ? `No desk called "${arg}". In the office: ${deskList(here)}.` : 'This session is not in the office.' }
-    if (hits.length > 1) return { text: `Several desks match "${arg}": ${deskList(hits)}. Use /leave <start of the id>.` }
-    const gone = hits[0]
-    await writeLeft($, dir, { ...(await readLeft($, dir)), [gone.id]: now })
+    if (!others && hits.length > 1) return { text: `Several desks match "${arg}": ${deskList(hits)}. Use /office-leave <start of the id>.` }
+    // who left long ago is off the board anyway: the list only keeps who could still show
+    const left = Object.fromEntries(Object.entries(await readLeft($, dir)).filter(([, ms]) => now - ms < LIVE_MS))
+    await writeLeft($, dir, { ...left, ...Object.fromEntries(hits.map(d => [d.id, now])) })
     await save($, () => undefined)
+    if (others) return { text: `${deskList(hits)} went home. Each comes back with a new prompt or when its session is opened again.` }
+    const gone = hits[0]
     const mine = gone.id === desk?.id
     return { text: `${gone.name} went home and freed a desk.${mine ? ' This session comes back on its next prompt or when it is opened again.' : ' It comes back when that session gets a new prompt or is opened again.'}` }
   })
 
   on('command.run', { command: 'office' }, async $ => {
     await ensure($)
-    return { text: `Open this page in your browser: file:///${dir.replace(/^\//, '')}/index.html\nEvery session with the office mod gets a desk there. Rename yours with /desk <name>.` }
+    return { text: `Open this page in your browser: file:///${dir.replace(/^\//, '')}/index.html\nEvery session with the office mod gets a desk there. Rename yours with /office-desk <name>.` }
+  })
+
+  on('command.run', { command: 'office-who' }, async ($, e: any) => {
+    await ensure($)
+    const now = await $.clock.now()
+    const here = await presentDesks($, dir, now)
+    const arg = String(e.args ?? '').trim().toLowerCase()
+    if (arg) {
+      const d = here.find(x => x.name.toLowerCase() === arg || x.id.startsWith(arg))
+      if (!d) return { text: `No desk called "${arg}". In the office: ${deskList(here)}.` }
+      return { text: [whoLine(d, d.id === desk?.id), ...planLines(d)].join('\n') }
+    }
+    if (!here.length) return { text: 'Nobody is in the office.' }
+    return { text: [...here.map(d => whoLine(d, d.id === desk?.id)), usageLine(here)].filter(Boolean).join('\n') }
+  })
+
+  on('command.run', { command: 'office-board' }, async ($, e: any) => {
+    await ensure($)
+    if (String(e.args ?? '').trim().toLowerCase() === 'clear') {
+      await save($, clearPlan)
+      return { text: 'Your board is clear.' }
+    }
+    return { text: desk?.steps.length ? [...planLines(desk), desk.eta && !desk.eta.allDone ? `Due ${hhmm(desk.eta.finishMs)}.` : ''].filter(Boolean).join('\n') : 'No plan on your board.' }
+  })
+
+  on('command.run', { command: 'office-quiet' }, async ($, e: any) => {
+    const arg = String(e.args ?? '').trim().toLowerCase()
+    if (arg && arg !== 'on' && arg !== 'off') return { text: 'Use /office-quiet on, /office-quiet off, or /office-quiet to switch.' }
+    const quiet = arg ? arg === 'on' : !(await $.store.get('quiet'))
+    await $.store.set('quiet', quiet)
+    return { text: quiet ? 'No more sound at the end of a turn.' : 'The sound at the end of a turn is back.' }
+  })
+
+  on('command.run', { command: 'office-theme' }, async ($, e: any) => {
+    await ensure($)
+    const keys = await themeKeys($, `${$.plugin.root}/web`)
+    const arg = String(e.args ?? '').trim().toLowerCase()
+    if (!arg || !keys.includes(arg)) return { text: `${arg ? `No room called "${arg}". ` : ''}Rooms: ${keys.join(', ')}. Use /office-theme <room>.` }
+    await writeRoom($, dir, { theme: arg, ms: await $.clock.now() })
+    await save($, () => undefined)
+    return { text: `The office is now the ${arg} room.` }
   })
 
   on('prompt.submit', async ($, e, next) => {
@@ -305,7 +352,7 @@ export const register: Register = on => {
         d.doneLine = `Done in ${Math.round((now - d.turnMs) / 1000)}s${s}`
       }
     })
-    if (!e.isAborted && desk?.doneMs && desk.doneMs >= desk.turnMs) await $.audio.play({ asset: 'sounds/done.wav' }).catch(() => undefined)
+    if (!e.isAborted && desk?.doneMs && desk.doneMs >= desk.turnMs && !(await $.store.get('quiet'))) await $.audio.play({ asset: 'sounds/done.wav' }).catch(() => undefined)
     return next(e)
   })
 
