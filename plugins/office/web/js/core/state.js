@@ -18,7 +18,7 @@ let hoverCh=null,cardId=null;
 // after a break this long, a nap gets likelier (35% instead of 25%); ?nap=<seconds> to try it
 const NAP_MS=(()=>{const m=Q.match(/nap=(\d+)/);return m?+m[1]*1000:180000;})();
 function newChar(id,lk){return {id,x:DOOR.x,y:DOOR.y,path:[],hidden:true,seated:false,look:lk,blinkT:Math.random()*4,jumpUntil:0,sendT:Math.random()*2,
-  sq:0,sqv:0,face:1,nextBlink:0,mood:null,moodUntil:0,pet:0,pokes:[],nextEmote:0};}
+  sq:0,sqv:0,face:1,nextBlink:0,mood:null,moodUntil:0,pet:0,pokes:[],nextEmote:0,pace:36+Math.random()*10};}
 
 function looksFor(id){if(!colourOf.has(id)){colourOf.set(id,colourNext%LOOKS.length);colourNext++;}return LOOKS[colourOf.get(id)];}
 // Desks and their boards share one lane on the wall, between the door sign (x 31) and the curtains (x 266).
@@ -43,25 +43,48 @@ function posFor(st,i,dx){
     default:return {x:DOOR.x,y:DOOR.y,exit:true};
   }
 }
+// The open floor starts in front of the desk row. Open floor is crossed in a straight line, unless
+// something stands in the way: then the walk goes by the corridor at WALK_Y. FLOOR_BLOCK holds the
+// room's fixed furniture, with a margin: cabinet, machine, counter, plants.
+const FLOOR_Y=122,FLOOR_BLOCK=[{x0:14,y0:136,x1:44,y1:181},{x0:84,y0:131,x1:128,y1:181},{x0:237,y0:150,x1:283,y1:181},{x0:1,y0:156,x1:17,y1:181},{x0:290,y0:90,x1:316,y1:134}];
+const clearFloor=(a,b)=>!FLOOR_BLOCK.some(o=>crosses(a,b,o));
+// The way past a desk: left of it, midway to its neighbour when the row is tight.
+const aisle=x=>x-Math.min(22,deskSpan(desks.length)/2);
 function buildPath(e,t){
   const pts=[];
   if(e.hidden){e.hidden=false;e.x=DOOR.x;e.y=DOOR.y;}
   let cx=e.x,cy=e.y;
-  const SHELF_Y=89, lane=x=>{const xs=deskXs(desks.length);let best=x;let d=1e9;xs.forEach(dx=>{const l=dx-22;if(Math.abs(l-x)<d){d=Math.abs(l-x);best=l;}});return best;};
+  const SHELF_Y=89, lane=x=>{const xs=deskXs(desks.length);let best=x;let d=1e9;xs.forEach(dx=>{const l=aisle(dx);if(Math.abs(l-x)<d){d=Math.abs(l-x);best=l;}});return best;};
+  // out of the chair, or sideways to a lane: nobody leaves the desk row through a desk
+  const clearRow=()=>{
+    if(e.seated){cx=aisle(e.seatX);pts.push({x:cx,y:SEAT_Y});e.seated=false;}
+    else if(cy<FLOOR_Y&&deskXs(desks.length).some(dx=>Math.abs(cx-dx)<deskHalf(desks.length)+2)){cx=lane(cx);pts.push({x:cx,y:cy});}
+  };
+  const floorTo=q=>{
+    if(cy<FLOOR_Y){pts.push({x:cx,y:WALK_Y});cy=WALK_Y;}
+    if(!clearFloor({x:cx,y:cy},q)){if(Math.abs(cy-WALK_Y)>.5)pts.push({x:cx,y:WALK_Y});pts.push({x:q.x,y:WALK_Y});}
+    pts.push({x:q.x,y:q.y});cx=q.x;cy=q.y;
+  };
   if(t.shelf){
-    if(e.seated){pts.push({x:e.seatX-22,y:SEAT_Y},{x:e.seatX-22,y:SHELF_Y});e.seated=false;}
-    else if(cy>SHELF_Y+2){const l=lane(cx);if(Math.abs(cy-WALK_Y)>.5)pts.push({x:cx,y:WALK_Y});pts.push({x:l,y:WALK_Y},{x:l,y:SHELF_Y});}
+    if(e.seated){pts.push({x:aisle(e.seatX),y:SEAT_Y},{x:aisle(e.seatX),y:SHELF_Y});e.seated=false;}
+    else if(cy>SHELF_Y+2){clearRow();const l=lane(cx);floorTo({x:l,y:WALK_Y});pts.push({x:l,y:SHELF_Y});}
     pts.push({x:t.x,y:SHELF_Y});return pts;
   }
   if(cy<SHELF_Y+2){
-    if(t.seated){pts.push({x:t.x-22,y:SHELF_Y},{x:t.x-22,y:SEAT_Y},{x:t.x,y:SEAT_Y});return pts;}
+    if(t.seated){pts.push({x:aisle(t.x),y:SHELF_Y},{x:aisle(t.x),y:SEAT_Y},{x:t.x,y:SEAT_Y});return pts;}
     const l=lane(cx);pts.push({x:l,y:SHELF_Y},{x:l,y:WALK_Y});cx=l;cy=WALK_Y;
   }
-  if(e.seated){pts.push({x:e.seatX-22,y:SEAT_Y});cx=e.seatX-22;e.seated=false;}
-  if(Math.abs(cy-WALK_Y)>.5)pts.push({x:cx,y:WALK_Y});
-  if(t.seated){pts.push({x:t.x-22,y:WALK_Y},{x:t.x-22,y:SEAT_Y},{x:t.x,y:SEAT_Y});}
-  else{pts.push({x:t.x,y:WALK_Y},{x:t.x,y:t.y});}
+  clearRow();
+  if(t.seated){floorTo({x:aisle(t.x),y:WALK_Y});pts.push({x:aisle(t.x),y:SEAT_Y},{x:t.x,y:SEAT_Y});}
+  else if(t.y<FLOOR_Y){floorTo({x:t.x,y:WALK_Y});pts.push({x:t.x,y:t.y});}
+  else floorTo(t);
   return pts;
+}
+// Two Claudes never aim for the same spot: the later one stands a step to the side.
+function freeSpot(e,t){
+  const taken=(x,y)=>[...chars.values()].some(o=>{if(o===e||o.hidden||o.removed)return false;const p=o.tgt||o;return Math.abs(p.x-x)<8&&Math.abs(p.y-y)<5;});
+  if(!taken(t.x,t.y))return;
+  for(const s of [9,-9,18,-18]){const x=t.x+s,q={x,y:t.y};if(x>=8&&x<=312&&!taken(x,t.y)&&!FLOOR_BLOCK.concat((TH&&TH.obstacles)||[]).some(o=>crosses(q,q,o))){t.x=x;return;}}
 }
 // Furniture standing on the floor (a theme's table, TH.obstacles: feet boxes {x0,y0,x1,y1}) is walked
 // around, never through; a rug is not an obstacle. Each leg of a path that would cross a box goes
@@ -87,6 +110,7 @@ function setTarget(e,t,instant){
   if(!t.exit&&!t.seated&&!t.shelf)outOfFurniture(t);
   t.key=(t.st||'')+':'+Math.round(t.x)+':'+Math.round(t.y);
   if(e.tgt&&e.tgt.key===t.key)return;
+  if(!e.small&&!t.exit&&!t.seated&&!t.shelf&&!instant)freeSpot(e,t);
   e.tgt=t; e.arrived=false;
   if(instant){
     e.path=[];

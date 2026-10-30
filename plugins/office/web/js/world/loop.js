@@ -1,20 +1,38 @@
 // The frame loop: moves everyone, picks each pose, draws the room in depth order.
 'use strict';
 // The per-frame loop, plus the file shelf, desk boards and live room details.
+const WALK_ACCEL=170; // px/s²: how fast a walker gets going, and brakes before it arrives
+// On the open floor a walker steps sideways round anyone in its way, to the side it is already on;
+// two meeting head on both keep right. The next waypoint then pulls it back on course.
+function dodge(e,left,dt){
+  if(e.y<FLOOR_Y+2||left<12)return;
+  const p=e.path[0],dx=p.x-e.x,dy=p.y-e.y,d=Math.hypot(dx,dy);if(d<1)return;
+  const ux=dx/d,uy=dy/d;
+  chars.forEach(o=>{
+    if(o===e||o.hidden||o.held||o.seated)return;
+    const rx=o.x-e.x,ry=o.y-e.y,ahead=rx*ux+ry*uy,side=ry*ux-rx*uy;
+    if(ahead<0||ahead>18||Math.abs(side)>10)return;
+    const s=(Math.abs(side)<1?1:-Math.sign(side))*22*dt,q={x:e.x-uy*s,y:e.y+ux*s};
+    if(q.y>=FLOOR_Y+2&&q.y<=179&&q.x>=6&&q.x<=314&&!FLOOR_BLOCK.concat((TH&&TH.obstacles)||[]).some(b=>crosses(q,q,b))){e.x=q.x;e.y=q.y;}
+  });
+}
 function stepEntity(e,dt){
   // a Claude held by the pointer hangs under it, a little behind, like on a string
   if(e.held){const k=Math.min(1,dt*16);e.x+=(e.held.x-e.x)*k;e.y+=(e.held.y+16-e.y)*k;return false;}
-  if(e.hidden||!e.path.length)return false;
-  let budget=(e.small?34:40)*dt;
+  if(e.hidden||!e.path.length){e.v=0;return false;}
+  let left=0,from=e;e.path.forEach(p=>{left+=Math.hypot(p.x-from.x,p.y-from.y);from=p;});
+  if(!e.small)dodge(e,left,dt);
+  e.v=Math.min(e.small?34:e.pace||40,(e.v||0)+WALK_ACCEL*dt,Math.max(10,Math.sqrt(2*WALK_ACCEL*left)));
+  let budget=e.v*dt;
+  e.stride=(e.stride||0)+budget;
   while(budget>0&&e.path.length){
     const p=e.path[0],dx=p.x-e.x,dy=p.y-e.y,d=Math.hypot(dx,dy);
-    if(Math.abs(dx)>.3)e.face=dx>0?1:-1;
+    if(Math.abs(dx)>1.5)e.face=dx>0?1:-1;
     if(d<=budget){e.x=p.x;e.y=p.y;budget-=d;e.path.shift();}
     else{e.x+=dx/d*budget;e.y+=dy/d*budget;budget=0;}
   }
   if(!e.path.length){
-    e.arrived=true; e.sqv=(e.sqv||0)-14; // a little squash on landing, and a puff of dust
-    if(!e.small)for(let i=0;i<3;i++)confetti.push({x:e.x+(i-1)*5,y:e.y-1,vx:(i-1)*12,vy:-8,c:'rgba(255,255,255,.45)',life:.3,w:1});
+    e.arrived=true; e.v=0; e.sqv=(e.sqv||0)-8; // a small settle on arriving
     if(e.tgt&&e.tgt.dir)e.face=e.tgt.dir;
     if(e.tgt&&e.tgt.seated){e.seated=true;e.seatX=e.tgt.x;}
     if(e.tgt&&e.tgt.exit){e.hidden=true;}
@@ -124,11 +142,12 @@ function frame(tp){
   // things drawn after the lights are applied: badges, bubbles and reactions stay bright at night
   const post=[];
   const frameOf=(e,rate)=>Math.floor(tp/1000*rate+(e.blinkT||0))%2;
+  const stepOf=e=>Math.floor((e.stride||0)/6.5)%2; // legs follow the ground covered, so feet never slide
   chars.forEach(ch=>{
     if(ch.hidden)return;
     const pose=poseFor(ch,tp);
     let jy=0; if(tp<ch.jumpUntil){jy=-Math.round(Math.abs(Math.sin((ch.jumpUntil-tp)/1000*Math.PI*2.6))*6);}
-    const bob=pose==='walk'?(frameOf(ch,6)?-1:0):0;
+    const bob=pose==='walk'?(stepOf(ch)?-1:0):0;
     const rate={walk:6,type:7,press:3,wave:4,sip:.5,talk:5,water:4,juggle:3,catch:2,dance:2.5,eat:3,fold:2,rps:6,dangle:5,clap:5,pet:3,game:1.5}[pose]||2;
     // how high off the floor: held up by the pointer, or floating in the space station
     const air=ch.held?7:(ch.idle&&ch.idle.act==='float'&&ch.idle.phase==='do')?Math.round(4+2*Math.sin(tp/700)):0;
@@ -136,7 +155,7 @@ function frame(tp){
     // what is in hand: a treat's own state, else what the break activity calls for
     const st=treatNow(ch,tp),I=ch.idle,doing=I&&I.phase==='do'&&!ch.path.length?I.act:null;
     const held=st?st.held:doing==='donut'?{kind:'donut'}:doing==='tea'?{kind:'teacup'}:null;
-    const o={look:ch.look,pose,frame:st&&st.frame!=null?st.frame:frameOf(ch,rate),blink:blinking(ch,tp),dir:dirOf(ch),sq:sqOf(ch,tp,pose,jy),gaze:gazeOf(ch,tp),
+    const o={look:ch.look,pose,frame:st&&st.frame!=null?st.frame:pose==='walk'?stepOf(ch):frameOf(ch,rate),blink:blinking(ch,tp),dir:dirOf(ch),sq:sqOf(ch,tp,pose,jy),gaze:gazeOf(ch,tp),
       mood:st&&st.mood?st.mood:moodOf(ch,tp,pose),wob:(ch.path.length||jy||ch.held)?Math.round(Math.sin(tp/70)):0,glow:n>.5,air,held,lift:st?st.lift:0,
       carry:ch.errand&&ch.errand.phase==='go'?ch.errand.col:null,breath:((tp/1000+ch.blinkT)%2.8)<1.4?0:1};
     items.push({d:ch.held?999:ch.y,f:()=>{
@@ -161,7 +180,7 @@ function frame(tp){
   interns.forEach(e=>{
     if(e.hidden)return;
     const pose=e.path.length?'walk':'type',hop=tp<(e.hopUntil||0)?-Math.round(Math.sin((e.hopUntil-tp)/400*Math.PI)*3):0;
-    items.push({d:e.y,f:()=>{e.headTop=drawPerson(wx,e.x,e.y+hop,{look:e.look,pose,small:true,frame:Math.floor(tp/1000*(pose==='walk'?7:6)+e.blinkT)%2,blink:((tp/1000+e.blinkT)%4)<.12});}});
+    items.push({d:e.y,f:()=>{e.headTop=drawPerson(wx,e.x,e.y+hop,{look:e.look,pose,small:true,frame:pose==='walk'?stepOf(e):Math.floor(tp/1000*6+e.blinkT)%2,blink:((tp/1000+e.blinkT)%4)<.12});}});
   });
   items.sort((a,b)=>a.d-b.d).forEach(it=>it.f());
 

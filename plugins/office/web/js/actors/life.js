@@ -38,7 +38,7 @@ function gazeOf(ch,tp){
   if(!ch.seated){const k=(tp/1000+ch.blinkT*3)%7.5;if(k>6)return k<6.7?-1:1;}
   return 0;
 }
-function dirOf(ch){const tp=performance.now();if(tp<(ch.waveUntil||0)||tp<(ch.hfUntil||0)||ch.held)return ch.face||1;const I=ch.idle;if(I&&I.pair)return Math.sign(I.pair.x-ch.x)||1;return (ch.tgt&&ch.tgt.dir)||ch.face||1;}
+function dirOf(ch){const tp=performance.now();if(ch.path.length&&!ch.held)return ch.face||1;if(tp<(ch.waveUntil||0)||tp<(ch.hfUntil||0)||ch.held)return ch.face||1;const I=ch.idle;if(I&&I.pair)return Math.sign(I.pair.x-ch.x)||1;return (ch.tgt&&ch.tgt.dir)||ch.face||1;}
 function sqOf(ch,tp,pose,jy){
   if(pose==='slump')return -2;
   let s=Math.round(ch.sq);

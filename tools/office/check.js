@@ -43,6 +43,29 @@
     box('buttons',284,169,36,11),box('item bar',141,169,39,10)];
   const pairs=[];room.forEach((a,i)=>room.slice(i+1).forEach(b=>{if(hit(a,b))pairs.push(a.n+' / '+b.n);}));
   pairs.forEach(p=>log(false,'overlap: '+p));
+  // 7. walking: no leg goes through a desk or fixed furniture, even when redirected halfway
+  const spots=[...ROAM,...CHAT,...PLAY,SPOT.window,SPOT.plant,{x:46,y:177},{x:131,y:178},{x:81,y:178},{x:210,y:178},{x:171,y:158}];
+  const route=(e,t)=>{const pts=buildPath(e,{...t});let a={x:e.x,y:e.y};return pts.map(b=>{const leg=[a,b];a=b;return leg;});};
+  for(const k of THEME_KEYS){themeKey=k;TH=THEMES[k];
+    for(let n=1;n<=MAX_DESKS;n++){
+      desks=Array.from({length:n},(_,i)=>({id:'t'+i,name:'Dev',steps:[]}));
+      const xs=deskXs(n),hw=deskHalf(n),deskBoxes=xs.map(x=>({x0:x-hw,y0:112,x1:x+hw,y1:122})),blocks=FLOOR_BLOCK.map(b=>({x0:b.x0+2,y0:Math.max(b.y0+2,WALK_Y+1),x1:b.x1-2,y1:b.y1-2}));
+      // the corridor itself runs along the machine's back edge, so a block starts below it
+      const test=(from,t,what)=>route({...from},t).forEach(([a,b])=>{const along=a.y===WALK_Y&&b.y===WALK_Y;
+        (along?deskBoxes:[...deskBoxes,...blocks]).forEach(o=>{if(crosses(a,b,o))log(false,`${k} n=${n}: ${what} crosses (${o.x0},${o.y0}) on (${a.x},${a.y})-(${b.x},${b.y})`);});});
+      spots.forEach(s=>{spots.forEach(u=>test({x:s.x,y:s.y,path:[]},u,'spot to spot'));
+        xs.forEach(x=>{test({x,y:SEAT_Y,seated:true,seatX:x,path:[]},s,'seat to spot');test({x:x-8,y:SEAT_Y,path:[]},s,'redirected leaving a seat');test({x:s.x,y:s.y,path:[]},{x,y:SEAT_Y,seated:true},'spot to seat');});});
+    }
+  }
+  // 8. a walker faces where it goes, and two walkers meeting head on pass apart
+  themeKey=keep;TH=THEMES[keep];
+  {const live=[...chars.entries()];chars.clear();
+    const mk=(id,x,y,px)=>{const e={...newChar(id,{c:'#fff'}),hidden:false,x,y,path:[{x:px,y}],tgt:{x:px,y,dir:1}};chars.set(id,e);return e;};
+    const a=mk('a',60,150,260),b=mk('b',260,150,60);let min=1e9;
+    for(let i=0;i<600&&(a.path.length||b.path.length);i++){stepEntity(a,1/60);stepEntity(b,1/60);if(a.path.length&&b.path.length)min=Math.min(min,Math.hypot(a.x-b.x,a.y-b.y));}
+    log(min>=6,'walkers meet at '+min.toFixed(1)+' px');log(!a.path.length&&!b.path.length,'walkers never arrived');
+    const c=mk('c',200,150,100);stepEntity(c,1/60);log(dirOf(c)===-1,'a walker going left faces '+dirOf(c));
+    chars.clear();live.forEach(([k,v])=>chars.set(k,v));}
   themeKey=keep;TH=THEMES[keep];desks=keepDesks;
   // one line per failure: the browser log keeps only the first line of a message
   if(!fails.length)console.log('CHECK OK all layout checks passed');
