@@ -323,14 +323,14 @@ function shakeRoom(){
   deskXs(desks.length).forEach(dx=>{if(Math.random()<PAPER_ODDS&&!shaken.some(f=>f.kind==='paper'&&f.floor===curFloor&&Math.abs(f.x-dx)<30))shakeLoose(dx-14+Math.random()*10,96,126+Math.random()*6,'#FFFDF8','paper');});
   for(let i=0;i<4;i++)shakeLoose(296+Math.random()*16,100+Math.random()*14,136+Math.random()*4,i%2?TH.leafB:TH.leafA,'leaf');
 }
-// A gust through the window brings a handful of leaves across the room.
+// A gust through the open window now and then, every 3 to 5 minutes: a few leaves cross the room.
 function leafGust(){
-  for(let i=0;i<6;i++){const gy=140+Math.random()*34,x=135+Math.random()*Math.max(10,COUNTER.x-150),h=gy-62;shakeLoose(282,62,gy,LEAF_COLS[i%LEAF_COLS.length],'tree',(x-282)/(h/30));}
+  for(let i=0;i<3;i++){const gy=140+Math.random()*34,x=135+Math.random()*Math.max(10,COUNTER.x-150),h=gy-62;shakeLoose(282,62,gy,LEAF_COLS[i%LEAF_COLS.length],'tree',(x-282)/(h/30));}
 }
 function shakenItems(items,tp){
   const dt=Math.min(.05,Math.max(0,(tp-shakenAt)/1000)),now=Date.now();shakenAt=tp;
-  if(!nextGust)nextGust=now+15000;
-  if(now>nextGust){nextGust=now+70000+Math.random()*60000;if(!TH.noWeather&&seasonNow()==='autumn')leafGust();}
+  if(!nextGust)nextGust=now+60000;
+  if(now>nextGust){nextGust=now+180000+Math.random()*120000;if(!TH.noWeather&&seasonNow()==='autumn'&&windowIsOpen())leafGust();}
   shaken=shaken.filter(f=>!f.rest||now<f.rest+SHAKEN_MS);
   shaken.forEach(f=>{
     if(f.floor!==curFloor)return;

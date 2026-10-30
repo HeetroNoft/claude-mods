@@ -168,11 +168,12 @@ function drawPorthole(g,tp,n){
 // The motes in the sunbeam take the season's light (world/loop.js).
 const DUST_TINT={spring:'255,236,240',summer:'255,240,190',autumn:'255,214,160',winter:'224,238,255'};
 const SEASON_DRIFT={
-  spring:{p:.03,life:3.6,vy:3,w:2,cols:()=>['#F7B6C8','#FFD9E4','#FFFFFF']},
-  summer:{p:.02,life:2.6,vy:-1,w:1,cols:n=>n>.5?['#E8F06A','#D8E85A']:['#FFE9A8','#FFF6D0']},
-  autumn:{p:.03,life:3.4,vy:4,w:2,cols:()=>LEAF_COLS},
-  winter:{p:.07,life:2.6,vy:9,w:1,cols:()=>['#FFFFFF','#DCEBF7']},
+  spring:{p:.008,life:3.6,vy:3,w:2,cols:()=>['#F7B6C8','#FFD9E4','#FFFFFF']},
+  summer:{p:.006,life:2.6,vy:-1,w:1,cols:n=>n>.5?['#E8F06A','#D8E85A']:['#FFE9A8','#FFF6D0']},
+  autumn:{p:.006,life:3.4,vy:4,w:2,cols:()=>LEAF_COLS},
+  winter:{p:.025,life:2.6,vy:9,w:1,cols:()=>['#FFFFFF','#DCEBF7']},
 };
+const windowIsOpen=()=>(TH.window==='round'?winAmt<.5:winAmt>.5&&curAmt<.5);
 function windowDrift(open,n,x0,span,y0){
   if(!open||TH.noWeather)return;
   const D=SEASON_DRIFT[SEASON];if(Math.random()>=D.p)return;
