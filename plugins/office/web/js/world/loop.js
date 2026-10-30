@@ -141,6 +141,7 @@ function frame(tp){
   });
   // things drawn after the lights are applied: badges, bubbles and reactions stay bright at night
   const post=[],over=[]; // over: what a Claude is saying or doing, above everyone's badges
+  const lifted=[]; // a Claude held by the pointer, with its badge and bubbles: last, above the whole room
   const frameOf=(e,rate)=>Math.floor(tp/1000*rate+(e.blinkT||0))%2;
   const stepOf=e=>Math.floor((e.stride||0)/6.5)%2; // legs follow the ground covered, so feet never slide
   chars.forEach(ch=>{
@@ -162,24 +163,25 @@ function frame(tp){
     const raiseTo=pose!=='sip'&&pose!=='eat'?0:st&&st.raise!=null?st.raise:(st||pose==='sip')?o.frame:((tp/1000+ch.blinkT)%1.6<.5?1:0);
     const tr=trailOf(ch,ch.x+sway,ch.y+jy+bob-air,pose,o.mood,raiseTo,st&&st.lift||0,tp);
     o.sway=Math.round(tr.x);o.pop=Math.round(-tr.y);o.raise=tr.raise;o.lift=Math.round(tr.lift);
-    items.push({d:ch.held?999:ch.y,f:()=>{
+    const body=()=>{
       if(cardId===ch.id)drawRing(wx,ch.x,ch.y,ch.look.c,tp);
       ch.bodyTop=ch.y+jy+bob-air-15;
       ch.headTop=drawPerson(wx,ch.x+sway,ch.y+jy+bob-air,o);
       drawIdleProps(wx,ch,tp);
       if(st)drawTreat(wx,ch,tp,st);
       if(tp<(ch.flowerUntil||0)&&ch.bodyTop!=null)drawProp(wx,'blossom',Math.round(ch.x+3+o.sway),HATS.has(ch.look.style)?Math.round(ch.headTop+1-o.pop):Math.round(ch.bodyTop-2)); // tucked in the hat band, or on the head
-    }});
+    };
+    if(ch.held)lifted.push(body);else items.push({d:ch.y,f:body});
     // the badge steps up out of the way of balls in the air, and comes down after
     ch.badgeUp=(ch.badgeUp||0)+(((st&&(st.juggle||st.caught||st.star))||doing==='juggle'?10:0)-(ch.badgeUp||0))*Math.min(1,dt*10);
-    over.push(()=>{
+    (ch.held?lifted:over).push(()=>{
       const ht=ch.headTop; if(ht==null)return;
       if(pose==='sit'&&ch.act==='think')drawThought(wx,ch,tp);else ch.thoughtAt=0;
       if(pose==='sleep')drawZz(wx,ch.x,ht,tp);
       if(o.mood==='dizzy')drawDizzy(wx,ch.x,ht,tp);
       drawChatBubble(wx,ch,tp);drawRps(wx,ch,tp);
     });
-    post.push(()=>{
+    (ch.held?lifted:post).push(()=>{
       if(ch.headTop==null)return;const ht=ch.headTop-Math.round(ch.badgeUp);
       if(!LABELS){const dk=ch.desk||{};const badge=ch.act==='limit'?['skull','#B03A2E']:ch.act==='ask'?['quest',Math.floor(tp/300)%2?AMBER:ch.look.c]:[iconFor(dk),ch.look.c];
         drawBadge(wx,badge[0],ch.x,ht,badge[1],tp,ch.id);
@@ -212,7 +214,7 @@ function frame(tp){
   desks.forEach((dk,i)=>{if(!boardShift(dk))oneBoard(dk,xs[i]);});
   drawBoardDrag(wx,xs,oneBoard); // the board being dragged, over the others (ui/boards.js)
   if(TH.neon)drawNeon(wx,tp);
-  post.forEach(f=>f());over.forEach(f=>f());
+  post.forEach(f=>f());over.forEach(f=>f());lifted.forEach(f=>f());
   drawEmotes(wx,tp);
   leaves=leaves.filter(l=>{l.life-=dt;l.vy+=8*dt;l.x+=(l.vx+Math.sin(tp/250+l.p)*6)*dt;l.y+=l.vy*dt;if(l.life<=0||l.y>178)return false;wx.globalAlpha=Math.min(1,l.life);R(wx,l.x,l.y,l.w,1,l.c);wx.globalAlpha=1;return true;});
   // decorative send planes
@@ -245,6 +247,8 @@ function frame(tp){
   drawClockText(now);
   drawGaugeText(now);
   desks.forEach((dk,i)=>drawBoardText(dk,xs[i]+(boardShift(dk)||0),now));
+  // the room's text lives on this upper canvas: a held Claude goes in front of it too
+  chars.forEach(ch=>{if(ch.held&&!ch.hidden&&ch.headTop!=null)ox.clearRect(P(ch.x-10),P(ch.headTop-1),P(20),P(ch.y-ch.headTop-5));});
   }
   // glyphs
   if(!LABELS){glyphs=glyphs.filter(gl=>{gl.life-=dt;gl.y+=gl.vy*dt;gl.x+=gl.vx*dt;if(gl.life<=0)return false;
