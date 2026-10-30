@@ -29,6 +29,7 @@ const world=document.getElementById('world'),wx=world.getContext('2d');
 const ov=document.getElementById('ov'),ox=ov.getContext('2d');
 let S=5,dpr=1,cssW=1600,cssH=900;
 const TS=1.6; // labels read at 1080 wide
+let UI_SCALE=1; // the settings' compact buttons
 // Game mode is the default: the room tells the story in pixels, with no words on screen.
 // The tag button (or ?labels) shows names, plans and message text for anyone who wants them.
 const Q=location.search+location.hash;
@@ -40,7 +41,7 @@ function resize(){
   stage.style.width=w+'px'; stage.style.height=h+'px';
   dpr=window.devicePixelRatio||1; ov.width=Math.round(w*dpr); ov.height=Math.round(h*dpr);
   cssW=w; cssH=h; S=w/W;
-  stage.style.setProperty('--u',(w/1600).toFixed(4)); // buttons and item bar scale with the room (office.css)
+  stage.style.setProperty('--u',(w/1600*UI_SCALE).toFixed(4)); // buttons and item bar scale with the room (office.css)
   document.getElementById('card').style.fontSize=Math.max(11,Math.min(14,Math.round(w/95)))+'px';
 }
 window.addEventListener('resize',resize);

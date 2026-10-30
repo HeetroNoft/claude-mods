@@ -37,7 +37,7 @@ function poke(c,tp){
   else{setMood(c,'happy',1000);emote(c,'note');c.sqv+=18;}
   blip(700+Math.random()*300,.04);
 }
-const overUi=e=>!!(e.target.closest&&e.target.closest('#card,#menu,#items,#floors,button'));
+const overUi=e=>!!(e.target.closest&&e.target.closest('#card,#menu,#items,#floors,#prefs,button'));
 stage.addEventListener('pointermove',e=>{
   const p=toWorld(e),dx=p.x-ptr.x;ptr.x=p.x;ptr.y=p.y;ptr.in=true;
   if(overUi(e)){hoverCh=null;stage.classList.remove('hand');return;}
@@ -51,7 +51,7 @@ stage.addEventListener('pointermove',e=>{
 stage.addEventListener('pointerleave',()=>{ptr.in=false;hoverCh=null;stage.classList.remove('hand');});
 stage.addEventListener('click',e=>{
   if(overUi(e)||performance.now()<suppressClickUntil)return;
-  closeMenu();
+  closeMenu();openPrefs(false);
   const p=toWorld(e),tp=performance.now();
   const c=charAt(p.x,p.y);
   if(c){poke(c,tp);if(cardId===c.id)closeCard();else openCard(c.id);return;}

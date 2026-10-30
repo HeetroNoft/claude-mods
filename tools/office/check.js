@@ -105,6 +105,20 @@
       for(let i=0;i<A.length;i+=4){if(!A[i+3])continue;const added=A[i]!==base[i]||A[i+1]!==base[i+1]||A[i+2]!==base[i+2]||A[i+3]!==base[i+3];
         if(added&&(A[i]!==B[i]||A[i+1]!==B[i+1]||A[i+2]!==B[i+2]))n++;}
       log(!n,`${VARIANTS[style]} ${pose} ${extra&&extra.held?extra.held.kind:extra&&extra.carry?'file':''} dir ${dir} raise ${extra&&extra.raise}: ${n} px covered`);}}
+  // 12. the action buttons stay in their corner, apart, whatever their number
+  {const r=stage.getBoundingClientRect(),bs=['set','snd','lbl','thm','itm'].map(id=>{const b=document.getElementById(id).getBoundingClientRect();return box(id,(b.left-r.left)/r.width*W,(b.top-r.top)/r.height*H,b.width/r.width*W,b.height/r.height*H);});
+    bs.forEach((a,i)=>{log(a.x>=284&&a.y>=169,`button ${a.n} leaves the corner: ${a.x.toFixed(1)},${a.y.toFixed(1)}`);bs.slice(i+1).forEach(b=>log(!hit(a,b),`buttons ${a.n} and ${b.n} overlap`));});
+    // 13. settings: open, each choice takes effect and is remembered, keys and defaults work
+    const b=id=>document.getElementById(id),on=q=>document.querySelector('#prefs '+q);
+    b('set').click();log(b('prefs').classList.contains('open'),'settings do not open');
+    on('[data-sw=calm]').click();log(document.body.classList.contains('calm')&&calmMotion(),'less motion not applied');
+    on('[data-sw=badges]').click();log(PREFS.badges===false,'head icons not switched');
+    on('[data-seg=time][data-v=night]').click();const stored=JSON.parse(localStorage.getItem('office.prefs')||'{}');
+    log(stored.calm===true&&stored.badges===false&&stored.time==='night','settings not remembered: '+JSON.stringify(stored));
+    const w0=b('set').offsetWidth;on('[data-sw=compact]').click();log(b('set').offsetWidth<w0,'compact buttons not smaller');
+    on('[data-sw=items]').click();log(barOn===false&&b('items').classList.contains('hide'),'item bar not hidden');
+    on('.reset').click();log(barOn&&PREFS.badges&&!PREFS.calm&&!PREFS.compact&&PREFS.time==='auto'&&b('set').offsetWidth===w0,'defaults not restored');
+    window.dispatchEvent(new KeyboardEvent('keydown',{key:'Escape'}));log(!b('prefs').classList.contains('open'),'Esc does not close settings');}
   // one line per failure: the browser log keeps only the first line of a message
   if(!fails.length)console.log('CHECK OK all layout checks passed');
   else{console.log('CHECK FAIL '+fails.length);fails.slice(0,40).forEach(m=>console.log('CHECK FAIL: '+m));}

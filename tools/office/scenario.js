@@ -1,5 +1,5 @@
 // Test page script: forces activities so a screenshot shows them (scn=t: the room's own break activities,
-// scn=i: every treat mid-story, scn=a / scn=b: pairs, floating, treats, picking up, a high five, scn=c: a chat and a thought, scn=r: a round of rock, paper, scissors). Logs ERR and STATE lines.
+// scn=i: every treat mid-story, scn=a / scn=b: pairs, floating, treats, picking up, a high five, scn=c: a chat and a thought, scn=r: a round of rock, paper, scissors, scn=p: the settings panel). Logs ERR and STATE lines.
 'use strict';
 window.addEventListener('error',e=>console.log('ERR '+e.message+' @'+e.filename.split('/').pop()+':'+e.lineno));
 const SCN=(location.search.match(/scn=(\w+)/)||[])[1]||'a';
@@ -36,6 +36,8 @@ setTimeout(()=>{try{
     startIdle(C('c3'),'chat',C('d4'));tele(C('c3'));tele(C('d4'));
   }else if(SCN==='r'){
     startIdle(C('c3'),'rps',C('d4'));tele(C('c3'));tele(C('d4'));
+  }else if(SCN==='p'){
+    document.body.classList.add('calm');openPrefs(true); // calm: the screenshot shows the panel at rest
   }else if(SCN==='a'){
     startIdle(C('c3'),'rps',C('d4'));tele(C('c3'));tele(C('d4'));
     startIdle(C('e4'),'float',null);tele(C('e4'));

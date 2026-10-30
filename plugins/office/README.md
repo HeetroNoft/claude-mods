@@ -16,7 +16,7 @@ The board follows what the session really does: the `plan` tool when Claude give
 
 Four desks fit on a floor. With more sessions the office opens more floors, and floors that fit on one merge again (a desk you placed by hand stays where you put it): the panel by the item bar has a light per desk, blinking when a Claude waits for you and red when one is out of usage, and the tab title counts who is waiting. Click a floor or press **1**-**9**, **Page Up** or **Page Down** to go there.
 
-In the page: **T** changes the room (8 themes, each with day and night following your local time), **L** shows labels, **I** shows or hides the item bar. Drag a Claude to move it, drag a board onto another desk's place to move that desk there, or onto the floor panel to send it to that floor (order and floors last as long as the sessions do), drag an item from the bar onto a Claude to give it, click a Claude for its card.
+In the page: **T** changes the room (8 themes, each with day and night following your local time), **L** shows labels, **I** shows or hides the item bar, **S** or the gear opens the settings (room, time of day, labels, head icons, hiding the bars, compact buttons, less motion, sound). Drag a Claude to move it, drag a board onto another desk's place to move that desk there, or onto the floor panel to send it to that floor (order and floors last as long as the sessions do), drag an item from the bar onto a Claude to give it, click a Claude for its card.
 
 ## Layout
 

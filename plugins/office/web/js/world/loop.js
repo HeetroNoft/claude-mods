@@ -181,7 +181,7 @@ function frame(tp){
     });
     post.push(()=>{
       if(ch.headTop==null)return;const ht=ch.headTop-Math.round(ch.badgeUp);
-      if(!LABELS){const dk=ch.desk||{};const badge=ch.act==='limit'?['skull','#B03A2E']:ch.act==='ask'?['quest',Math.floor(tp/300)%2?AMBER:ch.look.c]:[iconFor(dk),ch.look.c];
+      if(!LABELS&&(PREFS.badges||ch.act==='limit'||ch.act==='ask')){const dk=ch.desk||{};const badge=ch.act==='limit'?['skull','#B03A2E']:ch.act==='ask'?['quest',Math.floor(tp/300)%2?AMBER:ch.look.c]:[iconFor(dk),ch.look.c];
         drawBadge(wx,badge[0],ch.x,ht,badge[1],tp,ch.id);
         if(tp<ch.jumpUntil+2500&&ch.starT&&tp-ch.starT<4000)drawStar(wx,Math.round(ch.x),Math.round(ht-21+Math.sin(tp/150)),Math.floor(tp/200)%2?'#FFD84A':'#FFFFFF');}
     });
