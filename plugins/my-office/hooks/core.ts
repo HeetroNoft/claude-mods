@@ -44,6 +44,8 @@ export type Desk = {
   planTurn?: number
   missionSteps?: number
   pausedMs?: number
+  // the turn stopped with steps left, by an error or by the user; cleared by the next prompt
+  stopped?: { kind: 'error' | 'interrupted'; ms: number }
 }
 
 export const newDesk = (id: string, name: string, now: number): Desk => ({
@@ -215,7 +217,7 @@ export function usageLine(desks: Desk[]) {
 
 // Takes the plan off the board.
 export function clearPlan(d: Desk) {
-  d.steps = []; d.planMs = 0; d.doneMs = 0; d.pausedMs = undefined; d.planSource = undefined; d.planTurn = undefined; d.missionSteps = undefined
+  d.steps = []; d.planMs = 0; d.doneMs = 0; d.pausedMs = undefined; d.stopped = undefined; d.planSource = undefined; d.planTurn = undefined; d.missionSteps = undefined
 }
 
 // The name to show for a teammate: the role this Claude gave it, else its own session name.
@@ -258,12 +260,23 @@ export function rateOf(windows: unknown, now: number): Rate | undefined {
   return r.fiveHour == null && r.sevenDay == null ? undefined : r
 }
 
+// A turn that ends normally finishes its plan: every step left is ticked.
+export function finishPlan(d: Desk, now: number) {
+  d.steps = d.steps.map(s => (s.doneMs ? s : { ...s, startMs: s.startMs ?? now, doneMs: now }))
+  d.pausedMs = undefined
+}
+// A turn stopped by an error or by the user leaves its steps as they are, frozen until the next prompt.
+export function stopPlan(d: Desk, kind: 'error' | 'interrupted', now: number) {
+  if (d.steps.some(s => !s.doneMs)) { d.stopped = { kind, ms: now }; pausePlan(d, now) }
+}
+
 // While the session waits for the user the plan is paused, so waiting never reads as running late:
 // on resume, every time the plan counts from moves forward by the length of the pause.
 export function pausePlan(d: Desk, now: number) {
   if (!d.pausedMs && d.steps.some(s => !s.doneMs)) d.pausedMs = now
 }
 export function resumePlan(d: Desk, now: number) {
+  d.stopped = undefined
   if (!d.pausedMs) return
   const gap = now - d.pausedMs
   d.pausedMs = undefined

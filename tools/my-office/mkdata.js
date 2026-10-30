@@ -1,4 +1,4 @@
-// Fake data.js for test runs: N desks (env N, default 4) covering every board state.
+// Fake data.js for test runs: N desks (env N, default 4) covering every board state; the sixth and seventh were stopped by the user and by an error.
 // Usage: N=6 node mkdata.js > data.js
 const now=Date.now(),M=60000;
 const st=(l,m,s,d)=>({label:l,estMin:m,startMs:s,doneMs:d});
@@ -13,5 +13,6 @@ for(let i=4;i<N;i++)all.push(desk("e"+i,["Writer","CEO","Dev"][i%3],"read",[st("
 // the account's usage, as the gauge reads it, and a fifth desk knocked out by the usage limit
 all[0].rate={fiveHour:62,sevenDay:35,fiveResets:new Date(now+2*60*M).toISOString(),sevenResets:new Date(now+3*24*60*M).toISOString(),ms:now};
 if(all[4])Object.assign(all[4],{activity:'limit',limited:{since:now-M,resetsAt:new Date(now+95*M).toISOString()}});
+[[5,'interrupted'],[6,'error']].forEach(([i,kind])=>{if(all[i])Object.assign(all[i],{activity:'idle',stopped:{kind,ms:now-2*M},pausedMs:now-2*M});});
 const desks=all.slice(0,N);
 process.stdout.write(`window.__office && window.__office(${JSON.stringify({now,desks})})\n`);

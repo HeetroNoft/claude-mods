@@ -108,7 +108,7 @@ function boardPixels(g,x,dk,now,tp){
   const n=inf.total;
   if(n){
     const gap=n>8?1:2,pw=Math.max(1,Math.floor((CW-gap*(n-1))/n)),x0=centre(n*pw+gap*(n-1));
-    inf.steps.forEach((st,i)=>{const px=x0+i*(pw+gap),cur=st===inf.cur;
+    inf.steps.forEach((st,i)=>{const px=x0+i*(pw+gap),cur=st===inf.cur&&inf.mode!=='stopped';
       // a step ticked in the last 1.6 s flashes white before it settles green
       const fresh=st.doneMs&&now-st.doneMs<1600,c=fresh&&Math.floor(tp/120)%2?'#FFFFFF':st.doneMs?GREEN:cur?(Math.floor(tp/450)%2?col:shade(col,.45)):off;
       if(fresh)R(g,px+((pw-1)>>1),37-Math.floor((now-st.doneMs)/400),1,1,'#FFD84A');
@@ -120,6 +120,7 @@ function boardPixels(g,x,dk,now,tp){
   const w=dk.waiting,warn=readable(AMBER,bg,3.5),red=readable('#E5484D',bg,3.5),live=dk.detail&&!['idle','gone','asleep'].includes(dk.activity)&&Math.floor((tp+seed)/5000)%3===2;
   if(dk.limited)pixMarquee(g,'OUT OF USAGE',L,47,CW,red,tp,seed);
   else if(w)pixMarquee(g,Math.floor(tp/2600)%2?w.text:(w.kind==='permission'?'NEEDS YOUR OK':w.kind==='question'?'QUESTION FOR YOU':'YOUR TURN'),L,47,CW,Math.floor(tp/500)%2?warn:ink,tp,seed);
+  else if(inf.mode==='stopped')pixMarquee(g,inf.kind==='error'?`ENDED ${inf.done} OF ${n}`:'INTERRUPTED',L,47,CW,inf.kind==='error'?red:warn,tp,seed);
   else pixMarquee(g,live?dk.detail:n?(inf.cur?inf.cur.label:'ALL STEPS DONE'):'NO PLAN YET',L,47,CW,live?soft:n&&inf.cur?ink:dimInk,tp,seed);
   // row 4: a draining bar and the finish time; a narrow board shows the time alone, centred
   const T5=19,wide=CW>=T5+20,barW=CW-T5-4,tx=wide?L+CW-T5:centre(T5);
@@ -134,6 +135,12 @@ function boardPixels(g,x,dk,now,tp){
     const m=Math.max(0,Math.floor((now-dk.waiting.since)/60000)),t=m<1?'NOW':m<100?m+'M':'99M',warn=readable(AMBER,bg,3.5);
     if(wide){R(g,L,56,barW,3,off);R(g,L,56,Math.max(1,Math.round(barW*Math.min(1,m/30))),3,AMBER);pixText(g,'?',L+barW+1,55,warn);}
     pixText(g,t,wide?tx:centre(pixWidth(t)),55,warn);return;
+  }
+  if(inf.mode==='stopped'){
+    // stopped by an error or by the user: how far it got, and when
+    const c=inf.kind==='error'?red:warn;
+    if(wide){R(g,L,56,barW,3,off);if(inf.done)R(g,L,56,Math.max(1,Math.round(barW*inf.done/n)),3,c);}
+    pixText(g,hhmm(inf.at),tx,55,c);return;
   }
   if(inf.mode==='paused'){
     // paused while the session waits: the time left, frozen, behind a pause sign

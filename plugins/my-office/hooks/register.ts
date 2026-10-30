@@ -2,7 +2,7 @@ import type { Register } from 'claude-code'
 
 import {
   activityOf, applyTool, clean, clearPlan, type Desk, eta, finishStep, firstWords, hhmm, lastQuestion, msgKey, newDesk,
-  parseReceived, pausePlan, peerName, planLines, planSteps, push, rateOf, resumePlan, todoSteps, usageLine, whoLine,
+  finishPlan, parseReceived, pausePlan, peerName, planLines, planSteps, push, rateOf, resumePlan, stopPlan, todoSteps, usageLine, whoLine,
 } from './core'
 import { deskList, installPage, LIVE_MS, carryOver, officeDesks, officeDir, pageInTest, presentDesks, publish, readDesk, readLeft, removeDesk, themeKeys, uselessDesks, writeDesk, writeLeft, writeRoom } from './room'
 import { COMMANDS, PROMPT_HINT, TOOLS } from './tools'
@@ -324,7 +324,7 @@ export const register: Register = on => {
         d.limited = { since: now, resetsAt: resets }; d.waiting = undefined
         d.activity = 'limit'; d.detail = 'Out of usage'; d.activityMs = now
       })
-    }
+    } else await save($, (d, now) => stopPlan(d, 'error', now))
     return next(e)
   })
 
@@ -362,11 +362,13 @@ export const register: Register = on => {
     await save($, (d, now) => {
       if (d.limited) { d.activity = 'limit'; d.detail = 'Out of usage'; return }
       d.activity = 'idle'; d.detail = 'Coffee'; d.activityMs = now
-      // a turn that ends on a question waits for the reply; an unfinished plan pauses meanwhile
+      // a turn that ends on a question waits for the reply, and its plan pauses meanwhile; one the user
+      // interrupted keeps its steps, like one an error stopped (see StopFailure); any other finishes its plan
       const q = e.isAborted ? '' : lastQuestion(e.answer)
-      if (q) { d.waiting = { kind: 'reply', text: q, since: now }; d.detail = 'Waiting for you' }
-      pausePlan(d, now)
-      if (!e.isAborted && d.turnMs && now - d.turnMs >= 15_000) {
+      if (q) { d.waiting = { kind: 'reply', text: q, since: now }; d.detail = 'Waiting for you'; pausePlan(d, now) }
+      else if (e.isAborted) stopPlan(d, 'interrupted', now)
+      else if (!d.stopped) finishPlan(d, now)
+      if (!e.isAborted && !d.stopped && d.turnMs && now - d.turnMs >= 15_000) {
         d.doneMs = now
         const s = d.steps.length ? ` · ${d.steps.filter(x => x.doneMs).length} of ${d.steps.length} steps` : ''
         d.doneLine = `Done in ${Math.round((now - d.turnMs) / 1000)}s${s}`
