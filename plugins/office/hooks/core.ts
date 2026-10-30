@@ -11,6 +11,7 @@ export type Eta = { finishMs: number; plannedMs: number; lateMin: number; allDon
 export type Waiting = { kind: 'question' | 'permission' | 'reply'; text: string; since: number; key?: string; tool?: string }
 // The account's usage windows (percent used, 0..100) and when each resets, as last reported.
 export type Rate = { fiveHour?: number; sevenDay?: number; fiveResets?: string; sevenResets?: string; ms: number }
+export type Room = { theme?: string; ms?: number }
 export type Desk = {
   id: string
   name: string
@@ -89,7 +90,7 @@ export function activityOf(tool: string, input: any): { activity: string; detail
 
 // Paths and long ids never reach the page: a bubble shows words, not where files live.
 export const clean = (s: string, n: number) => {
-  const t = s.replace(/(~|\.{0,2})?\/[^\s"'`]+/g, '…').replace(/\b[0-9a-f]{8}-[0-9a-f-]{20,}\b/gi, '…').replace(/\s+/g, ' ').trim()
+  const t = s.replace(/\b[A-Za-z]:\\[^\s"'`]+/g, '…').replace(/(~|\.{0,2})?\/[^\s"'`]+/g, '…').replace(/\b[0-9a-f]{8}-[0-9a-f-]{20,}\b/gi, '…').replace(/\s+/g, ' ').trim()
   return t.length > n ? `${t.slice(0, n - 1)}…` : t
 }
 
@@ -184,8 +185,33 @@ export function applyTool(d: Desk, tool: string, input: any, key: string, now: n
   return out
 }
 
-export const dataJs = (now: number, desks: Desk[]) =>
-  `window.__office && window.__office(${JSON.stringify({ now, desks })})\n`
+// room: what the whole office shares, here the theme a /office-theme asked for (the page follows it once).
+export const dataJs = (now: number, desks: Desk[], room?: Room) =>
+  `window.__office && window.__office(${JSON.stringify({ now, desks, room })})\n`
+
+// One line of /office-who: who it is, what it does now, how far its plan is.
+export function whoLine(d: Desk, mine: boolean) {
+  const bits = [d.limited ? 'out of usage' : d.waiting ? `waiting for you: ${d.waiting.text}` : d.detail]
+  if (d.steps.length) bits.push(`plan ${d.steps.filter(s => s.doneMs).length}/${d.steps.length}`)
+  if (d.eta && !d.eta.allDone) bits.push(`due ${hhmm(d.eta.finishMs)}${d.eta.lateMin ? `, ${d.eta.lateMin} min late` : ''}`)
+  return `${d.name}${mine ? ' (you)' : ''}: ${bits.join(' · ')}`
+}
+
+// A desk's plan, one step a line.
+export const planLines = (d: Desk) => d.steps.map((s, i) => `${s.doneMs ? '[x]' : '[ ]'} ${i + 1}. ${s.label}${s.estMin ? ` (${s.estMin} min)` : ''}`)
+
+// The usage left, from the freshest reading any desk has.
+export function usageLine(desks: Desk[]) {
+  const r = desks.map(d => d.rate).filter((x): x is Rate => Boolean(x)).sort((a, b) => b.ms - a.ms)[0]
+  if (!r) return ''
+  const left = (used?: number) => `${Math.round(100 - (used ?? 0))}%`
+  return `Usage left: ${[r.fiveHour != null && `5 hours ${left(r.fiveHour)}`, r.sevenDay != null && `week ${left(r.sevenDay)}`].filter(Boolean).join(', ')}`
+}
+
+// Takes the plan off the board.
+export function clearPlan(d: Desk) {
+  d.steps = []; d.planMs = 0; d.doneMs = 0; d.pausedMs = undefined; d.planSource = undefined; d.planTurn = undefined; d.missionSteps = undefined
+}
 
 // The name to show for a teammate: the role this Claude gave it, else its own session name.
 export function peerName(d: Pick<Desk, 'peers' | 'seen'>, who: string) {

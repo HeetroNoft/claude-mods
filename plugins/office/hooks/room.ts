@@ -1,12 +1,14 @@
-import { dataJs, type Desk } from './core'
+import { dataJs, type Desk, type Room } from './core'
 
 // The shared folder every session writes to: ~/.claude/office/
 //   desks/<session id>.json  one per session, written only by that session
-//   left.json                sessions sent home with /leave, by id
+//   left.json                sessions sent home with /office-leave, by id
+//   room.json                what the whole office shares: the theme a /office-theme asked for
+//   .dev                     set by tools/office/run.sh preview: keep the page copied there
 //   data.js                  every live desk, rebuilt after each write and read by the page
 //   index.html, office.css, js/  the page itself, copied from the mod's web/ folder
 
-const LIVE_MS = 2 * 60 * 60_000
+export const LIVE_MS = 2 * 60 * 60_000
 
 // HOME is unset in a Windows session started outside Git Bash; USERPROFILE is the same folder.
 export async function officeDir($: any): Promise<string> {
@@ -33,12 +35,30 @@ export async function liveDesks($: any, dir: string, now: number): Promise<Desk[
   return desks.sort((a, b) => a.id.localeCompare(b.id))
 }
 
-// Sessions sent home with /leave stay off the board until their next prompt.
+// Sessions sent home with /office-leave stay off the board until their next prompt.
 export async function readLeft($: any, dir: string): Promise<Record<string, number>> {
   try { return JSON.parse(await $.fs.read(`${dir}/left.json`)) ?? {} } catch { return {} }
 }
 export function writeLeft($: any, dir: string, left: Record<string, number>) {
   return $.fs.write(`${dir}/left.json`, JSON.stringify(left))
+}
+
+export async function readRoom($: any, dir: string): Promise<Room | undefined> {
+  try { return JSON.parse(await $.fs.read(`${dir}/room.json`)) } catch { return undefined }
+}
+export function writeRoom($: any, dir: string, room: Room) {
+  return $.fs.write(`${dir}/room.json`, JSON.stringify(room))
+}
+
+// The rooms this mod ships: one file per theme, next to the theme engine.
+export async function themeKeys($: any, web: string): Promise<string[]> {
+  const entries = await $.fs.list(`${web}/js/themes`).catch(() => [])
+  return entries.map((en: any) => String(en.name)).filter((n: string) => n.endsWith('.js') && n !== 'engine.js').map((n: string) => n.slice(0, -3)).sort()
+}
+
+// A page under test (tools/office/run.sh preview) is not replaced by a session starting.
+export async function pageInTest($: any, dir: string): Promise<boolean> {
+  try { await $.fs.read(`${dir}/.dev`); return true } catch { return false }
 }
 
 // The desks still in the office: live, and not sent home.
@@ -49,7 +69,7 @@ export async function presentDesks($: any, dir: string, now: number): Promise<De
 
 export async function publish($: any, dir: string) {
   const now = await $.clock.now()
-  await $.fs.write(`${dir}/data.js`, dataJs(now, await presentDesks($, dir, now)))
+  await $.fs.write(`${dir}/data.js`, dataJs(now, await presentDesks($, dir, now), await readRoom($, dir)))
 }
 
 export const deskList = (ds: Desk[]) => ds.map(d => `${d.name} (${d.id.slice(0, 8)})`).join(', ') || 'nobody'

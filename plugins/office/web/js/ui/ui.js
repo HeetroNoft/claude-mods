@@ -105,6 +105,10 @@ card.addEventListener('click',e=>{if(e.target.closest('.x'))closeCard();});
 const menu=document.getElementById('menu'),tbtn=document.getElementById('thm');
 function renderMenu(){menu.innerHTML=THEME_KEYS.map(k=>{const t=THEMES[k];return `<button type="button" role="menuitemradio" aria-checked="${k===themeKey}" class="${k===themeKey?'on':''}" data-k="${k}"><span class="sw">${t.swatch.map(c=>`<i style="background:${c}"></i>`).join('')}</span>${esc(t.name)}</button>`;}).join('');}
 function closeMenu(){menu.classList.remove('open');tbtn.classList.remove('on');}
+// A /office-theme from a session: the page follows each one once, then T goes on working as usual.
+let roomSeen=null;
+function followRoom(r){if(!r||!r.theme||!r.ms)return;if(roomSeen===null)try{roomSeen=+localStorage.getItem('office.roomMs')||0;}catch(e){roomSeen=0;}
+  if(r.ms<=roomSeen)return;roomSeen=r.ms;try{localStorage.setItem('office.roomMs',String(r.ms));}catch(e){}setTheme(r.theme);}
 function setTheme(k){if(!THEMES[k])return;themeKey=k;TH=THEMES[k];resetCatWorld();buildBg();try{localStorage.setItem('office.theme',k);}catch(e){}renderMenu();}
 tbtn.addEventListener('click',()=>{const o=!menu.classList.contains('open');menu.classList.toggle('open',o);tbtn.classList.toggle('on',o);});
 menu.addEventListener('click',e=>{const b=e.target.closest('button[data-k]');if(b)setTheme(b.dataset.k);});
