@@ -63,6 +63,7 @@ stage.addEventListener('click',e=>{
 /* ---------- session card ---------- */
 const card=document.getElementById('card');
 const VARIANTS=['Classic','Headphones','Antenna','Beanie','Glasses','Bow','Sprout','Top hat','Cap','Chef'];
+const COLOURS=['Orange','Teal','Purple','Gold','Blue','Pink','Green','Grey','Red','Brown'];
 const ACT_TEXT={think:'Thinking',edit:'Editing files',read:'Reading',bash:'Running commands',web:'On the web',send:'Sending a message',agent:'Briefing a helper',ask:'Waiting for you',limit:'Out of usage',idle:'On a break',asleep:'Not joined yet',gone:'Gone home'};
 const IDLE_TEXT={coffee:'having a coffee',window:'looking out the window',plant:'watering the plant',stretch:'stretching',wander:'taking a stroll',juggle:'juggling',chat:'chatting with ',play:'playing catch with ',nap:'napping',read:'reading a book',yoga:'doing yoga',dance:'dancing',game:'playing a game',doze:'dozing off',files:'tidying the files',tinker:'tinkering with the machine',tea:'having tea',origami:'folding a paper crane',donut:'eating a doughnut',float:'floating about',catpet:'petting the cat',arcade:'playing the arcade',rps:'playing rock, paper, scissors with ',planes:'throwing paper planes with ',duet:'dancing with ',highfive:'giving a high five'};
 function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
@@ -73,13 +74,35 @@ function statusOf(ch){
   if(ch.act==='idle'&&I&&I.act)return 'On a break · '+IDLE_TEXT[I.act].replace('the cat',catName||'the cat')+(I.pair?str((I.pair.desk||{}).name||'Claude',14):'');
   return ACT_TEXT[ch.act]||'Working';
 }
-function openCard(id){cardId=id;card.classList.remove('open');void card.offsetWidth;card._h='';card.classList.add('open');renderCard();}
-function closeCard(){cardId=null;card.classList.remove('open');}
+function openCard(id){cardId=id;cardPick={};card.classList.remove('open');void card.offsetWidth;card._h='';card.classList.add('open');renderCard();}
+function closeCard(){cardId=null;cardPick={};card.classList.remove('open');}
+// The card's pickers: a free accessory or colour is worn at once. A taken accessory shows greyed and the Claude
+// keeps what it wears; a taken colour is never offered (skip).
+const PICKERS={
+  acc:{label:'accessory',names:VARIANTS,cur:id=>lookMem.get(id).s,taken:accessoryTaken,set:setAccessory},
+  col:{label:'colour',names:COLOURS,cur:id=>lookMem.get(id).c,taken:colourTaken,set:setColour,skip:true}
+};
+let cardPick={};
+function stepPick(k,d){
+  const ch=chars.get(cardId);if(!ch)return;
+  const pk=PICKERS[k],cur=pk.cur(cardId),n=pk.names.length;
+  let s=((cardPick[k]!=null?cardPick[k]:cur)+d+n)%n;
+  if(pk.skip)while(s!==cur&&pk.taken(cardId,s))s=(s+d+n)%n;
+  const free=!pk.taken(cardId,s);
+  cardPick[k]=s===cur||free?null:s;
+  if(free&&s!==cur){pk.set(cardId,s);ch.sqv-=18;blip(760,.04);}
+  renderCard();
+}
+function pickRow(k){
+  const pk=PICKERS[k],p=cardPick[k],off=p!=null;
+  return `<div class="acc"><button type="button" data-pick="${k}" data-step="-1" aria-label="Previous ${pk.label}">‹</button><span class="${off?'off':''}">${esc(pk.names[off?p:pk.cur(cardId)]||'')}${off?' · taken':''}</span><button type="button" data-pick="${k}" data-step="1" aria-label="Next ${pk.label}">›</button></div>`;
+}
 function renderCard(){
   if(!cardId)return;const ch=chars.get(cardId);if(!ch||ch.removed){closeCard();return;}
   const dk=ch.desk||{},inf=etaInfo(dk,Date.now());
   card.style.setProperty('--c',ch.look.c);
-  let h=`<button class="x" type="button" aria-label="Close">×</button><h3><i></i>${esc(str(dk.name||'Claude',24))}</h3><div class="sub">${esc(VARIANTS[ch.look.style]||'')} · ${esc(statusOf(ch))}</div>`;
+  let h=`<button class="x" type="button" aria-label="Close">×</button><h3><i></i>${esc(str(dk.name||'Claude',24))}</h3><div class="sub">${esc(statusOf(ch))}</div>`;
+  h+=pickRow('acc')+pickRow('col');
   const det=str(dk.detail,140);if(det&&ch.act!=='idle')h+=`<div class="now">${esc(det)}</div>`;
   if(inf.total)h+='<ol>'+inf.steps.map(s=>{const cur=s===inf.cur;return `<li class="${s.doneMs?'done':cur?'cur':''}"><span>${s.doneMs?'✓':cur?'▸':'·'}</span><span>${esc(str(s.label,70))}</span></li>`;}).join('')+'</ol>';
   let eta='';
@@ -94,12 +117,12 @@ function renderCard(){
 }
 function placeCard(ch){
   const w=card.offsetWidth,hh=card.offsetHeight;
-  let x=P(ch.x)+P(12),y=P(ch.headTop!=null?ch.headTop:ch.y-20)-hh*.25;
+  let x=P(ch.x)+P(12),y=P(ch.y-20)-hh*.25; // from the feet, not the head: a taller hat must not move the card under the pointer
   if(x+w>cssW-6)x=P(ch.x)-P(12)-w;
   x=Math.max(6,x);y=Math.max(6,Math.min(cssH-hh-6,y));
   card.style.left=Math.round(x)+'px';card.style.top=Math.round(y)+'px';
 }
-card.addEventListener('click',e=>{if(e.target.closest('.x'))closeCard();});
+card.addEventListener('click',e=>{if(e.target.closest('.x'))closeCard();const b=e.target.closest('[data-pick]');if(b)stepPick(b.dataset.pick,+b.dataset.step);});
 
 /* ---------- the room ---------- */
 // A /my-office-theme from a session: the page follows each one once, then T goes on working as usual.
