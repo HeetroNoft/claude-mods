@@ -16,13 +16,14 @@ function renderFloors(){
   const drag=!!(boardDrag&&boardDrag.on),waiting=everyDesk.filter(d=>d.waiting&&!d.limited).length;
   document.title=(waiting?`(${waiting}) `:'')+BASE_TITLE;
   const many=floorCount>4,fs=[...Array(floorCount).keys()];
-  const key=[drag,curFloor,floorCount,...everyDesk.map(d=>[d.id,d.name,floorOf.get(String(d.id)),deskState(d)].join(':'))].join('|');
+  const catF=cat&&floorCount>1?cat.floor:-1;
+  const key=[drag,curFloor,floorCount,catF,...everyDesk.map(d=>[d.id,d.name,floorOf.get(String(d.id)),deskState(d)].join(':'))].join('|');
   if(key===floorsKey)return;floorsKey=key;
   floorsEl.classList.toggle('show',floorCount>1||(drag&&everyDesk.length>1));
   floorsEl.classList.toggle('many',many);
   floorsEl.innerHTML=fs.map(f=>{
     const dk=floorDesks(f),st=dk.some(d=>d.limited)?'limit':dk.some(d=>d.waiting)?'wait':'',name=esc(floorName(f));
-    const lights=many?'':dk.map(d=>`<i class="${deskState(d)}" style="background:${looksFor(String(d.id)).c}"></i>`).join('');
+    const lights=(f===catF?'<u class="cat" title="The cat is here"></u>':'')+(many?'':dk.map(d=>`<i class="${deskState(d)}" style="background:${looksFor(String(d.id)).c}"></i>`).join(''));
     return `<button type="button" data-f="${f}" class="${f===curFloor?'cur ':''}${st}${drag&&dk.length>=MAX_DESKS?' full':''}" aria-label="${name}" aria-pressed="${f===curFloor}" title="${name}"><b>${f+1}</b>${lights}</button>`;
   }).join('')+(drag?`<button type="button" data-f="${floorCount}" class="new" aria-label="A new floor" title="A new floor"><b>+</b></button>`:'');
 }
@@ -41,7 +42,9 @@ function leaveFloor(dir,floors){
 function goFloor(f){
   f=Math.max(0,Math.min(floorCount-1,f));if(f===curFloor)return false;
   leaveFloor(f>curFloor?1:-1,Math.abs(f-curFloor));
+  saveRoom(curFloor);
   curFloor=f;floorJump=true;
+  loadRoom(f);catOnFloor(false);
   ingest(lastData||{desks:everyDesk},true);
   return true;
 }
