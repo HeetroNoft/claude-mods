@@ -126,12 +126,17 @@ export function planSteps(raw: unknown, now: number): Step[] {
   return steps
 }
 
+// A plan runs in order, so ticking a step closes the ones before it: a Claude that jumps to the last
+// step must not leave the first one "in progress" for good (a Manager's board did, three times).
 export function finishStep(steps: Step[], n: number, now: number): Step[] {
   const out = steps.map(s => ({ ...s }))
   const s = out[n - 1]
   if (!s || s.doneMs) return out
-  s.startMs = s.startMs ?? now
-  s.doneMs = now
+  for (const x of out.slice(0, n)) {
+    if (x.doneMs) continue
+    x.startMs = x.startMs ?? now
+    x.doneMs = now
+  }
   const next = out.find(x => !x.doneMs)
   if (next && !next.startMs) next.startMs = now
   return out

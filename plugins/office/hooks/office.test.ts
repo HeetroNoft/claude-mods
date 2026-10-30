@@ -59,6 +59,24 @@ test('ETA: a fast pace brings the finish forward, and no estimates means no cloc
   expect(eta(planSteps([{ label: 'A', minutes: 0 }], T0), T0, T0)).toBeUndefined()
 })
 
+test('ticking a later step closes the steps before it, and the ETA keeps the real time', async () => {
+  // what a Manager's session did: a plan of three, then only step_done 3
+  let steps = planSteps([{ label: 'A', minutes: 1 }, { label: 'B', minutes: 3 }, { label: 'C', minutes: 2 }], T0)
+  steps = finishStep(steps, 3, T0 + 6 * MIN)
+  expect(steps.map(s => s.doneMs)).toEqual([T0 + 6 * MIN, T0 + 6 * MIN, T0 + 6 * MIN])
+  const e = eta(steps, T0, T0 + 6 * MIN)!
+  expect(e.allDone).toBe(true)
+  expect(e.finishMs).toBe(T0 + 6 * MIN)
+
+  // a middle step closes what is before it and starts what comes next, and a repeat changes nothing
+  let more = planSteps([{ label: 'A', minutes: 1 }, { label: 'B', minutes: 1 }, { label: 'C', minutes: 1 }], T0)
+  more = finishStep(more, 2, T0 + MIN)
+  expect(more.map(s => Boolean(s.doneMs))).toEqual([true, true, false])
+  expect(more[2].startMs).toBe(T0 + MIN)
+  expect(finishStep(more, 1, T0 + 2 * MIN)[0].doneMs).toBe(T0 + MIN)
+  expect(finishStep(more, 9, T0 + 2 * MIN)).toEqual(more)
+})
+
 test('the shared data file names files, never their folders', async () => {
   let d = newDesk('s1', 'CTO', T0)
   d = applyTool(d, 'Read', { file_path: '/home/sam/private/intro.md' }, 'k1', T0)
