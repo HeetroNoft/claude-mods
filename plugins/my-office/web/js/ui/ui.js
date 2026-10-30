@@ -37,7 +37,7 @@ function poke(c,tp){
   else{setMood(c,'happy',1000);emote(c,'note');c.sqv+=18;}
   blip(700+Math.random()*300,.04);
 }
-const overUi=e=>!!(e.target.closest&&e.target.closest('#card,#items,#floors,#prefs,#usage,button'));
+const overUi=e=>!!(e.target.closest&&e.target.closest('#card,#plan,#items,#floors,#prefs,#usage,button'));
 stage.addEventListener('pointermove',e=>{
   const p=toWorld(e),dx=p.x-ptr.x;ptr.x=p.x;ptr.y=p.y;ptr.in=true;
   if(overUi(e)){hoverCh=null;stage.classList.remove('hand');return;}
@@ -46,7 +46,7 @@ stage.addEventListener('pointermove',e=>{
   hoverCh=c;
   if(c)c.pet=(c.pet||0)+Math.min(6,Math.abs(dx));
   if(cat&&Math.abs(p.x-cat.x)<=6&&p.y>=cat.y-cat.z-10&&p.y<=cat.y-cat.z+1)cat.pet+=Math.min(6,Math.abs(dx));
-  stage.classList.toggle('hand',!!(c||internAt(p.x,p.y)||objectAt(p.x,p.y)||boardAt(p.x,p.y)>=0));
+  stage.classList.toggle('hand',!!(c||internAt(p.x,p.y)||objectAt(p.x,p.y)||boardHit(p.x,p.y)>=0));
 });
 stage.addEventListener('pointerleave',()=>{ptr.in=false;hoverCh=null;stage.classList.remove('hand');});
 stage.addEventListener('click',e=>{
@@ -57,6 +57,7 @@ stage.addEventListener('click',e=>{
   if(c){poke(c,tp);if(cardId===c.id)closeCard();else openCard(c.id);return;}
   const it=internAt(p.x,p.y);if(it){it.hopUntil=tp+400;emoteAt(it.x+3,it.y-11,'excl');blip(900,.03);return;}
   const o=objectAt(p.x,p.y);if(o){o.go(tp);return;}
+  const b=boardHit(p.x,p.y);if(b>=0){togglePlan(b);return;}
   closeCard();
 });
 
@@ -74,15 +75,15 @@ function statusOf(ch){
   if(ch.act==='idle'&&I&&I.act)return 'On a break · '+IDLE_TEXT[I.act].replace('the cat',catName||'the cat')+(I.pair?str((I.pair.desk||{}).name||'Claude',14):'');
   return ACT_TEXT[ch.act]||'Working';
 }
-function openCard(id){cardId=id;cardPick={};card.classList.remove('open');void card.offsetWidth;card._h='';card.classList.add('open');renderCard();}
-function closeCard(){cardId=null;cardPick={};card.classList.remove('open');}
+function openCard(id){closePlan();cardId=id;cardPick={};cardHist=false;card.classList.remove('open');void card.offsetWidth;card._h='';card.classList.add('open');renderCard();}
+function closeCard(){closePlan();cardId=null;cardPick={};card.classList.remove('open');}
 // The card's pickers: a free accessory or colour is worn at once. A taken accessory shows greyed and the Claude
 // keeps what it wears; a taken colour is never offered (skip).
 const PICKERS={
   acc:{label:'accessory',names:VARIANTS,cur:id=>lookMem.get(id).s,taken:accessoryTaken,set:setAccessory},
   col:{label:'colour',names:COLOURS,cur:id=>lookMem.get(id).c,taken:colourTaken,set:setColour,skip:true}
 };
-let cardPick={};
+let cardPick={},cardHist=false;
 function stepPick(k,d){
   const ch=chars.get(cardId);if(!ch)return;
   const pk=PICKERS[k],cur=pk.cur(cardId),n=pk.names.length;
@@ -97,6 +98,21 @@ function pickRow(k){
   const pk=PICKERS[k],p=cardPick[k],off=p!=null;
   return `<div class="acc"><button type="button" data-pick="${k}" data-step="-1" aria-label="Previous ${pk.label}">‹</button><span class="${off?'off':''}">${esc(pk.names[off?p:pk.cur(cardId)]||'')}${off?' · taken':''}</span><button type="button" data-pick="${k}" data-step="1" aria-label="Next ${pk.label}">›</button></div>`;
 }
+// The plan's state in a line, for the card and the board's panel.
+function etaLine(inf){
+  if(inf.mode==='ontime')return `Done by <b>${hhmm(inf.fin)}</b> · ${about(inf.left)} left`;
+  if(inf.mode==='late')return `Now done by ${hhmm(inf.fin)} · <b style="color:#B26A00">${about(inf.late*60000)} behind plan</b>`;
+  if(inf.mode==='stopped')return `<b style="color:${inf.kind==='error'?'#B03A2E':'#B26A00'}">${inf.kind==='error'?'Ended':'Interrupted'} at ${hhmm(inf.at)}${inf.kind==='error'&&!inf.label.startsWith('ENDED')?' · '+esc(inf.label):''}</b>${inf.total?` · ${inf.done} of ${inf.total} steps`:''}`;
+  if(inf.mode==='finished')return `<b style="color:#2E8A57">Finished at ${hhmm(inf.at)}</b>`;
+  return inf.total?'':'No plan yet';
+}
+// The session's latest news, newest first, folded until asked for.
+const BAD_NEWS=new Set(['fail','denied','error']);
+function historyHtml(dk){
+  const log=(Array.isArray(dk.log)?dk.log:[]).filter(Boolean);if(!log.length)return '';
+  const list=cardHist?'<ul class="hist">'+log.slice().reverse().map(l=>`<li class="${BAD_NEWS.has(l.kind)?'bad':''}"><span>${hhmm(l.ms)}</span><span>${esc(str(l.text,60))}</span></li>`).join('')+'</ul>':'';
+  return `<button type="button" class="histbtn" aria-expanded="${cardHist}" data-hist>${cardHist?'▾':'▸'} History (${log.length})</button>`+list;
+}
 function renderCard(){
   if(!cardId)return;const ch=chars.get(cardId);if(!ch||ch.removed){closeCard();return;}
   const dk=ch.desk||{},inf=etaInfo(dk,Date.now());
@@ -105,14 +121,10 @@ function renderCard(){
   h+=pickRow('acc')+pickRow('col');
   const det=str(dk.detail,140);if(det&&ch.act!=='idle')h+=`<div class="now">${esc(det)}</div>`;
   if(inf.total)h+='<ol>'+inf.steps.map(s=>{const cur=s===inf.cur;return `<li class="${s.doneMs?'done':cur?'cur':''}"><span>${s.doneMs?'✓':cur?'▸':'·'}</span><span>${esc(str(s.label,70))}</span></li>`;}).join('')+'</ol>';
-  let eta='';
-  if(inf.mode==='ontime')eta=`Done by <b>${hhmm(inf.fin)}</b> · ${about(inf.left)} left`;
-  else if(inf.mode==='late')eta=`Now done by ${hhmm(inf.fin)} · <b style="color:#B26A00">${about(inf.late*60000)} behind plan</b>`;
-  else if(inf.mode==='stopped')eta=`<b style="color:${inf.kind==='error'?'#B03A2E':'#B26A00'}">${inf.kind==='error'?'Ended':'Interrupted'} at ${hhmm(inf.at)}${inf.kind==='error'&&!inf.label.startsWith('ENDED')?' · '+esc(inf.label):''}</b>${inf.total?` · ${inf.done} of ${inf.total} steps`:''}`;
-  else if(inf.mode==='finished')eta=`<b style="color:#2E8A57">Finished at ${hhmm(inf.at)}</b>`;
-  else if(!inf.total)eta='No plan yet';
+  const eta=etaLine(inf);
   if(eta)h+=`<div class="eta">${eta}</div>`;
   const nh=(Array.isArray(dk.interns)?dk.interns:[]).length;if(nh)h+=`<div class="eta">${nh} helper${nh>1?'s':''} on it</div>`;
+  h+=historyHtml(dk);
   const facts=[dk.branch&&'Branch '+str(dk.branch,30),dk.model&&str(dk.model,24),dk.ctx!=null&&'Context '+dk.ctx+'%',dk.tasks&&dk.tasks.total&&`Tasks ${dk.tasks.done} of ${dk.tasks.total}`].filter(Boolean);
   if(facts.length)h+=`<div class="eta">${esc(facts.join(' · '))}</div>`;
   if(h!==card._h){card.innerHTML=h;card._h=h;}
@@ -125,7 +137,7 @@ function placeCard(ch){
   x=Math.max(6,x);y=Math.max(6,Math.min(cssH-hh-6,y));
   card.style.left=Math.round(x)+'px';card.style.top=Math.round(y)+'px';
 }
-card.addEventListener('click',e=>{if(e.target.closest('.x'))closeCard();const b=e.target.closest('[data-pick]');if(b)stepPick(b.dataset.pick,+b.dataset.step);});
+card.addEventListener('click',e=>{if(e.target.closest('.x'))closeCard();if(e.target.closest('[data-hist]')){cardHist=!cardHist;renderCard();}const b=e.target.closest('[data-pick]');if(b)stepPick(b.dataset.pick,+b.dataset.step);});
 
 /* ---------- the room ---------- */
 // A /my-office-theme from a session: the page follows each one once, then T goes on working as usual.

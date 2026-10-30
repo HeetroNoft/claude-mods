@@ -1,10 +1,12 @@
 // The settings panel (the gear, or S): what the page lets you choose, remembered in this browser.
 'use strict';
-const PREFS_DEFAULT={time:'auto',season:'auto',hemi:'north',badges:true,gauge:true,autohide:false,compact:false,calm:false};
+const SOUNDS=[['plan','Plan finished','All the steps done'],['ship','Commit or push',''],['pass','Tests passed',''],['fail','Something failed','A failed command or tests'],['denied','Permission refused',''],['usage','Usage alarm','The gauge running low']];
+const PREFS_DEFAULT={time:'auto',season:'auto',hemi:'north',badges:true,gauge:true,autohide:false,compact:false,calm:false,...Object.fromEntries(SOUNDS.map(([k])=>['snd_'+k,true]))};
 const PREFS={...PREFS_DEFAULT};
 const prefsEl=document.getElementById('prefs'),setBtn=document.getElementById('set');
 try{Object.assign(PREFS,JSON.parse(localStorage.getItem('office.prefs')||'{}'));}catch(e){}
 try{if(!/labels/.test(Q)&&localStorage.getItem('office.labels')==='1')LABELS=true;}catch(e){}
+const soundFor=k=>PREFS['snd_'+k]!==false;
 function savePrefs(){try{localStorage.setItem('office.prefs',JSON.stringify(PREFS));}catch(e){}}
 const TIMES={auto:null,day:12,night:23};
 // What each choice changes on the page. A ?hour= in the address (the test pages) wins over the setting.
@@ -17,14 +19,29 @@ function applyPrefs(){
 }
 const prefsKey=()=>JSON.stringify([PREFS,themeKey,LABELS,barOn,soundOn,prefsTab]);
 let prefsSeen='',prefsTab='room';
-const TABS=[['room','Room'],['display','Display'],['sound','Sound'],['keys','Shortcuts']];
+const TABS=[['room','Room'],['display','Display'],['sound','Sound'],['legend','Legend'],['keys','Shortcuts']];
+// What the boards and badges can show, in the order of the Legend tab. The board's own words come from plan.js.
+const TASK_MEANS={tests:'Running the tests',build:'Building',commit:'Making a commit',push:'Pushing',compact:'Compacting the context'};
+const LEGEND=[
+  ['Working',[...Object.entries(TASK_MEANS).map(([k,t])=>[TASK_LOOK[k][1],TASK_LOOK[k][0],t]),['lamp','PLANNING','In plan mode'],['alarm','WAITING','A background job or a timer']]],
+  ['News',[['check','OK','Tests passed, or work shipped'],['box','MOVED','It changed project or branch'],['bolt','NEW MODEL','It changed model']]],
+  ['Needs you',[['quest','?','A question or a permission'],['quest','STUCK?','No news for five minutes'],['cross','FAILED','A command or the tests failed'],['noway','DENIED','A permission was refused'],['skull','NO USAGE','Out of usage']]],
+];
+const iconSrcs={};
+function iconSrc(name){
+  if(iconSrcs[name])return iconSrcs[name];
+  const c=document.createElement('canvas');c.width=c.height=7;drawIcon(c.getContext('2d'),name,0,0,'#FFFFFF');
+  return iconSrcs[name]=c.toDataURL();
+}
 // One tab's content. Radio groups and the tab bar use a roving tabindex: Tab reaches the chosen one, arrows move (see the keydown below).
 function prefsTabHtml(){
   const sw=(k,label,on,note)=>`<button type="button" class="tog" role="switch" aria-checked="${on}" data-sw="${k}"><span>${label}${note?`<small>${note}</small>`:''}</span><i></i></button>`;
   const seg=(k,label,opts)=>`<div class="row stack"><span id="seg-${k}">${label}</span><div class="seg" role="radiogroup" aria-labelledby="seg-${k}">${opts.map(([v,t])=>`<button type="button" role="radio" aria-checked="${PREFS[k]===v}" tabindex="${PREFS[k]===v?0:-1}" class="${PREFS[k]===v?'on':''}" data-seg="${k}" data-v="${v}">${t}</button>`).join('')}</div></div>`;
   if(prefsTab==='display')return `<section><h3>On screen</h3>${sw('labels','Labels',LABELS,'Names and plans in words')}${sw('badges','Head icons',PREFS.badges,'The role above each Claude')}${sw('gauge','Usage gauge',PREFS.gauge,'Slides away; its tab stays')}${sw('items','Item bar',barOn)}</section>
 <section><h3>Interface</h3>${sw('autohide','Hide the bars',PREFS.autohide,'They come back near the bottom')}${sw('compact','Compact buttons',PREFS.compact)}${sw('calm','Less motion',PREFS.calm,'No slides, no bounces')}</section>`;
-  if(prefsTab==='sound')return `<section><h3>Sound</h3>${sw('sound','Sound',soundOn)}<div class="row"><label for="pvol">Volume</label><input id="pvol" type="range" min="0" max="100" step="5" value="${volume}"><output id="pvolv" for="pvol">${volume}%</output></div></section>`;
+  if(prefsTab==='sound')return `<section><h3>Sound</h3>${sw('sound','Sound',soundOn)}<div class="row"><label for="pvol">Volume</label><input id="pvol" type="range" min="0" max="100" step="5" value="${volume}"><output id="pvolv" for="pvol">${volume}%</output></div></section>
+<section><h3>Which sounds</h3>${SOUNDS.map(([k,t,n])=>sw('snd_'+k,t,soundFor(k),n)).join('')}</section>`;
+  if(prefsTab==='legend')return LEGEND.map(([title,rows])=>`<section><h3>${title}</h3><dl class="legend">${rows.map(([ic,word,t])=>`<div><dt><img src="${iconSrc(ic)}" alt="">${esc(word)}</dt><dd>${t}</dd></div>`).join('')}</dl></section>`).join('');
   if(prefsTab==='keys'){const keys=[['T','Next room'],['L','Labels'],['I','Item bar'],['G','Usage gauge'],['M','Sound'],['S','Settings'],['1-9','Go to a floor'],['Esc','Close']];
     return `<section><h3>Shortcuts</h3><dl>${keys.map(([k,t])=>`<div><dt>${k}</dt><dd>${t}</dd></div>`).join('')}</dl></section>`;}
   return `<section><h3>Room</h3><div class="rooms" role="radiogroup" aria-label="Room">${THEME_KEYS.map(k=>{const t=THEMES[k],on=k===themeKey;return `<button type="button" role="radio" class="${on?'on':''}" aria-checked="${on}" tabindex="${on?0:-1}" data-room="${k}"><span class="sw">${t.swatch.map(c=>`<i style="background:${c}"></i>`).join('')}</span><span class="nm">${esc(t.name)}</span></button>`;}).join('')}</div></section>

@@ -31,7 +31,7 @@ function resetWords(ms,now){if(isNaN(ms))return '';if(ms-now<20*3600000)return h
 // reading only sets the levels, so opening the page on a low gauge stays quiet.
 let gaugeSeen=null,gaugeShakeUntil=0;
 const ALARM={1:[660,520],2:[880,660,880],3:[440,330,220]};
-function gaugeAlarm(level){(ALARM[level]||[]).forEach((f,i)=>setTimeout(()=>blip(f,level===3?.22:.12,'square'),i*(level===3?260:170)));}
+function gaugeAlarm(level){if(!soundFor('usage'))return;(ALARM[level]||[]).forEach((f,i)=>setTimeout(()=>blip(f,level===3?.22:.12,'square'),i*(level===3?260:170)));}
 function watchGauge(wins,tp){
   const lv=wins.map(w=>w.left==null?null:w.level);
   if(gaugeSeen){const worse=lv.reduce((m,l,i)=>l!=null&&gaugeSeen[i]!=null&&l>gaugeSeen[i]?Math.max(m,l):m,0);

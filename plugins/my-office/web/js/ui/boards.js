@@ -2,10 +2,11 @@
 // desks between shift one along, and every Claude walks to its desk's new place.
 'use strict';
 let boardDrag=null;
-function boardAt(x,y){
-  if(everyDesk.length<2||!desks.length||y<BOARD_TOP||y>=BOARD_TOP+BOARD_H)return -1;
+function boardHit(x,y){
+  if(!desks.length||y<BOARD_TOP||y>=BOARD_TOP+BOARD_H)return -1;
   const h=boardHalf(desks.length);return deskXs(desks.length).findIndex(dx=>x>=dx-h&&x<dx+h);
 }
+const boardAt=(x,y)=>everyDesk.length<2?-1:boardHit(x,y); // a lone desk has nowhere to go
 function slotAt(x){const xs=deskXs(desks.length);let best=0;xs.forEach((dx,i)=>{if(Math.abs(dx-x)<Math.abs(xs[best]-x))best=i;});return best;}
 // How far the dragged board has come; null for any other board.
 function boardShift(dk){
@@ -40,7 +41,7 @@ stage.addEventListener('pointerdown',e=>{
 stage.addEventListener('pointermove',e=>{
   const D=boardDrag;if(!D)return;
   D.x=toWorld(e).x;
-  if(!D.on&&Math.abs(D.x-D.sx)>3){D.on=true;blip(620,.04,'triangle');try{stage.setPointerCapture(D.pid);}catch(err){}renderFloors();}
+  if(!D.on&&Math.abs(D.x-D.sx)>3){D.on=true;closePlan();blip(620,.04,'triangle');try{stage.setPointerCapture(D.pid);}catch(err){}renderFloors();}
   if(D.on)floorHover(e.clientX,e.clientY);
 });
 stage.addEventListener('pointerup',e=>{
@@ -53,3 +54,32 @@ stage.addEventListener('pointerup',e=>{
 const dropDrag=()=>{if(boardDrag){boardDrag=null;renderFloors();}};
 stage.addEventListener('pointercancel',dropDrag);
 window.addEventListener('keydown',e=>{if(e.key==='Escape')dropDrag();});
+
+/* ---------- a board clicked: its plan in detail ---------- */
+const planEl=document.getElementById('plan');
+let planId=null;
+const mins=ms=>{const m=Math.round(Math.max(0,ms)/60000);return m<1?'<1 min':m+' min';};
+// A step's time: the estimate, then what it really took (so far, for the step under way; a pause does not count).
+function stepTimes(s,dk,now){
+  const est=s.estMin?s.estMin+' min':'',at=s.startMs||(s.doneMs?dk.planMs:0);
+  if(!at)return est;
+  const real=mins((s.doneMs||dk.pausedMs||now)-at);
+  return est?est+' → '+real:real;
+}
+function renderPlan(){
+  if(!planId)return;
+  const i=desks.findIndex(d=>String(d.id)===planId);if(i<0){closePlan();return;}
+  const dk=desks[i],now=Date.now(),inf=etaInfo(dk,now);
+  planEl.style.setProperty('--c',looksFor(planId).c);
+  let h=`<button class="x" type="button" aria-label="Close">×</button><h3>${esc(str(dk.name||'Claude',24))}</h3>`;
+  if(inf.total)h+='<ol>'+inf.steps.map(s=>{const cur=s===inf.cur;return `<li class="${s.doneMs?'done':cur?'cur':''}"><span>${s.doneMs?'✓':cur?'▸':'·'}</span><span>${esc(str(s.label,70))}</span><span>${esc(stepTimes(s,dk,now))}</span></li>`;}).join('')+'</ol>';
+  const eta=etaLine(inf)||(inf.mode==='paused'?'Paused while it waits for you':'');if(eta)h+=`<div class="eta">${eta}</div>`;
+  if(h!==planEl._h){planEl.innerHTML=h;planEl._h=h;}
+  const w=planEl.offsetWidth,x=Math.max(6,Math.min(cssW-w-6,P(deskXs(desks.length)[i])-w/2));
+  planEl.style.left=Math.round(x)+'px';planEl.style.top=Math.round(P(BOARD_TOP+BOARD_H)+6)+'px';
+}
+function openPlan(id){closeCard();planId=id;planEl.classList.remove('open');void planEl.offsetWidth;planEl._h='';planEl.classList.add('open');renderPlan();}
+function closePlan(){planId=null;planEl.classList.remove('open');}
+function togglePlan(i){const id=String(desks[i].id);if(planId===id)closePlan();else{openPlan(id);blip(620,.03,'triangle');}}
+planEl.addEventListener('click',e=>{if(e.target.closest('.x'))closePlan();});
+setInterval(renderPlan,1000);
