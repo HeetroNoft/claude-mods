@@ -86,3 +86,27 @@
   if(!fails.length)console.log('CHECK OK all layout checks passed');
   else{console.log('CHECK FAIL '+fails.length);fails.slice(0,40).forEach(m=>console.log('CHECK FAIL: '+m));}
 })();
+// Moving a desk, with real pointer events once the desks have come in: the last desk dragged onto the
+// first place lands there, the others shift along, Claudes follow, and the order outlives new data.
+setTimeout(()=>{
+  const fails=[],ids=()=>desks.map(d=>String(d.id)),r=stage.getBoundingClientRect(),keepOrder=deskOrder;
+  const fire=(type,x,y)=>stage.dispatchEvent(new PointerEvent(type,{bubbles:true,button:0,pointerId:1,clientX:r.left+x/W*r.width,clientY:r.top+y/H*r.height}));
+  const before=ids(),n=before.length,xs=deskXs(n),y=BOARD_TOP+9,last=before[n-1],seated=[...chars.values()].find(c=>c.id===before[0]);
+  if(n<2)fails.push('only '+n+' desks in the fake data');
+  fire('pointerdown',xs[n-1],y);fire('pointermove',xs[n-1]-30,y);
+  if(!boardDrag||!boardDrag.on)fails.push('dragging a board did not pick it up');
+  if(boardShift(desks[n-1])!==-30)fails.push('the board moved by '+boardShift(desks[n-1]));
+  fire('pointermove',xs[0],y);fire('pointerup',xs[0],y);
+  const want=[last,...before.slice(0,n-1)].join();
+  if(ids().join()!==want)fails.push('order '+ids().join()+', wanted '+want);
+  ids().forEach((id,i)=>{if(chars.get(id).dx!==xs[i])fails.push(id+' desk at '+chars.get(id).dx+', wanted '+xs[i]);});
+  if(seated&&seated.act!=='idle'&&!seated.errand&&seated.tgt.x!==xs[1])fails.push('its Claude is not going to its new place');
+  ingest(lastData,false);if(ids().join()!==want)fails.push('new data undid the order');
+  fire('pointerdown',xs[1],y);fire('pointermove',xs[3],y);window.dispatchEvent(new KeyboardEvent('keydown',{key:'Escape'}));fire('pointerup',xs[3],y);
+  if(ids().join()!==want)fails.push('Escape did not cancel the drag');
+  fire('pointerdown',xs[1],y);fire('pointerup',xs[1],y);
+  if(ids().join()!==want)fails.push('a plain click moved a desk');
+  deskOrder=keepOrder;try{localStorage.removeItem('office.deskOrder');}catch(e){}ingest(lastData,false);
+  if(ids().join()!==before.join())fails.push('order not put back');
+  if(!fails.length)console.log('CHECK OK moving a desk');else fails.forEach(m=>console.log('CHECK FAIL: '+m));
+},2500);

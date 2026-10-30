@@ -46,7 +46,7 @@ stage.addEventListener('pointermove',e=>{
   hoverCh=c;
   if(c)c.pet=(c.pet||0)+Math.min(6,Math.abs(dx));
   if(cat&&Math.abs(p.x-cat.x)<=6&&p.y>=cat.y-cat.z-10&&p.y<=cat.y-cat.z+1)cat.pet+=Math.min(6,Math.abs(dx));
-  stage.classList.toggle('hand',!!(c||internAt(p.x,p.y)||objectAt(p.x,p.y)));
+  stage.classList.toggle('hand',!!(c||internAt(p.x,p.y)||objectAt(p.x,p.y)||boardAt(p.x,p.y)>=0));
 });
 stage.addEventListener('pointerleave',()=>{ptr.in=false;hoverCh=null;stage.classList.remove('hand');});
 stage.addEventListener('click',e=>{

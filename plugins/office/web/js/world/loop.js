@@ -200,7 +200,9 @@ function frame(tp){
   if(gaugeEmpty()){wx.fillStyle='rgba(18,4,6,.42)';wx.fillRect(0,0,W,H);}
   drawGauge(wx,now,tp);
   if(TH.live)TH.live(wx,tp);
-  desks.forEach((dk,i)=>{const c=looksFor(String(dk.id)).c;outlined(wx,'board'+xs[i]+'/'+desks.length,g=>drawBoard(g,xs[i],c,dk.activity==='gone',tp),g=>drawBoard(g,xs[i],c,false,0));if(!LABELS)boardPixels(wx,xs[i],dk,now,tp);});
+  const oneBoard=(dk,x)=>{const c=looksFor(String(dk.id)).c;outlined(wx,'board'+x+'/'+desks.length,g=>drawBoard(g,x,c,dk.activity==='gone',tp),g=>drawBoard(g,x,c,false,0));if(!LABELS)boardPixels(wx,x,dk,now,tp);};
+  desks.forEach((dk,i)=>{if(!boardShift(dk))oneBoard(dk,xs[i]);});
+  drawBoardDrag(wx,xs,oneBoard); // the board being dragged, over the others (ui/boards.js)
   if(TH.neon)drawNeon(wx,tp);
   post.forEach(f=>f());
   drawEmotes(wx,tp);
@@ -231,7 +233,7 @@ function frame(tp){
   text('THE OFFICE',P(16),P(33.5),Math.max(12,1.95*S*TS),'#FFFFFF','center');
   drawClockText(now);
   drawGaugeText(now);
-  desks.forEach((dk,i)=>drawBoardText(dk,xs[i],now));
+  desks.forEach((dk,i)=>drawBoardText(dk,xs[i]+(boardShift(dk)||0),now));
   }
   // glyphs
   if(!LABELS){glyphs=glyphs.filter(gl=>{gl.life-=dt;gl.y+=gl.vy*dt;gl.x+=gl.vx*dt;if(gl.life<=0)return false;

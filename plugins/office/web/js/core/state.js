@@ -127,14 +127,21 @@ function setTarget(e,t,instant){
 /* ---------- ingest ---------- */
 window.__office=function(d){try{misses=0;lastCall=Date.now();ingest(d,false);}catch(err){console.error('office ingest',err);}};
 
+// The order the desks were dragged into (ui/boards.js), by desk id. An id lasts as long as its
+// session, so a new session simply joins at the end of the row.
+let deskOrder=[],lastData=null;
+try{const a=JSON.parse(localStorage.getItem('office.deskOrder')||'[]');if(Array.isArray(a))deskOrder=a.map(String);}catch(e){}
+function orderDesks(list){const at=id=>{const i=deskOrder.indexOf(String(id));return i<0?1e9:i;};return list.map((d,i)=>[d,i]).sort((a,b)=>at(a[0].id)-at(b[0].id)||a[1]-b[1]).map(a=>a[0]);}
+
 function ingest(d,synthetic){
   const now=Date.now();
+  if(!synthetic)lastData=d;
   const real=(d&&Array.isArray(d.desks)?d.desks:[]).filter(x=>x&&x.id!=null);
   // A teammate a Claude has named (CEO, Writer) but who has no desk yet sleeps at an empty desk.
   const have=new Set(real.map(x=>String(x.name||'').toLowerCase()));
   const sleepers=[];
   real.forEach(x=>Object.values(x.peers||{}).forEach(n=>{const k=String(n).toLowerCase();if(n&&!have.has(k)){have.add(k);sleepers.push({id:'asleep:'+n,name:String(n),activity:'asleep',detail:'Not joined yet',steps:[],interns:[],files:[],sent:[],got:[],asleep:true});}}));
-  const list=real.filter(x=>x.activity!=='gone').slice(0,MAX_DESKS);
+  const list=orderDesks(real.filter(x=>x.activity!=='gone').slice(0,MAX_DESKS));
   if(!synthetic)gotData=true;
   desks=list;
   const xs=deskXs(list.length);
