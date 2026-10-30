@@ -42,7 +42,7 @@ function stepEntity(e,dt){
 // The pose this frame, by priority: held, walking, a gift in hand, a scene (high five, clapping,
 // waving), then what the work or the break calls for.
 function poseFor(ch,tp){
-  if(ch.held)return 'dangle';
+  if(ch.held||ch.fly)return 'dangle';
   if(ch.path.length)return 'walk';
   // the cat: a stroke for it, a stop while it sits on the desk, a nap broken for a moment
   if(tp<(ch.catPetUntil||0))return 'pet';
@@ -132,6 +132,7 @@ function frame(tp){
   items.push({d:FRONT.coffee,f:()=>outlined(wx,'coffee',g=>drawCoffee(g,tp,coffeeBusy),g=>drawCoffee(g,0,false))});
   items.push({d:129,f:()=>outlinedLive(wx,'plant',[290,90,27,43],g=>drawPlant(g,tp))});
   catDrawables(items,tp); // the cat, what it knocked over, its ball (world/cat.js)
+  roomItems(items,wx); // what the breaks left behind (actors/scenes.js)
   desks.forEach((dk,i)=>{
     const x=xs[i],dim=dk.activity==='gone'; const ch=chars.get(String(dk.id));
     const typing=ch&&!ch.hidden&&ch.seated&&!ch.path.length&&(ch.act==='edit'||ch.act==='send'||ch.act==='bash')&&!(tp<(ch.catBlockUntil||0));
@@ -151,7 +152,7 @@ function frame(tp){
     const bob=pose==='walk'?(stepOf(ch)?-1:0):0;
     const rate={walk:6,type:7,press:3,wave:4,sip:.5,talk:5,water:4,juggle:3,catch:2,dance:2.5,eat:3,fold:2,rps:6,dangle:5,clap:5,pet:3,game:1.5}[pose]||2;
     // how high off the floor: held up by the pointer, or floating in the space station
-    const air=ch.held?7:(ch.idle&&ch.idle.act==='float'&&ch.idle.phase==='do')?Math.round(4+2*Math.sin(tp/700)):0;
+    const air=ch.held?7:ch.fly?Math.round(ch.fly.h):(ch.idle&&ch.idle.act==='float'&&ch.idle.phase==='do')?Math.round(4+2*Math.sin(tp/700)):0;
     const sway=pose==='dance'?(frameOf(ch,rate)?1:-1):0;
     // what is in hand: a treat's own state, else what the break activity calls for
     const st=treatNow(ch,tp),I=ch.idle,doing=I&&I.phase==='do'&&!ch.path.length?I.act:null;

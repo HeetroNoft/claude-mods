@@ -28,6 +28,18 @@ setTimeout(()=>{
   const pr=prefsEl.getBoundingClientRect();ok(prefsEl.scrollWidth<=prefsEl.clientWidth&&pr.width>=300,'the panel is too narrow');
   [...prefsEl.querySelectorAll('button')].forEach(b=>{const r=b.getBoundingClientRect();ok(r.height>=34,'a control is only '+r.height+' px high: '+b.textContent);});
   openPrefs(false);ok(document.activeElement===setBtn,'closing does not hand the focus back');prefsEl.blur();setBtn.blur();
+  // the new scenes: every one runs through its begin, tick, pose, props and end, in every season
+  const sc=[...chars.values()][0],sb=[...chars.values()][1],keepIdle=sc.idle,keepIdleB=sb.idle;
+  SEASONS.forEach(s=>{SEASON=s;['season','clock','doodle','shelfread','share','mop'].forEach(a=>{const D=IDLES[a],I={act:a,phase:'do',start:0,dur:1000,until:1e12};sc.idle=I;stain=stain||{floor:curFloor,x:100,y:176,left:1};
+    try{if(D.spot)D.spot(sc);if(D.begin)D.begin(sc,I,0);if(D.tick)D.tick(sc,I,1);ok(typeof D.pose(sc,1)==='string',a+' has no pose');if(D.props)D.props(wx,sc,1,I);if(D.end)D.end(sc,I,1);}catch(err){ok(false,a+' in '+s+': '+err.message);}});
+    ['snowball','selfie','napside'].forEach(a=>{const D=IDLES[a],I={act:a,phase:'do',pair:sb,role:0,sync:1,dur:9000,start:0,until:1e12};sc.idle=I;sb.idle={act:a,phase:'do',pair:sc,role:1,dur:9000,start:0,until:1e12};
+    try{if(D.tick){D.tick(sc,I,5000);D.tick(sc,I,7000);}ok(typeof D.pose(sc,5000)==='string',a+' has no pose');if(D.props)D.props(wx,sc,5000,I);}catch(err){ok(false,a+' in '+s+': '+err.message);}});
+    const its=[];floorThing={floor:curFloor,kind:s,until:Date.now()+1e4};try{roomItems(its,wx);its.forEach(i=>i.f());}catch(err){ok(false,'room items in '+s+': '+err.message);}});
+  ok(photos.length>0,'the selfie left no photo');stain={floor:curFloor,x:100,y:176,left:1};ok(IDLES.mop.weight()>0,'a stain does not call for a mop');mopEnd(sc);ok(!stain,'mopping left the stain');
+  floorThing=null;photos=[];sc.idle=keepIdle;sb.idle=keepIdleB;
+  // the pointer: a Claude let go in flight lands, dizzy, and the floor can be tapped
+  const fx=sc.x;flingClaude(sc,200,60,0);for(let i=0;i<400&&sc.fly;i++)flyTick(sc,.02,i);ok(!sc.fly&&sc.x>=8&&sc.x<=312,'the throw never landed');ok(sc.mood==='dizzy','the thrown Claude is not dizzy');sc.x=fx;sc.resumeAt=0;
+  floorTap({x:150,y:150},performance.now());
   // avatars: the first one in is the plain Claude, the rest are drawn, and a refresh changes nobody
   const lookKey=()=>everyDesk.map(d=>{const l=looksFor(String(d.id));return d.id+'='+l.c+':'+l.style;}).join();
   const lookRules=why=>{const pairs=everyDesk.map(d=>{const l=looksFor(String(d.id));return l.c+':'+l.style;});ok(new Set(pairs).size===pairs.length,why+': two sessions share an avatar');

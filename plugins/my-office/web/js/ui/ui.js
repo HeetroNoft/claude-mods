@@ -58,6 +58,7 @@ stage.addEventListener('click',e=>{
   const it=internAt(p.x,p.y);if(it){it.hopUntil=tp+400;emoteAt(it.x+3,it.y-11,'excl');blip(900,.03);return;}
   const o=objectAt(p.x,p.y);if(o){o.go(tp);return;}
   const b=boardHit(p.x,p.y);if(b>=0){togglePlan(b);return;}
+  floorTap(p,tp); // actors/scenes.js
   closeCard();
 });
 

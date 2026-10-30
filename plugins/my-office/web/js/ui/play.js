@@ -66,16 +66,16 @@ let grab=null,suppressClickUntil=0;
 stage.addEventListener('pointerdown',e=>{
   if(overUi(e)||e.button>0)return;
   const p=toWorld(e),c=charAt(p.x,p.y);if(!c)return;
-  grab={ch:c,sx:p.x,sy:p.y,on:false,shake:0,lx:p.x,id:e.pointerId};
+  grab={ch:c,sx:p.x,sy:p.y,on:false,shake:0,lx:p.x,ly:p.y,lt:performance.now(),vx:0,vy:0,id:e.pointerId};
 });
 stage.addEventListener('pointermove',e=>{
   if(!grab)return;
   const p=toWorld(e),tp=performance.now();
   if(!grab.on&&Math.hypot(p.x-grab.sx,p.y-grab.sy)>3){grab.on=true;pickUp(grab.ch,p,tp);try{stage.setPointerCapture(grab.id);}catch(err){}}
   if(grab.on){grab.ch.held={x:Math.max(6,Math.min(314,p.x)),y:Math.max(60,Math.min(160,p.y))};grab.shake+=Math.abs(p.x-grab.lx);grab.ch.face=p.x>grab.lx?1:p.x<grab.lx?-1:grab.ch.face;}
-  grab.lx=p.x;
+  const dt=Math.max(8,tp-grab.lt);grab.vx=(p.x-grab.lx)/dt*1000;grab.vy=(p.y-grab.ly)/dt*1000;grab.lx=p.x;grab.ly=p.y;grab.lt=tp;
 });
-const endGrab=e=>{if(!grab)return;if(grab.on){putDown(grab.ch,grab.shake,performance.now());suppressClickUntil=performance.now()+60;}grab=null;};
+const endGrab=e=>{if(!grab)return;if(grab.on){const tp=performance.now(),fast=tp-grab.lt<90&&Math.hypot(grab.vx,grab.vy)>180;putDown(grab.ch,grab.shake,tp);if(fast)flingClaude(grab.ch,grab.vx,grab.vy,tp);suppressClickUntil=tp+60;}grab=null;};
 stage.addEventListener('pointerup',endGrab);
 stage.addEventListener('pointercancel',endGrab);
 
