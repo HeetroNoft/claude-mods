@@ -1,9 +1,44 @@
 // Reactions: emotes, chat bubbles, dizzy stars, thought clouds, sound effects.
 'use strict';
-function drawZz(g,x,ht,tp){
-  const k=(tp/1000)%3;
-  for(let i=0;i<3;i++){const ph=(k+i)%3;const a=1-ph/3;g.globalAlpha=a;const zx=Math.round(x+3+ph*3),zy=Math.round(ht-3-ph*4),z=i===2?3:2;
-    R(g,zx,zy,z+1,1,'#FFFFFF');R(g,zx+z-1,zy+1,1,z-1,'#FFFFFF');R(g,zx,zy+z,z+1,1,'#FFFFFF');}
+// A sleeper's Zs grow as they rise and sway; seed keeps two sleepers out of step.
+const ZS=[['1111','..1.','.1..','1111'],['11111','...1.','..1..','.1...','11111'],['111111','....1.','...1..','..1...','.1....','111111']];
+function drawZz(g,x,ht,tp,seed){
+  const t=tp/1000+seed*7,rise=3.6;
+  for(let i=0;i<3;i++){const ph=(t/rise+i/3)%1;
+    const rows=ZS[ph<.34?0:ph<.67?1:2],zx=Math.round(x+9+ph*8+Math.sin(ph*7+i)*1.2),zy=Math.round(ht+2-rows.length-ph*17);
+    g.globalAlpha=Math.min(1,ph/.12,(1-ph)/.3);
+    // a dark rim, so a Z reads on a pale wall as well as a dark one
+    [[-1,0],[1,0],[0,-1],[0,1]].forEach(([dx,dy])=>pattern(g,rows,zx+dx,zy+dy,'#26304F'));pattern(g,rows,zx,zy,'#FFFFFF');}
+  g.globalAlpha=1;
+}
+// What work gives off, by activity: code bits jump from the keyboard, a terminal's lines rise from the
+// desk, pages flutter off the cabinet, a signal runs up from the machine, sparks at the door for a helper.
+const SYNTAX=['#7CC7FF','#FFD84A','#FF8FB1','#FFFFFF'];
+const BITS={prompt:['1....','.1...','1.111'],page:['2222','2112','2222','2112','2222'],plus:['.1.','111','.1.']};
+const BIT_ODDS={edit:.85,bash:.5,read:.16,web:.4,agent:.22}; // chance per spawn tick
+function workBit(ch){
+  const r=Math.random,side=r()<.5?-1:1,bar=n=>['1'.repeat(n)];
+  switch(ch.act){
+    case 'edit':return {x:ch.x+side*(5+r()*6),y:103,vx:side*(3+r()*6),vy:-(20+r()*10),ay:34,rows:bar(1+(r()*3|0)),c:[...SYNTAX,ch.look.c][(r()*5)|0],life:.95,ch:GLYPHS[(r()*GLYPHS.length)|0]};
+    case 'bash':{const p=r()<.3;return {x:ch.x+side*(5+r()*6),y:101,vx:0,vy:-9,rows:p?BITS.prompt:bar(3+(r()*4|0)),c:'#5BD08A',life:1.5,ch:p?'>':'_'};}
+    case 'read':return {x:ch.x+side*(3+r()*5),y:ch.y-13,vx:side*2,vy:-7,sway:1,rows:BITS.page,c:'#8A94A6',c2:'#FFFFFF',life:2,ch:'='};
+    case 'web':return {x:ch.x+side*(2+r()*4),y:ch.y-14,vx:0,vy:-14,sway:1,rows:bar(1),c:'#7FD6FF',life:1.1,ch:'.'};
+    case 'agent':return {x:ch.x+side*(5+r()*6),y:ch.y-16+r()*6,vx:0,vy:-6,twinkle:1,rows:BITS.plus,c:ch.look.c,life:1.2,ch:'+'};
+  }
+}
+function spawnWork(ch,pose){
+  const odds=BIT_ODDS[ch.act];if(!odds||Math.random()>odds*(calmMotion()?.35:1))return;
+  if((ch.act==='edit'||ch.act==='bash')&&pose!=='type')return; // the hands rest: nothing flies
+  const b=workBit(ch);b.max=b.life;b.seed=Math.random()*6;glyphs.push(b);
+}
+function drawWorkBit(g,b,tp){
+  const u=Math.max(2,Math.round(S*.9)),x=Math.round(P(b.x+(b.sway?Math.sin(tp/260+b.seed)*1.5:0))),y=Math.round(P(b.y));
+  const rows=b.twinkle&&Math.floor(tp/130+b.seed)%3===0?['...','.1.','...']:b.rows;
+  g.globalAlpha=Math.min(1,b.life/(b.max*.4));
+  rows.forEach((row,j)=>{for(let i=0;i<row.length;i++){if(row[i]==='.')continue;
+    g.fillStyle='rgba(0,0,0,.3)';g.fillRect(x+(i-1)*u,y+(j+1)*u,u,u);}});
+  rows.forEach((row,j)=>{for(let i=0;i<row.length;i++){if(row[i]==='.')continue;
+    g.fillStyle=row[i]==='2'?b.c2:b.c;g.fillRect(x+i*u,y+j*u,u,u);}});
   g.globalAlpha=1;
 }
 const SOFT='rgba(0,0,0,.25)'; // no outline: a soft shadow, down and left, lifts bubbles off the room

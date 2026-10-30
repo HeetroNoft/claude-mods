@@ -90,10 +90,7 @@ function frame(tp){
   // spawn effects
   spawnT+=dt; steamT+=dt;
   if(spawnT>.16){spawnT=0;
-    chars.forEach(ch=>{
-      if(ch.hidden||ch.path.length||!ch.seated)return;
-      if((ch.act==='edit'||ch.act==='bash')&&Math.random()<.85)glyphs.push({x:ch.x+(Math.random()<.5?-1:1)*(4+Math.random()*7),y:103,vy:-(9+Math.random()*7),vx:(Math.random()-.5)*4,ch:GLYPHS[(Math.random()*GLYPHS.length)|0],c:Math.random()<.5?ch.look.c:'#FFFFFF',life:1.3});
-    });
+    chars.forEach(ch=>{if(!ch.hidden&&!ch.path.length&&!ch.held)spawnWork(ch,poseFor(ch,tp));}); // actors/reactions.js
   }
   chars.forEach(ch=>{
     if(ch.hidden||ch.path.length||ch.act!=='send'||!ch.seated)return;
@@ -178,7 +175,7 @@ function frame(tp){
     (ch.held?lifted:over).push(()=>{
       const ht=ch.headTop; if(ht==null)return;
       if(pose==='sit'&&ch.act==='think')drawThought(wx,ch,tp);else ch.thoughtAt=0;
-      if(pose==='sleep')drawZz(wx,ch.x,ht,tp);
+      if(pose==='sleep')drawZz(wx,ch.x,ht,tp,ch.blinkT||0);
       if(o.mood==='dizzy')drawDizzy(wx,ch.x,ht,tp);
       drawChatBubble(wx,ch,tp);drawRps(wx,ch,tp);
     });
@@ -252,9 +249,9 @@ function frame(tp){
   chars.forEach(ch=>{if(ch.held&&!ch.hidden&&ch.headTop!=null)ox.clearRect(P(ch.x-10),P(ch.headTop-1),P(20),P(ch.y-ch.headTop-5));});
   }
   // glyphs
-  if(!LABELS){glyphs=glyphs.filter(gl=>{gl.life-=dt;gl.y+=gl.vy*dt;gl.x+=gl.vx*dt;if(gl.life<=0)return false;
-    const g2=ox,sz=Math.max(2,S*.9);g2.globalAlpha=Math.min(1,gl.life*1.4);g2.fillStyle=gl.c;g2.fillRect(Math.round(P(gl.x)),Math.round(P(gl.y)),sz*(gl.ch.charCodeAt(0)%3+1),sz);g2.globalAlpha=1;return true;});}
-  else glyphs=glyphs.filter(gl=>{gl.life-=dt;gl.y+=gl.vy*dt;gl.x+=gl.vx*dt;if(gl.life<=0)return false;ox.globalAlpha=Math.min(1,gl.life*1.4);font(Math.max(12,2.1*S*TS));ox.textAlign='center';ox.textBaseline='middle';ox.lineWidth=3;ox.strokeStyle='rgba(0,19,47,.85)';ox.strokeText(gl.ch,P(gl.x),P(gl.y));ox.fillStyle=gl.c;ox.fillText(gl.ch,P(gl.x),P(gl.y));ox.globalAlpha=1;return true;});
+  glyphs=glyphs.filter(gl=>{gl.life-=dt;gl.vy+=(gl.ay||0)*dt;gl.y+=gl.vy*dt;gl.x+=gl.vx*dt;if(gl.life<=0)return false;
+    if(!LABELS){drawWorkBit(ox,gl,tp);return true;}
+    ox.globalAlpha=Math.min(1,gl.life*1.4);font(Math.max(12,2.1*S*TS));ox.textAlign='center';ox.textBaseline='middle';ox.lineWidth=3;ox.strokeStyle='rgba(0,19,47,.85)';ox.strokeText(gl.ch,P(gl.x),P(gl.y));ox.fillStyle=gl.c;ox.fillText(gl.ch,P(gl.x),P(gl.y));ox.globalAlpha=1;return true;});
   if(LABELS){
   // tags
   const tagItems=[];
