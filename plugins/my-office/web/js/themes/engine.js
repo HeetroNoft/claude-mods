@@ -127,10 +127,11 @@ const PART_SHADOWS={
 };
 // A light switch by the door and two sockets low on the wall, clear of the boards, the desks and the
 // space station's vents; painted on the wall itself (no rim). A theme drops them with parts.fixtures: null.
+const SOCKETS=[118,220];
 function paintFixtures(g,T){
   const plate=mix(T.wall,'#FFFFFF',.55),edge=shade(T.wall,-.3);
   R(g,29,55,3,5,edge);R(g,29,55,3,4,plate);R(g,30,56,1,2,edge);
-  [118,220].forEach(x=>{R(g,x,76,4,5,edge);R(g,x,76,4,4,plate);R(g,x+1,77,1,1,edge);R(g,x+2,77,1,1,edge);});
+  SOCKETS.forEach(x=>{R(g,x,76,4,5,edge);R(g,x,76,4,4,plate);R(g,x+1,77,1,1,edge);R(g,x+2,77,1,1,edge);});
 }
 function partOf(T,name){return T.parts&&name in T.parts?T.parts[name]:PARTS[name];}
 // What stands on the floor but is painted with the room: a copy of it, with its rim, goes back over

@@ -201,6 +201,26 @@ function unpinTick(ch,I,tp){
   }else if(I.stage===1){I.stage=2;cabPulse=tp+1300;I.until=tp+1300;emote(ch,'star');}
 }
 function unpinProps(g,ch,tp,I){if(I.phase==='do'&&I.stage===1){const x=Math.round(ch.x+dirOf(ch)*8)-2;R(g,x,ch.y-13,5,5,'#FFFDF8');R(g,x+1,ch.y-12,3,2,'#9FB0C8');}}
+// Charging the phone at a wall socket: the Claude stands by it, plugs in, and goes on scrolling at the end of
+// the cable while the battery fills. One Claude to a socket, and only in a room that has sockets.
+const hasSockets=()=>!(TH.parts&&TH.parts.fixtures===null);
+const socketsFree=ch=>SOCKETS.filter(x=>![...chars.values()].some(o=>o!==ch&&o.idle&&o.idle.act==='charge'&&o.idle.socket===x));
+function chargeSpot(ch){
+  const x=socketsFree(ch).sort((a,b)=>Math.abs(a-ch.x)-Math.abs(b-ch.x))[0],side=ch.x<x?-1:1;
+  ch.idle.socket=x;return {x:x+2+side*11,y:89,shelf:true,dir:-side,st:'i-charge'+x};
+}
+function chargeBegin(ch,I,tp){blip(880,.03,'triangle');ch.sqv+=8;}
+function chargeEnd(ch){setMood(ch,'happy',1000);emote(ch,'zap');blip(1046,.04,'triangle');}
+function chargeProps(g,ch,tp,I){
+  if(I.phase!=='do'||ch.path.length)return;
+  const sx=I.socket+2,sy=78,ex=Math.round(ch.x),ey=ch.y-3,u=Math.min(1,(tp-I.start)/I.dur);
+  R(g,I.socket+1,77,2,2,'#1F2230'); // the plug
+  for(let i=0;i<=16;i++){const k=i/16;R(g,sx+(ex-sx)*k,sy+(ey-sy)*k+Math.sin(k*Math.PI)*5,1,1,'#2B2F3A');}
+  // the battery over its head, filling from red to green, a spark while it takes the charge
+  const bx=Math.round(ch.x+10),by=Math.round((ch.headTop!=null?ch.headTop:ch.y-18)+2),c=u<.3?'#E5484D':u<.7?AMBER:GREEN;
+  R(g,bx,by,8,4,'#FFFFFF');R(g,bx+8,by+1,1,2,'#FFFFFF');R(g,bx+1,by+1,6,2,'#1F2230');R(g,bx+1,by+1,Math.max(1,Math.round(6*u)),2,c);
+  if(Math.floor(tp/400)%2)R(g,bx+3,by-2,2,1,'#FFD84A');
+}
 // A coffee spilt in front of the counter: a splash, then the stain; the next Claude free mops it up.
 function maybeSpill(ch){
   if(stain||Math.random()>.05)return;
@@ -235,6 +255,7 @@ Object.assign(IDLES,{
   share:{w:1.5,t:[20,20],can:ch=>!!freeForOne(ch,124),spot:()=>({x:COUNTER.x-6,y:178,st:'i-share'}),begin(ch,I,tp){I.stage=0;I.t=tp+1400;brewUntil=tp+1200;},pose:()=>'hold',tick:shareTick,props:shareProps},
   season:{w:1.3,t:[6,9],can:()=>!TH.noWeather&&SEASON!=='autumn'&&!(floorThing&&floorThing.kind===SEASON),spot:()=>({...SEASON_SPOT[SEASON],st:'i-season'}),begin:seasonBegin,tick:seasonTick,pose:()=>SEASON==='spring'?'water':SEASON==='summer'?'hold':'pet',end:seasonEnd,props:seasonProps},
   unpin:{w:0,t:[30,30],can:()=>!!duePhoto(),spot:()=>({x:photoX(duePhoto()),y:89,shelf:true,st:'i-unpin'}),pose:ch=>ch.idle.stage===2?'read':'stretch',tick:unpinTick,props:unpinProps},
+  charge:{w:1.2,t:[12,20],can:ch=>hasSockets()&&socketsFree(ch).length>0,spot:chargeSpot,begin:chargeBegin,pose:()=>'phone',end:chargeEnd,props:chargeProps},
   sweep:{w:0,weight:()=>lying().length?6:0,t:[40,40],can:ch=>!!nearestLying(ch),spot:ch=>sweepSpot(nearestLying(ch)),pose:sweepPose,tick:sweepTick,end:sweepEnd,props:sweepProps},
   clock:{w:.7,t:[8,8],spot:()=>({x:CLOCK_SPOT,y:89,dir:1,shelf:true,st:'i-clock'}),pose:clockPose,tick:clockTick,behind:clockLadder,props:clockKey,air:clockAir,aloft:true},
   doodle:{w:1.2,t:[4,6],spot:ch=>({x:ch.dx,y:89,shelf:true,st:'i-doodle'}),begin:doodleBegin,tick:doodleTick,pose:()=>'look'},
