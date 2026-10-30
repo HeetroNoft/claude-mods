@@ -92,6 +92,19 @@
     followRoom({theme:k,ms});log(themeKey===k,'/office-theme not followed: '+themeKey);
     setTheme(other);followRoom({theme:k,ms});log(themeKey===other,'/office-theme applied twice');
     setTheme(keep);}
+  // 11. what a Claude holds or carries stays in front of what it wears: every pixel it adds to a
+  // plain Claude must come out the same on a Claude with an accessory, for each one and both ways
+  {const cv=document.createElement('canvas');cv.width=cv.height=48;const g=cv.getContext('2d',{willReadFrequently:true});
+    const px=o=>{g.clearRect(0,0,48,48);drawPerson(g,24,40,o);return g.getImageData(0,0,48,48).data;},c='#8E6CCF';
+    const mug={kind:'mug',fill:1},tea={kind:'teacup'},cookie={kind:'cookie'},donut={kind:'donut'},flower={kind:'flower'},gift={kind:'gift'},ball={kind:'ball'};
+    const CASES=[['walk',0,{carry:'#4FA3E0'}],['walk',1,{carry:'#4FA3E0'}],['read',1],['game',1],['fold',0],['fold',1],['water',1],
+      ...[mug,tea].flatMap(h=>[0,.5,1].map(r=>['sip',1,{held:h,raise:r}])),...[cookie,donut].flatMap(h=>[0,.5,1].map(r=>['eat',1,{held:h,raise:r}])),
+      ['hold',0,{held:flower}],['hold',0,{held:flower,lift:4}],['hold',0,{held:gift}],['hold',0,{held:ball}]];
+    for(let style=1;style<LOOKS.length;style++)for(const dir of [1,-1])for(const [pose,frame,extra] of CASES){
+      const o=l=>({look:l,pose,frame,dir,...extra,held:extra&&extra.held?{...extra.held}:undefined}),base=px({look:{c,style:0},pose:'stand',dir}),A=px(o({c,style:0})),B=px(o({c,style}));let n=0;
+      for(let i=0;i<A.length;i+=4){if(!A[i+3])continue;const added=A[i]!==base[i]||A[i+1]!==base[i+1]||A[i+2]!==base[i+2]||A[i+3]!==base[i+3];
+        if(added&&(A[i]!==B[i]||A[i+1]!==B[i+1]||A[i+2]!==B[i+2]))n++;}
+      log(!n,`${VARIANTS[style]} ${pose} ${extra&&extra.held?extra.held.kind:extra&&extra.carry?'file':''} dir ${dir} raise ${extra&&extra.raise}: ${n} px covered`);}}
   // one line per failure: the browser log keeps only the first line of a message
   if(!fails.length)console.log('CHECK OK all layout checks passed');
   else{console.log('CHECK FAIL '+fails.length);fails.slice(0,40).forEach(m=>console.log('CHECK FAIL: '+m));}

@@ -2,7 +2,8 @@
 // both frames of each; ?set=held draws the props in hand instead (run.sh gallery held), ?set=looks
 // every accessory in each state, on a light and dark checkerboard (run.sh gallery looks); ?set=motion
 // film strips of the springs, left to right, 1 frame every 50 ms (run.sh gallery motion); ?set=bubbles
-// a chat line and a thought from start to end, on light and dark (run.sh gallery bubbles).
+// a chat line and a thought from start to end, on light and dark (run.sh gallery bubbles); ?set=front
+// every accessory with what passes in front of it (run.sh gallery front).
 'use strict';
 startThemes();resize();
 const SET=(location.search.match(/set=(\w+)/)||[])[1]||'poses';
@@ -34,6 +35,9 @@ if(SET==='cat'){gx.fillStyle='#C08A5C';gx.fillRect(0,0,W,H);const tp=performance
     if(o.air){cat.air.t0=tp-(o.z?3000:1000);cat.air.dur=o.z?4000:2000;}
     if(o.state==='swipe')cat.swipe=tp-(i%2?300:50);
     drawCat(gx,t);});});}
+else if(SET==='front'){gx.fillStyle='#C08A5C';gx.fillRect(0,0,W,H); // every accessory with what can pass in front of it
+  [['walk',1,{carry:'#4FA3E0'}],['sip',1,{held:{kind:'mug',fill:1},raise:.5}],['eat',1,{held:{kind:'cookie'},raise:.5}],['hold',0,{held:{kind:'flower'},lift:4}],['read',1],['water',1]].forEach(([pose,frame,x],j)=>
+    LOOKS.forEach((look,i)=>drawPerson(gx,16+i*30,26+j*25,{look,pose,frame,dir:1,...x,held:x&&x.held?{...x.held}:undefined})));}
 else if(SET==='rps'){gx.fillStyle='#C08A5C';gx.fillRect(0,0,W,H); // both hands up, over the badges, at each moment of a round
   [1300,1500,2400,2560].forEach((u,i)=>[0,1].forEach(r=>{const x=30+i*76,y=70+r*70,A={id:'r'+i+r,x,y,bodyTop:y-15,look:LOOKS[1+i]},B={id:'s'+i+r,x:x+28,y,bodyTop:y-15,look:LOOKS[4+i]};
     A.idle={act:'rps',phase:'do',role:0,sync:1000-RPS_ROUND*r,pair:B};B.idle={act:'rps',phase:'do',role:1,pair:A};

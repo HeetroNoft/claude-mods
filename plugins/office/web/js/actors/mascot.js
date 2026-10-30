@@ -100,14 +100,15 @@ function drawPerson(g,cx,fy,o){
   const gz=sm?0:Math.max(-1,Math.min(1,o.gaze|0));
   const ex1=L+(sm?2:3)+gz,ex2=L+bw-(sm?3:4)+gz;
   if(!back)drawFace(g,o,sm,ex1,ex2,ey,L+(bw>>1)+gz,dk);
-  // what the pose holds, the arms reaching in front, then the prop in hand with fingers over it
+  // what it wears, then all that is in front of it: what the pose holds, the arms reaching across,
+  // the prop in hand with fingers over it
+  let top=T;
+  if(!sm){if(lk.style===4&&!back)drawGlasses(g,ex1,ex2,ey);top=drawAccessory(g,o,{L,T,bw,ol,side,back});}
   extras.forEach(fn=>fn());
   if(o.carry&&!sm){drawFolder(g,L+bw-4,ay-3,o.carry,true);R(g,L+bw-3,ay,4,4,ol);R(g,L+bw-2,ay+1,2,2,c);R(g,L+bw-2,ay+1,1,1,hi);} // a file under the arm
   drawArms(frontArms);
   if(hand&&o.held&&!sm)drawHeld(g,hand,o.held,c,ol);
-  if(sm)return T-2;
-  if(lk.style===4&&!back)drawGlasses(g,ex1,ex2,ey);
-  return drawAccessory(g,o,{L,T,bw,ol,side,back})-2;
+  return top-2;
 }
 // Accessory sprites: rows of palette letters, '.' for nothing.
 const ACC_BOW=['bb...bb','bhb.bhb','bbbkbbb','bdb.bdb','dd...dd'];
@@ -153,7 +154,7 @@ function drawAccessory(g,o,b){
   switch(st){
     case 1:{const n=bw-4;
       drawAcc(g,['...'+'h'.repeat(n)+'...','..h'+'b'.repeat(n)+'b..','.b'+'.'.repeat(n+2)+'b.'],pal,L-1,T-3,b);
-      [L-3,L+bw].forEach((x,i)=>drawAcc(g,ACC_CUPS,pal,x,T,b,i>0));return T-3;}
+      [L-3,L+bw].forEach((x,i)=>drawAcc(g,ACC_CUPS,pal,x,T-1,b,i>0));return T-3;}
     case 2:{if(out){drawAcc(g,ACC_STEM_LOW,pal,mid-1,T-3,b);drawAcc(g,ACC_BULB,pal,mid,T-7,b);return T-7;}
       const bend=(w>>1)+2;drawAcc(g,['.....'.slice(0,bend)+'s'+'.....'.slice(bend+1),'..s..','.ccc.'],pal,mid-2,T-3,b);drawAcc(g,ACC_BULB,o.glow?{a:'#FFF3A0',h:'#FFFFFF',y:'#FFD84A'}:pal,mid-1+w,T-7,b);return T-7;}
     case 3:{const rows=[centred('h'+ribs(bw-7),bw),centred('hh'+ribs(bw-6),bw),centred('h'+ribs(bw-3),bw),'cC'.repeat(bw).slice(0,bw),'CD'.repeat(bw).slice(0,bw)];
