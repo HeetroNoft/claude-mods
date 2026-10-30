@@ -17,6 +17,17 @@ setTimeout(()=>{
   ok(seasonOf(new Date('2026-01-15T12:00:00'),true)==='summer'&&seasonOf(new Date('2026-07-15T12:00:00'),true)==='winter','the south has the north\'s seasons');
   setPref('season','winter');ok(seasonNow()==='winter','the setting did not pin the season');setPref('season','auto');ok(seasonNow()===seasonOf(new Date(),false),'Live does not follow the date');
   setPref('hemi','south');ok(seasonNow()===seasonOf(new Date(),true),'the south setting is ignored');setPref('hemi','north');
+  // the settings: tabs, arrows, focus kept through a redraw and handed back on closing
+  openPrefs(true);const tab=k=>prefsEl.querySelector('[data-tab="'+k+'"]'),key=(el,k)=>el.dispatchEvent(new KeyboardEvent('keydown',{key:k,bubbles:true}));
+  ok(document.activeElement===tab('room'),'opening does not focus the tab');
+  key(tab('room'),'ArrowRight');ok(prefsTab==='display'&&prefsEl.querySelector('[data-sw="labels"]'),'the arrow did not change tab');
+  renderPrefs();ok(document.activeElement===tab('display'),'the redraw lost the tab focus');
+  key(tab('display'),'ArrowLeft');key(tab('room'),'ArrowLeft');ok(prefsTab==='keys'&&prefsEl.querySelector('dl'),'the arrows do not wrap round');
+  tab('room').click();renderPrefs();const seg0=prefsEl.querySelector('[data-seg="time"][data-v="auto"]');seg0.focus();key(seg0,'ArrowRight');
+  ok(PREFS.time==='day'&&document.activeElement.dataset.v==='day','the arrow did not choose in a radio group');setPref('time','auto');
+  const pr=prefsEl.getBoundingClientRect();ok(prefsEl.scrollWidth<=prefsEl.clientWidth&&pr.width>=300,'the panel is too narrow');
+  [...prefsEl.querySelectorAll('button')].forEach(b=>{const r=b.getBoundingClientRect();ok(r.height>=34,'a control is only '+r.height+' px high: '+b.textContent);});
+  openPrefs(false);ok(document.activeElement===setBtn,'closing does not hand the focus back');prefsEl.blur();setBtn.blur();
   // avatars: the first one in is the plain Claude, the rest are drawn, and a refresh changes nobody
   const lookKey=()=>everyDesk.map(d=>{const l=looksFor(String(d.id));return d.id+'='+l.c+':'+l.style;}).join();
   const lookRules=why=>{const pairs=everyDesk.map(d=>{const l=looksFor(String(d.id));return l.c+':'+l.style;});ok(new Set(pairs).size===pairs.length,why+': two sessions share an avatar');
