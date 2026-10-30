@@ -28,6 +28,39 @@ setTimeout(()=>{
   ok(lookMem.get(far).c===lookMem.get(d1).c,'the same colour was refused on another floor');
   const s3=lookMem.get(d3).s;Object.assign(lookMem.get(d3),{c:lookMem.get(d1).c});settleLooks(everyDesk);
   ok(lookMem.get(d3).s===s3&&lookMem.get(d3).c!==lookMem.get(d1).c,'a colour clash cost it its accessory');lookRules('colour clash on a floor');
+  // an accessory chosen on the card survives a colour clash and a refresh; a twin's is refused
+  const pick=[...LOOKS.keys()].find(s=>s!==lookMem.get(d2).s&&!accessoryTaken(d2,s));setAccessory(d2,pick);
+  Object.assign(lookMem.get(d2),{c:lookMem.get(d1).c});settleLooks(everyDesk);
+  ok(lookMem.get(d2).s===pick&&lookMem.get(d2).c!==lookMem.get(d1).c,'a chosen accessory was lost to a colour clash');lookRules('chosen accessory');
+  ok(refresh()===lookKey()&&lookMem.get(d2).pin,'a refresh lost the chosen accessory');
+  Object.assign(lookMem.get(far),{c:lookMem.get(d3).c,s:(lookMem.get(d3).s+1)%10});
+  ok(accessoryTaken(far,lookMem.get(d3).s),'an accessory that makes a twin was offered');settleLooks(everyDesk);lookRules('twin refused');
+  // the card's arrows: a free accessory is worn at once, a taken one greys and changes nothing
+  openCard(d1);const was=looksFor(d1).style,nx=(was+1)%VARIANTS.length,other=everyDesk.find(d=>String(d.id)!==d1&&lookMem.get(String(d.id)).c===lookMem.get(d1).c);
+  if(other)lookMem.get(String(other.id)).s=-1;
+  const twin=lookMem.get(d2),keep={c:twin.c,s:twin.s};Object.assign(twin,{c:lookMem.get(d1).c,s:nx});
+  card.querySelector('[data-pick="acc"][data-step="1"]').click();
+  ok(looksFor(d1).style===was&&card.querySelector('.acc .off'),'the card wore a taken accessory');
+  Object.assign(twin,keep);if(other)lookMem.get(String(other.id)).s=looksFor(String(other.id)).style;
+  card.querySelector('[data-pick="acc"][data-step="-1"]').click();card.querySelector('[data-pick="acc"][data-step="1"]').click();
+  ok(looksFor(d1).style===nx&&lookMem.get(d1).pin&&!card.querySelector('.acc .off'),'the card did not wear a free accessory');
+  closeCard();settleLooks(everyDesk);lookRules('after the card');
+  // the arrows stay under the pointer through every accessory, a hat of any height and a greyed name
+  openCard(d1);const arrow=()=>card.querySelector('[data-pick="acc"][data-step="1"]'),arrowAt=Math.round(arrow().getBoundingClientRect().top),chD1=chars.get(d1),head=chD1.headTop;
+  for(let i=0;i<VARIANTS.length;i++){arrow().click();chD1.headTop=head-i;renderCard();ok(Math.round(arrow().getBoundingClientRect().top)===arrowAt,'the card moved on accessory step '+i);}
+  chD1.headTop=head;closeCard();settleLooks(everyDesk);lookRules('after going round the accessories');
+  // the colour: one on the floor is skipped, the next free one is worn and stays
+  const c0=lookMem.get(d1).c,c2=lookMem.get(d2).c,nextC=()=>card.querySelector('[data-pick="col"][data-step="1"]').click();
+  lookMem.get(d2).c=(c0+1)%LOOKS.length;openCard(d1);nextC();
+  const freeC=lookMem.get(d1).c;
+  ok(freeC!==c0&&freeC!==(c0+1)%LOOKS.length&&looksFor(d1).c===LOOKS[freeC].c&&lookMem.get(d1).pinC&&!card.querySelector('.acc .off'),'the card did not skip a taken colour for the next free one');
+  lookMem.get(d2).c=c2;closeCard();settleLooks(everyDesk);saveLooks();
+  ok(refresh()===lookKey()&&lookMem.get(d1).c===freeC,'a refresh lost the chosen colour');lookRules('chosen colour');
+  // a drawn colour gives way to a chosen one; of two chosen, the later arrival gives way and loses its pin
+  const c4=String(floorDesks(0)[3].id);Object.assign(lookMem.get(d2),{c:freeC,pinC:false});settleLooks(everyDesk);
+  ok(lookMem.get(d1).c===freeC&&lookMem.get(d2).c!==freeC,'a chosen colour gave way to a drawn one');lookRules('chosen against drawn');
+  Object.assign(lookMem.get(c4),{c:freeC,pinC:true,at:lookMem.get(d1).at+1});settleLooks(everyDesk);
+  ok(lookMem.get(d1).c===freeC&&lookMem.get(c4).c!==freeC&&!lookMem.get(c4).pinC,'two chosen colours: the later arrival kept it');lookRules('two chosen colours');
   const first=ids().join();
   floorsEl.querySelector('[data-f="1"]').click();
   ok(curFloor===1&&ids().join()!==first,'clicking a floor did not change it');

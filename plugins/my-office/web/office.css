@@ -34,6 +34,11 @@ body.clean #set,body.clean #prefs,body.clean #items{display:none}
 #card .eta{margin-top:.5em;font-size:.95em}
 #card .x{position:absolute;top:.25em;right:.4em;border:0;background:none;font:inherit;font-size:1.35em;line-height:1;cursor:pointer;color:#6B6458;padding:.1em .3em}
 #card .x:hover{color:#1F1E1D}
+#card .acc{display:flex;align-items:center;gap:.4em;margin-bottom:.5em}
+#card .acc span{flex:1;text-align:center}
+#card .acc span.off{color:#6B6458;text-decoration:line-through}
+#card .acc button{flex:none;width:2em;height:1.7em;border:2px solid var(--c);border-radius:6px;background:none;color:inherit;font:inherit;line-height:1;cursor:pointer;padding:0}
+#card .acc button:hover{background:#F3EEE4}
 #items{--up:0px;position:absolute;left:50%;bottom:1.6%;z-index:1;transform:translate(-50%,var(--up));display:flex;gap:calc(4px*var(--u,1));padding:calc(4px*var(--u,1)) calc(6px*var(--u,1));background:rgba(0,19,47,.88);border:2px solid #D97557;border-radius:8px;touch-action:none;transition:transform .26s cubic-bezier(.34,1.3,.64,1),opacity .18s,visibility 0s}
 #items.hide{visibility:hidden;opacity:0;transform:translate(-50%,calc(100% + 12px*var(--u,1)));transition:transform .2s ease-in,opacity .18s,visibility 0s .2s}
 #items.hide button{animation:none}

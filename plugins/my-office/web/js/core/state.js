@@ -24,16 +24,19 @@ function newChar(id,lk){return {id,x:DOOR.x,y:DOOR.y,path:[],hidden:true,seated:
 // (lookMem: indexes into LOOKS for the colour, the accessory's style, and when it arrived). Whoever
 // arrives while nobody has the plain Claude gets it. settleLooks keeps the rules in arrival order: two
 // sessions never share an avatar, and no floor has one colour twice; the later arrival gives way.
+// An accessory chosen on the card is pinned (pin): from then on only the colour gives way. A colour
+// chosen there (pinC) goes first in that order, so a drawn colour gives way to it; between two chosen
+// ones the later arrival draws another and loses the pin.
 const looksFor=id=>{if(!lookObj.has(id))lookObj.set(id,{c:LOOKS[0].c,style:0});return lookObj.get(id);};
 function loadLooks(){
   lookMem.clear();lookAt=0;
-  try{Object.entries(JSON.parse(localStorage.getItem('office.looks')||'{}')).forEach(([id,m])=>{if(LOOKS[m.c]&&m.s>=0&&m.s<LOOKS.length){lookMem.set(id,{c:m.c,s:m.s,at:+m.at||0});lookAt=Math.max(lookAt,+m.at||0);}});}catch(e){}
+  try{Object.entries(JSON.parse(localStorage.getItem('office.looks')||'{}')).forEach(([id,m])=>{if(LOOKS[m.c]&&m.s>=0&&m.s<LOOKS.length){lookMem.set(id,{c:m.c,s:m.s,at:+m.at||0,pin:!!m.pin,pinC:!!m.pinC});lookAt=Math.max(lookAt,+m.at||0);}});}catch(e){}
 }
 loadLooks();
-function pickLook(floorCols,held,usedC,usedS,keepS){
+function pickLook(floorCols,held,usedC,usedS,keepS,keepC){
   let best=[],low=9;
   for(let c=0;c<LOOKS.length;c++){
-    if(floorCols.has(c))continue;
+    if(floorCols.has(c)||(keepC!=null&&c!==keepC))continue;
     for(let s=0;s<LOOKS.length;s++){
       if((keepS!=null&&s!==keepS)||held.has(c+':'+s)||(!c&&!s)||(c===3&&s===4))continue; // gold glasses on a gold body hardly show
       const score=(usedC.has(c)?1:0)+(usedS.has(s)?1:0);
@@ -43,22 +46,39 @@ function pickLook(floorCols,held,usedC,usedS,keepS){
   }
   return best[(Math.random()*best.length)|0]||null;
 }
+function saveLooks(){try{localStorage.setItem('office.looks',JSON.stringify(Object.fromEntries([...lookMem].sort((a,b)=>a[1].at-b[1].at).slice(-64))));}catch(e){}}
+// Can this desk wear that accessory? Not if it makes a twin of someone here, or gold glasses on gold.
+function accessoryTaken(id,s){
+  const m=lookMem.get(id);if(!m)return true;
+  return (m.c===3&&s===4)||everyDesk.some(d=>{const o=lookMem.get(String(d.id));return String(d.id)!==id&&o&&o.c===m.c&&o.s===s;});
+}
+function setAccessory(id,s){const m=lookMem.get(id);if(!m)return;m.s=s;m.pin=true;looksFor(id).style=s;saveLooks();}
+// Can this desk wear that colour? Not if someone on its floor has it, or it makes a twin, or gold glasses.
+function colourTaken(id,c){
+  const m=lookMem.get(id);if(!m)return true;
+  const f=floorOf.get(id);
+  return (c===3&&m.s===4)||everyDesk.some(d=>{const o=lookMem.get(String(d.id));return String(d.id)!==id&&o&&o.c===c&&(o.s===m.s||floorOf.get(String(d.id))===f);});
+}
+function setColour(id,c){const m=lookMem.get(id);if(!m)return;m.c=c;m.pinC=true;looksFor(id).c=LOOKS[c].c;saveLooks();}
 function settleLooks(all){
   const seen=d=>{const m=lookMem.get(String(d.id));return m?m.at:Infinity;};
   all.forEach(d=>{const m=lookMem.get(String(d.id));if(m&&!firstLoad&&!lookHere.has(String(d.id)))m.at=++lookAt;}); // back after a while: it arrives now
   const held=new Set(),usedC=new Set(),usedS=new Set(),floors=new Map();let changed=false;
-  all.map((d,i)=>[d,i]).sort((a,b)=>seen(a[0])-seen(b[0])||a[1]-b[1]).forEach(([d])=>{
+  const drawn=d=>{const m=lookMem.get(String(d.id));return m&&m.pinC?0:1;};
+  all.map((d,i)=>[d,i]).sort((a,b)=>drawn(a[0])-drawn(b[0])||seen(a[0])-seen(b[0])||a[1]-b[1]).forEach(([d])=>{
     const id=String(d.id),f=floorOf.get(id),cols=floors.get(f)||new Set();floors.set(f,cols);
     let m=lookMem.get(id);
     if(!m){m=held.has('0:0')||cols.has(0)?pickLook(cols,held,usedC,usedS):{c:0,s:0};m.at=++lookAt;lookMem.set(id,m);changed=true;}
     else if(held.has(m.c+':'+m.s)||cols.has(m.c)){
-      Object.assign(m,(!held.has(m.c+':'+m.s)&&pickLook(cols,held,usedC,usedS,m.s))||pickLook(cols,held,usedC,usedS));changed=true; // only its colour clashes: it keeps its accessory
+      const was=m.c,keepC=m.pinC&&!m.pin&&!cols.has(m.c); // a twin on another floor, chosen colour: the accessory gives way
+      Object.assign(m,(keepC&&pickLook(cols,held,usedC,usedS,null,m.c))||((m.pin||!held.has(m.c+':'+m.s))&&pickLook(cols,held,usedC,usedS,m.s))||pickLook(cols,held,usedC,usedS));changed=true; // only its colour clashes, or its accessory is pinned: it keeps it
+      if(m.c!==was)m.pinC=false;
     }
     held.add(m.c+':'+m.s);usedC.add(m.c);usedS.add(m.s);cols.add(m.c);
     Object.assign(looksFor(id),{c:LOOKS[m.c].c,style:m.s});
   });
   lookHere=new Set(all.map(d=>String(d.id)));
-  if(changed)try{localStorage.setItem('office.looks',JSON.stringify(Object.fromEntries([...lookMem].sort((a,b)=>a[1].at-b[1].at).slice(-64))));}catch(e){}
+  if(changed)saveLooks();
 }
 // Desks and their boards share one lane on the wall, between the door sign (x 31) and the curtains (x 266).
 // A row is centred under the clock (x 160) whenever it fits, and slides left only when it must.
