@@ -7,7 +7,7 @@ const CHAT=[{x:176,y:150,dir:1},{x:204,y:150,dir:-1}],PLAY=[{x:158,y:158,dir:1},
 // shows now and then, and for the ones done in twos, which pair of spots it uses. A weight of 0 means
 // only a room that lists it in THEME_IDLES offers it.
 const IDLES={
-  coffee:{w:3,t:[8,14],emo:'heart'},window:{w:2,t:[6,10],emo:'dots'},plant:{w:1.6,t:[4,6],emo:'note'},
+  coffee:{w:1,t:[8,14],emo:'heart'},window:{w:2,t:[6,10],emo:'dots'},plant:{w:1.6,t:[4,6],emo:'note'},
   stretch:{w:1.4,t:[3,4.5],emo:'sweat'},wander:{w:1.8,t:[3,6],emo:'note'},juggle:{w:1.1,t:[6,9],emo:'star'},
   read:{w:1.2,t:[7,11],emo:'bulb'},yoga:{w:1,t:[5,8],emo:'sweat'},dance:{w:1,t:[5,8],emo:'note'},
   game:{w:1.1,t:[6,10],emo:'zap'},doze:{w:0,t:[5,8]},files:{w:.9,t:[4,6],emo:'excl'},tinker:{w:.9,t:[4,6],emo:'zap'},
@@ -83,21 +83,21 @@ function idleEnds(ch,I,tp){
   if(I.act==='origami'){const y=(ch.headTop!=null?ch.headTop:ch.y-18)+6;leaves.push({x:ch.x,y,vx:-14,vy:-26,life:2.6,p:0,w:2,c:'#FFFFFF'});emote(ch,'star');}
   if(I.act==='tea'||I.act==='donut')setMood(ch,'happy',1200);
 }
-// What a Claude on a break does next, in order of preference: a coffee first (always the first thing
-// on a break, then 45% of the time, 25% right after one), then a nap at its desk (25%, 35% after a
+// What a Claude on a break does next, in order of preference: a coffee first (60% as a break starts,
+// then 25% of the time, 10% right after one), then a nap at its desk (25%, 35% after a
 // long break, 10% right after one), and otherwise one of the other activities, by their weights.
 const NAP_SECONDS=[15,30];
 function chooseIdle(ch,tp,now){
   const chore=choreNow(ch);if(chore){startIdle(ch,chore,null);return;} // cleaning comes first (actors/scenes.js)
   const last=ch.idle&&ch.idle.last,dk=ch.desk||{},longBreak=(now||Date.now())-(+dk.activityMs||now||Date.now())>NAP_MS;
   const drinking=[...chars.values()].filter(o=>o!==ch&&o.idle&&o.idle.act==='coffee'&&o.idle.phase!=='pick').length;
-  const pCoffee=!last?1:drinking>=4?0:last==='coffee'?.25:.45,pNap=last==='nap'?.1:longBreak?.35:.25,r0=Math.random();
+  const pCoffee=!last?.6:drinking>=4?0:last==='coffee'?.1:.25,pNap=last==='nap'?.1:longBreak?.35:.25,r0=Math.random();
   if(r0<pCoffee){startIdle(ch,'coffee',null);return;}
   if(r0<pCoffee+pNap*(1-pCoffee)){startNap(ch,tp);return;}
   const others=[...chars.values()].filter(o=>o!==ch&&!o.hidden&&!o.removed);
   const busyPlace=pl=>others.some(o=>o.idle&&o.idle.phase!=='pick'&&PLACE[o.idle.act]===pl);
   const busyPair=grp=>others.some(o=>o.idle&&o.idle.pair&&IDLES[o.idle.act]&&IDLES[o.idle.act].pair===grp);
-  const partner=others.find(o=>o.act==='idle'&&o.idle&&!o.errand&&!o.held&&!o.path.length&&!o.idle.pair&&o.idle.act!=='nap'&&o.idle.act!=='highfive'&&(o.idle.phase==='pick'||o.idle.phase==='do'));
+  const partner=others.find(o=>o.act==='idle'&&o.idle&&!o.errand&&!o.held&&!o.path.length&&!o.idle.pair&&!KEEP_DOING.includes(o.idle.act)&&(o.idle.phase==='pick'||o.idle.phase==='do'));
   const extra=THEME_IDLES[themeKey]||{},ok=[];
   for(const a in IDLES){
     const D=IDLES[a],w=D.weight?D.weight():extra[a]!=null?extra[a]:D.w;

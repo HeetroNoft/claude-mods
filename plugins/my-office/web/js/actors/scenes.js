@@ -34,9 +34,11 @@ function snowmanSprite(g,s,scarf){
   R(g,X-7,156,3,1,'#6B4A2E');R(g,X-9,155,2,1,'#6B4A2E');R(g,X+5,156,3,1,'#6B4A2E');R(g,X+8,155,2,1,'#6B4A2E');
 }
 const STAIN=['....bbbbbb......','..bbbcccbbbb..b.','.bbccaaccccbb...','bbcccccccccbbb..','.bbbbccccbbbb.b.','...bbbbbb.......'],STAIN_PAL={a:'#A8744A',b:'#4E2C14',c:'#6B4226'};
-// The stain goes pixel by pixel as it is mopped, not by fading.
+// The stain goes pixel by pixel, wherever the mop has been (s.gone), not by fading.
+const STAIN_PIXELS=STAIN.join('').replace(/\./g,'').length;
 function drawStain(g,s){
-  STAIN.forEach((r,j)=>{for(let i=0;i<r.length;i++){const k=r[i];if(k==='.'||(hash(i+'s'+j)%100)/100>s.left)continue;R(g,s.x-8+i,s.y-2+j,1,1,STAIN_PAL[k]);}});
+  STAIN.forEach((r,j)=>{for(let i=0;i<r.length;i++){const k=r[i];if(k==='.')continue;
+    if(!s.gone.has(i+','+j))R(g,s.x-8+i,s.y-2+j,1,1,STAIN_PAL[k]);}});
 }
 function drawLadder(g,x,top,bottom){
   const h=bottom-top;R(g,x-5,top,1,h,'#A8763E');R(g,x+4,top,1,h,'#8A5F30');for(let y=top+3;y<bottom;y+=5)R(g,x-4,y,8,1,'#C99A5E');
@@ -201,19 +203,29 @@ function unpinTick(ch,I,tp){
 function unpinProps(g,ch,tp,I){if(I.phase==='do'&&I.stage===1){const x=Math.round(ch.x+dirOf(ch)*8)-2;R(g,x,ch.y-13,5,5,'#FFFDF8');R(g,x+1,ch.y-12,3,2,'#9FB0C8');}}
 // A coffee spilt in front of the counter: a splash, then the stain; the next Claude free mops it up.
 function maybeSpill(ch){
-  if(stain||Math.random()>.15)return;
-  stain={floor:curFloor,x:COUNTER.x-14,y:176,left:1,wet:0};emote(ch,'excl');setMood(ch,'surprised',800);blip(240,.08,'triangle');
+  if(stain||Math.random()>.05)return;
+  stain={floor:curFloor,x:COUNTER.x-14,y:176,left:1,wet:0,gone:new Set()};emote(ch,'excl');setMood(ch,'surprised',800);blip(240,.08,'triangle');
   for(let i=0;i<10;i++)confetti.push({x:stain.x,y:stain.y,vx:(Math.random()-.5)*44,vy:-20-Math.random()*20,c:'#6B4226',life:.5,w:1});
 }
-function mopTick(ch,I,tp){if(stain)stain.left=Math.max(0,1-(tp-I.start)/I.dur);if(Math.random()<.1)confetti.push({x:stain?stain.x:ch.x,y:174,vx:(Math.random()-.5)*10,vy:-10,c:'rgba(200,230,255,.8)',life:.4,w:1});}
-function mopEnd(ch,I,tp){if(stain)stain={...stain,left:0,wet:Date.now()+3500};emote(ch,'star');}
+// Long even strokes across the stain: the mop takes what is under its head, more surely with each pass, and
+// everything on the last ones. What is wiped stays wiped, so a second Claude goes on from there.
+const mopX=tp=>stain.x+Math.sin(tp/190)*8;
+function wipeStain(test){STAIN.forEach((r,j)=>{for(let i=0;i<r.length;i++){if(r[i]!=='.'&&test(stain.x-8+i))stain.gone.add(i+','+j);}});stain.left=1-stain.gone.size/STAIN_PIXELS;}
+function mopTick(ch,I,tp){
+  if(!stain)return;const mx=mopX(tp),last=tp>I.until-1300;
+  // at the pace of the whole job, so it never scrubs a clean floor; the last strokes take all that is left
+  if(last||1-stain.left<(tp-I.start)/I.dur)wipeStain(x=>Math.abs(x-mx)<=3&&(last||Math.random()<.2));
+  if(stain.left<=0&&!stain.wet)stain.wet=Date.now()+1200;
+  if(Math.random()<.12)confetti.push({x:mx,y:174,vx:(Math.random()-.5)*10,vy:-10,c:'rgba(200,230,255,.8)',life:.4,w:1});
+}
+function mopEnd(ch,I,tp){if(stain){wipeStain(()=>true);stain.wet=stain.wet||Date.now()+1200;}emote(ch,'star');}
 function mopProps(g,ch,tp,I){
   if(I.phase!=='do'||ch.path.length||!stain)return;
   // the mop sweeps over the stain; the bucket waits on the other side, its water darkening
-  const mx=Math.round(stain.x+Math.sin(tp/130)*6),hx=Math.round(ch.x-8),hy=ch.y-9,n=10;
+  const mx=Math.round(mopX(tp)),hx=Math.round(ch.x+8),hy=ch.y-9,n=10;
   for(let i=0;i<=n;i++)R(g,hx+(mx-hx)*i/n,hy+(ch.y-1-hy)*i/n,1,1,'#8A5A3A');
   R(g,mx-3,ch.y-1,7,1,'#E8E2D0');for(let i=-3;i<=3;i+=2)R(g,mx+i,ch.y,1,1+(Math.floor(tp/100+i)&1),'#CFC8B4');
-  const bx=stain.x-20,by=ch.y;R(g,bx,by-6,8,6,'#7C8796');R(g,bx,by-6,8,1,'#AEB8C4');R(g,bx+1,by-5,6,1,mix('#8CCBF5','#6B4226',1-stain.left));R(g,bx,by-6,1,6,'#5E6876');
+  const bx=Math.round(ch.x-18),by=ch.y;R(g,bx,by-6,8,6,'#7C8796');R(g,bx,by-6,8,1,'#AEB8C4');R(g,bx+1,by-5,6,1,mix('#8CCBF5','#6B4226',1-stain.left));R(g,bx,by-6,1,6,'#5E6876');
   R(g,bx+1,by-8,1,2,'#5E6876');R(g,bx+6,by-8,1,2,'#5E6876');R(g,bx+1,by-9,6,1,'#5E6876');
 }
 Object.assign(IDLES,{
@@ -227,7 +239,7 @@ Object.assign(IDLES,{
   clock:{w:.7,t:[8,8],spot:()=>({x:CLOCK_SPOT,y:89,dir:1,shelf:true,st:'i-clock'}),pose:clockPose,tick:clockTick,behind:clockLadder,props:clockKey,air:clockAir,aloft:true},
   doodle:{w:1.2,t:[4,6],spot:ch=>({x:ch.dx,y:89,shelf:true,st:'i-doodle'}),begin:doodleBegin,tick:doodleTick,pose:()=>'look'},
   shelfread:{w:1,t:[7,10],emo:'bulb',spot:()=>({x:70+Math.random()*40,y:89,shelf:true,st:'i-shelf'}),pose:()=>'read',tick:shelfTick},
-  mop:{w:0,weight:()=>stain&&stain.left>0&&stain.floor===curFloor?7:0,t:[5,7],can:()=>!!(stain&&stain.left>0),spot:()=>({x:stain.x+10,y:stain.y+1,dir:-1,st:'i-mop'}),pose:()=>'pet',tick:mopTick,end:mopEnd,props:mopProps},
+  mop:{w:0,weight:()=>stain&&stain.left>0&&stain.floor===curFloor?7:0,t:[5,7],can:()=>!!(stain&&stain.left>0),spot:()=>({x:stain.x-18,y:stain.y+1,dir:1,st:'i-mop'}),pose:()=>'pet',tick:mopTick,end:mopEnd,props:mopProps,lean:(ch,tp)=>Math.round(Math.sin(tp/190))},
 });
 PLACE.mop='mop';PLACE.sweep='sweep';
 IDLES.coffee.end=maybeSpill;
@@ -263,7 +275,8 @@ function roomItems(items,g){
   if(stain&&stain.left<=0&&now>(stain.wet||0))stain=null;
   if(stain&&stain.floor===curFloor){
     drawStain(g,stain);
-    if(stain.wet>now){g.globalAlpha=Math.min(1,(stain.wet-now)/1500)*.3;R(g,stain.x-7,stain.y-1,15,3,'#D8EEFA');g.globalAlpha=1;}
+    // clean: a few glints on the wet floor, no patch that could pass for a stain
+    if(stain.wet>now){g.globalAlpha=Math.min(1,(stain.wet-now)/600);[[-5,0],[1,-1],[5,1]].forEach(([dx,dy],i)=>{if(Math.floor(tp/160+i)%2)R(g,stain.x+dx,stain.y+dy,1,1,'#FFFFFF');});g.globalAlpha=1;}
   }
   ripples=ripples.filter(r=>tp-r.t0<500);
   ripples.forEach(r=>{const u=(tp-r.t0)/500,rx=4+u*26,ry=rx*.42;g.globalAlpha=(1-u)*.55;for(let a=0;a<28;a++){const k=a/28*Math.PI*2;R(g,r.x+Math.cos(k)*rx,r.y+Math.sin(k)*ry,1,1,'#FFFFFF');}g.globalAlpha=1;});
