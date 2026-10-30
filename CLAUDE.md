@@ -49,7 +49,7 @@ Scripts are plain browser scripts sharing one global scope (the page runs from `
 ## Rules the office page keeps
 
 - **Eyes stay visible**: nothing on a desk covers x−5..x+4, y 95..98 around a seated Claude (`tools/office/check.js` enforces it).
-- **No overlaps**: desks and boards share the lane x 34..264, at most 6 desks (`MAX_DESKS`); boards keep 3 px apart, desks 2 px.
+- **No overlaps**: desks and boards share the lane x 34..264, at most 4 desks per floor (`MAX_DESKS`); boards keep 3 px apart, desks 2 px.
 - **Outlines** trace pixels with alpha ≥ .6; keep shadows and glows below that so they get no rim.
 - **Light comes from the window** (high, right): every shadow falls down and to the left.
 - **Everything shows and nothing overlaps**, in every theme: `tools/office/check.js` checks that each room element stands out from the wall or floor it sits on (contrast ≥ 1.8, by its colour or its rim) and that room elements, the item bar and the buttons never overlap. The buttons and the item bar scale with the room (`--u` in `office.css`), so they always cover the same corner of it; keep the bottom-right corner (x ≥ 284, y ≥ 169) and the strip under the rug free.

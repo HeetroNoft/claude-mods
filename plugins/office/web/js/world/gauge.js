@@ -7,7 +7,7 @@
 const GAUGE={x:2,y:1,w:56,h:16}; // ends at y 16, clear of the shelf (y 18); the shelf slots start past it
 const GAUGE_WIN=[['5H','fiveHour','fiveResets'],['7D','sevenDay','sevenResets']];
 const DAYS=['SUN','MON','TUE','WED','THU','FRI','SAT'];
-function latestRate(){let best=null;desks.forEach(d=>{const r=d.rate;if(r&&(!best||r.ms>best.ms))best=r;});return best;}
+function latestRate(){let best=null;everyDesk.forEach(d=>{const r=d.rate;if(r&&(!best||r.ms>best.ms))best=r;});return best;}
 // 0 fine, 1 low (20% left or less), 2 very low (5% or less), 3 empty
 function usageLevel(left){return left<=.5?3:left<=5?2:left<=20?1:0;}
 // each window as the gauge shows it: percent left, alarm level and reset time (null when not reported)

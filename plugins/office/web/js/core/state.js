@@ -24,7 +24,7 @@ function looksFor(id){if(!colourOf.has(id)){colourOf.set(id,colourNext%LOOKS.len
 // Desks and their boards share one lane on the wall, between the door sign (x 31) and the curtains (x 266).
 // A row is centred under the clock (x 160) whenever it fits, and slides left only when it must.
 // Half widths shrink with the count so neighbours never touch: 3 px of wall between boards, 2 px between desks.
-const LANE_L=34,LANE_R=264,ROOM_MID=160,MAX_DESKS=6; // 7 would leave desks touching
+const LANE_L=34,LANE_R=264,ROOM_MID=160,MAX_DESKS=+(Q.match(/desks=(\d)/)||[])[1]||4; // per floor: more and the boards lose their text (?desks=6 for test runs)
 const deskSpan=n=>Math.min(58,(LANE_R-LANE_L)/Math.max(1,n));
 function deskXs(n){const sp=deskSpan(n),gw=sp*n,left=Math.max(LANE_L,Math.min(LANE_R-gw,ROOM_MID-gw/2));
   const a=[];for(let i=0;i<n;i++)a.push(Math.round(left+(i+.5)*sp));return a;}
@@ -130,6 +130,36 @@ window.__office=function(d){try{misses=0;lastCall=Date.now();ingest(d,false);}ca
 // The order the desks were dragged into (ui/boards.js), by desk id. An id lasts as long as its
 // session, so a new session simply joins at the end of the row.
 let deskOrder=[],lastData=null;
+// Floors: the desks of the floor on show are `desks`, everyone's are `everyDesk`. A desk keeps its
+// floor (floorOf, by desk id, like the order) until you move it or it goes home; a new session takes
+// the lowest floor with room, an emptied floor closes, and two floors that fit on one merge, unless a
+// desk you placed by hand (floorPinned) stands on the upper one. ui/floors.js has the panel.
+let everyDesk=[],floorOf=new Map(),floorPinned=new Set(),curFloor=0,floorCount=1,floorJump=false,floorFade=0;
+try{floorOf=new Map(Object.entries(JSON.parse(localStorage.getItem('office.deskFloor')||'{}')).map(([k,v])=>[k,+v]));}catch(e){}
+try{floorPinned=new Set(JSON.parse(localStorage.getItem('office.deskPinned')||'[]').map(String));}catch(e){}
+function saveFloors(){try{localStorage.setItem('office.deskFloor',JSON.stringify(Object.fromEntries([...floorOf].slice(-64))));localStorage.setItem('office.deskPinned',JSON.stringify([...floorPinned].slice(-64)));}catch(e){}}
+function assignFloors(all){
+  if(!all.length)return;
+  const before=JSON.stringify([...floorOf]),count=[];
+  all.forEach(d=>{const id=String(d.id),f=floorOf.get(id);if(f!=null&&(count[f]||0)<MAX_DESKS)count[f]=(count[f]||0)+1;else floorOf.delete(id);});
+  all.forEach(d=>{const id=String(d.id);if(floorOf.has(id))return;let f=0;while((count[f]||0)>=MAX_DESKS)f++;floorOf.set(id,f);count[f]=(count[f]||0)+1;});
+  let followed=false;
+  for(let f=count.length-1;f>0;f--){
+    if(!count[f])continue;
+    const dk=all.filter(d=>floorOf.get(String(d.id))===f);if(dk.some(d=>floorPinned.has(String(d.id))))continue;
+    for(let g=0;g<f;g++)if(count[g]&&count[g]+count[f]<=MAX_DESKS){
+      dk.forEach(d=>floorOf.set(String(d.id),g));count[g]+=count[f];count[f]=0;
+      if(curFloor===f){curFloor=g;followed=true;} // you go down with them
+      break;
+    }
+  }
+  const used=[...count.keys()].filter(f=>count[f]);
+  all.forEach(d=>{const id=String(d.id);floorOf.set(id,used.indexOf(floorOf.get(id)));});
+  floorCount=used.length;
+  const at=used.indexOf(curFloor);curFloor=at>=0?at:Math.min(curFloor,floorCount-1);
+  if(JSON.stringify([...floorOf])!==before)saveFloors();
+  return followed;
+}
 try{const a=JSON.parse(localStorage.getItem('office.deskOrder')||'[]');if(Array.isArray(a))deskOrder=a.map(String);}catch(e){}
 function orderDesks(list){const at=id=>{const i=deskOrder.indexOf(String(id));return i<0?1e9:i;};return list.map((d,i)=>[d,i]).sort((a,b)=>at(a[0].id)-at(b[0].id)||a[1]-b[1]).map(a=>a[0]);}
 
@@ -141,11 +171,14 @@ function ingest(d,synthetic){
   const have=new Set(real.map(x=>String(x.name||'').toLowerCase()));
   const sleepers=[];
   real.forEach(x=>Object.values(x.peers||{}).forEach(n=>{const k=String(n).toLowerCase();if(n&&!have.has(k)){have.add(k);sleepers.push({id:'asleep:'+n,name:String(n),activity:'asleep',detail:'Not joined yet',steps:[],interns:[],files:[],sent:[],got:[],asleep:true});}}));
-  const list=orderDesks(real.filter(x=>x.activity!=='gone').slice(0,MAX_DESKS));
+  const all=orderDesks(real.filter(x=>x.activity!=='gone'));
+  if(assignFloors(all)&&!firstLoad){leaveFloor(-1,1);floorJump=true;}
+  const list=all.filter(x=>floorOf.get(String(x.id))===curFloor);
+  everyDesk=all;
   if(!synthetic)gotData=true;
   desks=list;
   const xs=deskXs(list.length);
-  const instant=firstLoad&&!synthetic;
+  const instant=(firstLoad&&!synthetic)||floorJump;floorJump=false;
   const cnt={};
   const live=new Set();
   list.forEach((dk,i)=>{
@@ -181,32 +214,33 @@ function ingest(d,synthetic){
   // desks that vanished
   chars.forEach((ch,id)=>{if(!live.has(id)){releaseIdle(ch);ch.removed=true;ch.act='gone';setTarget(ch,{x:DOOR.x,y:DOOR.y,exit:true,st:'exit'},instant);}});
   interns.forEach((e)=>{if(!live.has(e.pid)&&!e.leaving){e.leaving=true;setTarget(e,{x:DOOR.x,y:DOOR.y,exit:true,st:'exit'},instant);}});
+  renderFloors(); // ui/floors.js
   if(synthetic)return;
 
   // messages
   if(firstLoad){
-    list.forEach(dk=>{
+    all.forEach(dk=>{
       (dk.sent||[]).forEach(s=>{if(s&&now-(+s.ms||0)>20000)animated.add(norm(s.key));});
       (dk.got||[]).forEach(g=>{if(g&&now-(+g.ms||0)>20000)animated.add(norm(g.key));});
     });
   }
-  list.forEach(R_=>{
+  all.forEach(R_=>{
     (R_.got||[]).forEach(g=>{
       if(!g)return; const k=norm(g.key); if(!k||animated.has(k))return;
       let S_=null,sm=null;
-      for(const dk of list){if(dk===R_)continue;const f=(dk.sent||[]).find(s=>s&&keyMatch(norm(s.key),k));if(f){S_=dk;sm=f;break;}}
+      for(const dk of all){if(dk===R_)continue;const f=(dk.sent||[]).find(s=>s&&keyMatch(norm(s.key),k));if(f){S_=dk;sm=f;break;}}
       animated.add(k);
       if(S_){animated.add(norm(sm.key));pendingSent.delete(norm(sm.key));
         launch(String(S_.id),String(R_.id),str(S_.name||'Claude',12)+' > '+str(R_.name||'Claude',12),str(g.words||sm.words,44),looksFor(String(S_.id)).c);}
-      else{const nd=list.find(x=>x!==R_&&g.from&&String(x.name||'').toLowerCase()===String(g.from).toLowerCase());
+      else{const nd=all.find(x=>x!==R_&&g.from&&String(x.name||'').toLowerCase()===String(g.from).toLowerCase());
         if(nd)launch(String(nd.id),String(R_.id),str(nd.name,12)+' > '+str(R_.name||'Claude',12),str(g.words,44),looksFor(String(nd.id)).c);
         else launch(null,String(R_.id),'Message in',str(g.from||'Someone',14)+': '+str(g.words,40),'#2A9D8F');}
     });
   });
-  list.forEach(S_=>{(S_.sent||[]).forEach(s=>{if(!s)return;const k=norm(s.key);if(!k||animated.has(k)||pendingSent.has(k))return;pendingSent.set(k,{t:now,id:String(S_.id),words:s.words,to:s.to});});});
+  all.forEach(S_=>{(S_.sent||[]).forEach(s=>{if(!s)return;const k=norm(s.key);if(!k||animated.has(k)||pendingSent.has(k))return;pendingSent.set(k,{t:now,id:String(S_.id),words:s.words,to:s.to});});});
 
-  // files: a newly written file is carried to the shelf by the Claude who wrote it
-  list.forEach(dk=>{
+  // files: a newly written file is carried to the shelf by the Claude who wrote it (from another floor, it comes in by the door)
+  all.forEach(dk=>{
     const id=String(dk.id),col=looksFor(id).c,ch=chars.get(id);
     const marks=(Array.isArray(dk.files)?dk.files:[]).filter(f=>f&&f.kind==='edit').sort((a,b)=>(+a.ms||0)-(+b.ms||0));
     marks.forEach(f=>{
@@ -216,10 +250,10 @@ function ingest(d,synthetic){
   });
 
   // done detection
-  list.forEach(dk=>{
+  all.forEach(dk=>{
     const id=String(dk.id),dm=+dk.doneMs||0,prev=lastDone.get(id);
     if(prev===undefined){lastDone.set(id,dm);return;}
-    if(dm>prev){lastDone.set(id,dm);if(now-dm<=30000)celebrate(id,dk.doneLine);}
+    if(dm>prev){lastDone.set(id,dm);if(now-dm<=30000&&chars.has(id))celebrate(id,dk.doneLine);}
   });
   firstLoad=false;
 }
@@ -230,6 +264,7 @@ function charPoint(id){
   const dx=deskX(id); return dx==null?{x:DOOR.x,y:DOOR.y-14}:{x:dx,y:SEAT_Y-14};
 }
 function launch(fromId,toId,head,words,col){
+  if(!chars.has(fromId)&&!chars.has(toId))return; // between two other floors: nothing to see here
   const t0=Math.max(performance.now(),lastLaunch+1600); lastLaunch=t0;
   planes.push({fromId,toId,head,words,col,t0,dur:1900,hold:2600});
 }
@@ -238,12 +273,12 @@ function checkPending(){
   pendingSent.forEach((p,k)=>{
     if(now-p.t<6000)return;
     let matched=false;
-    for(const dk of desks){if((dk.got||[]).some(g=>g&&keyMatch(norm(g.key),k))){matched=true;break;}}
+    for(const dk of everyDesk){if((dk.got||[]).some(g=>g&&keyMatch(norm(g.key),k))){matched=true;break;}}
     pendingSent.delete(k);
     if(matched||animated.has(k))return;
     animated.add(k);
-    const dk=desks.find(d=>String(d.id)===p.id);
-    const td=desks.find(d=>p.to&&String(d.id)!==p.id&&String(d.name||'').toLowerCase()===String(p.to).toLowerCase());
+    const dk=everyDesk.find(d=>String(d.id)===p.id);
+    const td=everyDesk.find(d=>p.to&&String(d.id)!==p.id&&String(d.name||'').toLowerCase()===String(p.to).toLowerCase());
     launch(p.id,td?String(td.id):null,str(dk?dk.name:'Claude',12)+' > '+str(td?td.name:(p.to||'outside'),14),str(p.words,44),looksFor(p.id).c);
   });
 }

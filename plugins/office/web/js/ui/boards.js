@@ -3,7 +3,7 @@
 'use strict';
 let boardDrag=null;
 function boardAt(x,y){
-  if(desks.length<2||y<BOARD_TOP||y>=BOARD_TOP+BOARD_H)return -1;
+  if(everyDesk.length<2||!desks.length||y<BOARD_TOP||y>=BOARD_TOP+BOARD_H)return -1;
   const h=boardHalf(desks.length);return deskXs(desks.length).findIndex(dx=>x>=dx-h&&x<dx+h);
 }
 function slotAt(x){const xs=deskXs(desks.length);let best=0;xs.forEach((dx,i)=>{if(Math.abs(dx-x)<Math.abs(xs[best]-x))best=i;});return best;}
@@ -40,12 +40,16 @@ stage.addEventListener('pointerdown',e=>{
 stage.addEventListener('pointermove',e=>{
   const D=boardDrag;if(!D)return;
   D.x=toWorld(e).x;
-  if(!D.on&&Math.abs(D.x-D.sx)>3){D.on=true;blip(620,.04,'triangle');try{stage.setPointerCapture(D.pid);}catch(err){}}
+  if(!D.on&&Math.abs(D.x-D.sx)>3){D.on=true;blip(620,.04,'triangle');try{stage.setPointerCapture(D.pid);}catch(err){}renderFloors();}
+  if(D.on)floorHover(e.clientX,e.clientY);
 });
-stage.addEventListener('pointerup',()=>{
+stage.addEventListener('pointerup',e=>{
   const D=boardDrag;boardDrag=null;if(!D||!D.on)return;
   suppressClickUntil=performance.now()+60;
-  blip(moveDesk(D.id,slotAt(D.x))?480:300,.05,'triangle');
+  const f=floorChipAt(e.clientX,e.clientY); // dropped on the panel: to that floor
+  blip((f!=null?moveToFloor(D.id,f):moveDesk(D.id,slotAt(D.x)))?480:300,.05,'triangle');
+  renderFloors();
 });
-stage.addEventListener('pointercancel',()=>{boardDrag=null;});
-window.addEventListener('keydown',e=>{if(e.key==='Escape')boardDrag=null;});
+const dropDrag=()=>{if(boardDrag){boardDrag=null;renderFloors();}};
+stage.addEventListener('pointercancel',dropDrag);
+window.addEventListener('keydown',e=>{if(e.key==='Escape')dropDrag();});

@@ -201,6 +201,9 @@ function frame(tp){
   if(TH.dust==='neon'||TH.dust==='space')motes.forEach((m,i)=>{if(TH.moteCols)m.c=TH.moteCols[i%TH.moteCols.length];m.y-=m.v*dt*(TH.dust==='space'?.35:1);m.x+=Math.sin(tp/900+m.p)*dt*3;if(m.y<86){m.y=178;m.x=Math.random()*W;}wx.fillStyle=`rgba(${m.c},${.35+.3*Math.sin(tp/400+m.p)})`;wx.fillRect(Math.round(m.x),Math.round(m.y),1,1);});
   // boards and lights glow on their own
   if(TH.lights)drawBulbs(wx,tp);
+  // changing floors with reduced motion: the room comes up out of a quick dark
+  const fade=(floorFade-performance.now())/FLOOR_FADE; // on the wall clock: a late frame never leaves it dark
+  if(fade>0){wx.fillStyle=`rgba(0,0,0,${Math.min(1,fade)})`;wx.fillRect(0,0,W,H);}
   // a usage window run dry dims the room; the gauge, drawn after, stays lit
   if(gaugeEmpty()){wx.fillStyle='rgba(18,4,6,.42)';wx.fillRect(0,0,W,H);}
   drawGauge(wx,now,tp);
@@ -230,8 +233,11 @@ function frame(tp){
   });
   planes=planes.filter(p=>tp-p.t0<p.dur+p.hold);
 
+  const slideY=drawFloorSlide(wx); // the lift between floors (ui/floors.js)
+
   /* ---- overlay draw ---- */
   ox.setTransform(dpr,0,0,dpr,0,0); ox.clearRect(0,0,cssW,cssH);
+  if(slideY)ox.translate(0,P(slideY));
   ox.imageSmoothingEnabled=true;
   // sign
   if(LABELS){

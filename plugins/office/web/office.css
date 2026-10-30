@@ -56,3 +56,20 @@ body.clean #vol{display:none}
 #ghost{position:fixed;width:36px;height:36px;transform:translate(-50%,-60%);pointer-events:none;display:none;filter:drop-shadow(0 3px 0 rgba(0,0,0,.35));z-index:10}
 #ghost.on{display:block}
 @media (prefers-reduced-motion:reduce){#items button.nudge{animation:none}}
+#floors{position:absolute;left:56.9%;max-width:16.9%;bottom:1.6%;display:none;gap:calc(4px*var(--u,1));box-sizing:border-box;padding:calc(4px*var(--u,1));background:rgba(0,19,47,.88);border:2px solid #D97557;border-radius:8px}
+#floors.show{display:flex}
+#floors button{flex:0 1 auto;min-width:0;height:calc(32px*var(--u,1));display:flex;align-items:center;justify-content:center;gap:calc(2px*var(--u,1));padding:0 calc(5px*var(--u,1));border:0;border-radius:5px;background:rgba(255,255,255,.08);color:#fff;cursor:pointer}
+#floors.many button{flex:1 1 0;padding:0}
+#floors b{font:700 calc(13px*var(--u,1)) ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+#floors i{display:block;width:calc(8px*var(--u,1));height:calc(8px*var(--u,1));border-radius:1px}
+#floors i.limit{background:#E5484D!important}
+#floors i.wait{animation:floorBlink .9s steps(2,jump-none) infinite;outline:1px solid #FFD84A}
+#floors button:hover,#floors button:focus-visible{background:rgba(255,255,255,.22);outline:none}
+#floors button.cur{background:rgba(217,117,87,.55)}
+#floors.many button.wait{animation:floorBlink .9s steps(2,jump-none) infinite;background:#E0B04A;color:#00132F}
+#floors.many button.limit{background:#E5484D}
+#floors button.new{background:transparent;outline:1px dashed rgba(255,255,255,.5);outline-offset:-1px}
+#floors button.full{opacity:.4;cursor:not-allowed}
+#floors button.over:not(.full){background:#D97557}
+@keyframes floorBlink{from{opacity:1}to{opacity:.25}}
+@media (prefers-reduced-motion:reduce){#floors i.wait,#floors.many button.wait{animation:none}}

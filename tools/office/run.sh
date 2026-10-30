@@ -17,7 +17,7 @@ for b in "/c/Program Files (x86)/Microsoft/Edge/Application/msedge.exe" "/c/Prog
 SITE="$(mktemp -d)"; trap 'rm -rf "$SITE"' EXIT
 build(){ # $1: extra scripts after main.js (space separated), or "gallery"
   rm -rf "$SITE"/*; cp -r "$WEB"/. "$SITE"/; N="${N:-6}" node "$HERE/mkdata.js" > "$SITE/data.js"
-  cp "$HERE"/check.js "$HERE"/scenario.js "$HERE"/gallery.js "$SITE/js/"
+  cp "$HERE"/check.js "$HERE"/scenario.js "$HERE"/gallery.js "$HERE"/floors.js "$SITE/js/"
   local tags=""; for s in $1; do tags="$tags<script src=\"js/$s\"></script>"; done
   if [ "$1" = gallery.js ]; then sed -i "s#<script src=\"js/core/main.js\"></script>#$tags#" "$SITE/index.html"
   else sed -i "s#<script src=\"js/core/main.js\"></script>#<script src=\"js/core/main.js\"></script>$tags#" "$SITE/index.html"; fi
@@ -32,9 +32,10 @@ LOG="$(mktemp)"
 main(){
 case "${1:-check}" in
   check) build "check.js scenario.js"
-    for t in pixel claude cosy neon japan paper retro space; do echo "== $t"; open "theme=$t&hour=12&scn=t" "check_$t"; done ;;
-  shot) build ""; open "theme=${2:-pixel}&hour=${3:-12}" "shot_${2:-pixel}_${3:-12}" ;;
-  scenario) build "scenario.js"; open "theme=${2:-pixel}&hour=12&scn=${3:-a}" "scn_${2:-pixel}_${3:-a}" ;;
+    for t in pixel claude cosy neon japan paper retro space; do echo "== $t"; open "theme=$t&hour=12&scn=t&desks=6" "check_$t"; done
+    echo "== floors"; N=11 build "floors.js"; open "theme=pixel&hour=12" "check_floors" ;;
+  shot) build ""; open "theme=${2:-pixel}&hour=${3:-12}&desks=6" "shot_${2:-pixel}_${3:-12}" ;;
+  scenario) build "scenario.js"; open "theme=${2:-pixel}&hour=12&desks=6&scn=${3:-a}" "scn_${2:-pixel}_${3:-a}" ;;
   gallery) build "gallery.js"; open "theme=pixel&set=${2:-poses}" "gallery${2:+_$2}" ;;
   *) sed -n '2,10p' "$0"; exit 1 ;;
 esac

@@ -37,7 +37,7 @@ function poke(c,tp){
   else{setMood(c,'happy',1000);emote(c,'note');c.sqv+=18;}
   blip(700+Math.random()*300,.04);
 }
-const overUi=e=>!!(e.target.closest&&e.target.closest('#card,#menu,#items,button'));
+const overUi=e=>!!(e.target.closest&&e.target.closest('#card,#menu,#items,#floors,button'));
 stage.addEventListener('pointermove',e=>{
   const p=toWorld(e),dx=p.x-ptr.x;ptr.x=p.x;ptr.y=p.y;ptr.in=true;
   if(overUi(e)){hoverCh=null;stage.classList.remove('hand');return;}
