@@ -11,7 +11,7 @@ for(let i=0;i<10;i++)dust.push({x:250+Math.random()*60,y:90+Math.random()*45,v:2
 const motes=[];for(let i=0;i<18;i++)motes.push({x:Math.random()*W,y:88+Math.random()*90,v:1.5+Math.random()*3,p:Math.random()*6,c:i%3?'45,226,230':'255,61,203'});
 // things you can click, and what the room remembers about them
 const lampOff=new Set();
-let winOpen=false,brewUntil=0,plantT=-1e9,funUntil=0,clockSpin=-1e9,doorKnock=-1e9;
+let winOpen=false,brewUntil=0,plantT=-1e9,funUntil=0,clockSpin=-1e9,clockWindAt=-1e9,clockChimeAt=-1e9,doorKnock=-1e9;
 let emotes=[],leaves=[],cat=null;
 const ptr={x:0,y:0,in:false};
 let hoverCh=null,cardId=null;

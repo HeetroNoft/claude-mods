@@ -86,6 +86,8 @@ function drawPerson(g,cx,fy,o){
     case 'game':{const gx=L+(bw>>1)-3,gy=ay+2;if(sm){nub(-1,2);nub(1,2);}else twoHands(gx,6,gy+1);
       extras.push(()=>{R(g,gx,gy,6,3,'#2B2F3A');R(g,gx+1,gy+1,4,1,f?'#7FE8FF':'#5BD08A');if(!sm){R(g,gx,gy+3,6,1,'#1A1D24');thumbs(gx,6,gy+1);}});break;}
     case 'phone':{const px=L+(bw>>1)-2,py=T+5;if(sm||o.seated){nub(-1,2);nub(1,2);break;}twoHands(px,5,py+3);extras.push(()=>drawPhone(g,px,py,o,c));break;}
+    case 'climb':up(-1,0,f?6:3);up(1,0,f?3:6);break;
+    case 'wind':nub(-side,1);reach(side,side>0?L+bw+3:L-5,T+1+(f?-2:1));break;
     case 'hold':if(sm||!o.held){nub(-1,1,1);nub(1,1,1);hand={x:L+(bw>>1),y:ay+2,side:0};}else holdFront(ay+2-lift,o.held.kind);break;
     case 'fold':{const px=L+(bw>>1)-2;if(sm){nub(-1,1,f?1:0);nub(1,1,f?0:1);}else twoHands(px-(f?1:0),4+(f?1:0),ay);
       extras.push(()=>{R(g,px,ay,4,2,'#FFFFFF');R(g,px+1,ay-1,2,1,'#FFFFFF');R(g,px,ay+1,4,1,'#D5DAE2');});break;}

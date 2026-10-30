@@ -47,7 +47,9 @@ function drawPlant(g,tp){
 function clockHand(g,a,len,col){for(let i=0;i<=len;i+=.5)R(g,Math.floor(CLOCK.x+Math.sin(a)*i),Math.floor(CLOCK.y-Math.cos(a)*i),1,1,col);}
 // The clock: local time (hour, minute, second hands), and around the face a ring showing the time
 // left until the last plan in the room is due: it empties clockwise, amber and blinking when late,
-// all green when every plan is finished. A click spins the seconds hand.
+// all green when every plan is finished. A click spins the seconds hand; a Claude winding it (actors/scenes.js)
+// sends all three hands round and back to the time, then it chimes: a shake and a gold ring.
+const CLOCK_WIND=3000;
 function clockPixels(g,now,tp){
   let fin=null,start=null,late=false,allDone=desks.length>0;
   desks.forEach(dk=>{const e=dk.eta;if(!e||!e.finishMs)return;if(!e.allDone){allDone=false;
@@ -62,10 +64,17 @@ function clockPixels(g,now,tp){
   }
   const lt=new Date(now),sec=lt.getSeconds()+lt.getMilliseconds()/1000,min=lt.getMinutes()+sec/60,hr=(lt.getHours()%12)+min/60;
   const spin=tp-clockSpin<1400?Math.pow(1-(tp-clockSpin)/1400,2)*Math.PI*6:0;
-  clockHand(g,hr/12*Math.PI*2,4.5,TH.ink);
-  clockHand(g,min/60*Math.PI*2,6.5,TH.ink);
-  clockHand(g,Math.floor(sec)/60*Math.PI*2+spin,7,TH.clockRim);
+  const w=(tp-clockWindAt)/CLOCK_WIND,turn=w>=0&&w<1?(1-Math.pow(1-w,3))*Math.PI*2:0; // whole turns, so the hands land on the time
+  const ring=tp-clockChimeAt,shake=ring>=0&&ring<500?(Math.floor(tp/70)%2?1:-1):0;
+  if(shake)g.drawImage(bg,146,0,30,28,146+shake,0,30,28);
+  g.save();g.translate(shake,0);
+  clockHand(g,hr/12*Math.PI*2+turn,4.5,TH.ink);
+  clockHand(g,min/60*Math.PI*2+turn*3,6.5,TH.ink);
+  clockHand(g,Math.floor(sec)/60*Math.PI*2+spin+turn*6,7,TH.clockRim);
   R(g,160,13,1,1,TH.clockRim);
+  g.restore();
+  if(ring>=0&&ring<900){g.fillStyle=`rgba(255,216,74,${.55*(1-ring/900)})`;const r=11+ring/180;
+    for(let i=0;i<72;i++){const a=i/72*Math.PI*2;g.fillRect(Math.floor(cx+Math.sin(a)*r),Math.floor(cy-Math.cos(a)*r),1,1);}}
 }
 // The cabinet a Claude reads at, one piece of furniture per theme (TH.cabinetKind). Each kind draws
 // its body and top, lists its drawers and draws one drawer face; the first drawer slides out while
