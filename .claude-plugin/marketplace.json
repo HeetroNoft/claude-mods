@@ -1,8 +1,8 @@
 {
-  "name": "lucas-mods",
+  "name": "heet-mods",
   "owner": {
-    "name": "Lucas",
-    "email": "lucas.bize.pro@gmail.com"
+    "name": "Heet",
+    "email": "88349962+HeetroNoft@users.noreply.github.com"
   },
   "metadata": {
     "description": "Mes mods personnels pour Claude Code",
@@ -13,13 +13,13 @@
       "name": "office",
       "source": "./plugins/office",
       "description": "Bureau pixel-art local avec des variantes de la mascotte Claude (d'après l'office de charlie-free-mods)",
-      "version": "1.9.4"
+      "version": "1.9.5"
     },
     {
       "name": "mission-control",
       "source": "./plugins/mission-control",
       "description": "Panneau de mission en direct : le plan en barre de progression, ce que fait Claude en français clair, vos demandes cochées (d’après mission-control de charlie-free-mods)",
-      "version": "0.3.3"
+      "version": "0.3.4"
     }
   ]
 }

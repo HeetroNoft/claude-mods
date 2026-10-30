@@ -1,6 +1,6 @@
 # claude-mods
 
-Lucas's Claude Code mods, published as the `lucas-mods` marketplace (`.claude-plugin/marketplace.json`).
+Heet's Claude Code mods, published as the `heet-mods` marketplace (`.claude-plugin/marketplace.json`).
 
 | Plugin | Folder | What it is |
 | --- | --- | --- |
@@ -8,6 +8,8 @@ Lucas's Claude Code mods, published as the `lucas-mods` marketplace (`.claude-pl
 | mission-control | `plugins/mission-control` | A live panel of the current turn: plan bar, plain-language activity, ticked asks |
 
 `~/.claude/office/` is **output**, not source: desk files, `data.js` and a copy of the page that the office mod writes at session start. Never edit it by hand; edit `plugins/office/web/` and copy it over to preview (see Testing).
+
+**Never infer: ask.** When the request, the code or the checks leave something open, ask Heet instead of assuming the answer.
 
 ## Working with several Claude sessions at once
 
@@ -17,7 +19,7 @@ Several sessions may be editing this repository at the same time. To stay out of
 2. **Only edit files inside your area.** The areas are listed below; each file starts with a one-line comment saying what it owns.
 3. **Shared files** are edited by several areas: the `<script>` list in `plugins/office/web/index.html`, `plugins/office/web/office.css`, both `plugin.json` files and `.claude-plugin/marketplace.json`. Re-read one right before you change it, change only your lines with a targeted edit, and never rewrite it whole.
 4. **Version bumps**: bump a plugin's version in its `plugin.json` **and** in `marketplace.json` once, when your work is finished and checked, not per edit.
-5. **Git** (when the repository is a git repository): give each session its own worktree and branch, `git worktree add ../claude-mods-<task> -b <task>`, and merge when its checks pass. Commit only when Lucas asks.
+5. **Git** (when the repository is a git repository): give each session its own worktree and branch, `git worktree add ../claude-mods-<task> -b <task>`, and merge when its checks pass. Commit only when Heet asks.
 
 ### office: areas and files (`plugins/office/`)
 
