@@ -31,7 +31,7 @@ setTimeout(()=>{
   // the new scenes: every one runs through its begin, tick, pose, props and end, in every season
   callCleaner.at=Infinity; // nobody is called away while these run by hand
   const sc=[...chars.values()][0],sb=[...chars.values()][1],keepIdle=sc.idle,keepIdleB=sb.idle;
-  SEASONS.forEach(s=>{SEASON=s;['season','sweep','clock','doodle','shelfread','share','mop'].forEach(a=>{const D=IDLES[a],I={act:a,phase:'do',start:0,dur:1000,until:1e12};sc.idle=I;stain=stain||{floor:curFloor,x:100,y:176,left:1,wet:0,gone:new Set()};if(!lying().length)shaken.push({floor:curFloor,x:150,gy:150,h:0,c:'#D9662E',kind:'tree',seed:0,drift:0,rest:Date.now()});if(D.air)ok(D.air(sc,1)>=0,a+' sinks');
+  SEASONS.forEach(s=>{SEASON=s;['season','sweep','charge','clock','doodle','shelfread','share','mop'].forEach(a=>{const D=IDLES[a],I={act:a,phase:'do',start:0,dur:1000,until:1e12};sc.idle=I;stain=stain||{floor:curFloor,x:100,y:176,left:1,wet:0,gone:new Set()};if(!lying().length)shaken.push({floor:curFloor,x:150,gy:150,h:0,c:'#D9662E',kind:'tree',seed:0,drift:0,rest:Date.now()});if(D.air)ok(D.air(sc,1)>=0,a+' sinks');
     try{if(D.spot)D.spot(sc);if(D.begin)D.begin(sc,I,0);if(D.tick)D.tick(sc,I,1);ok(typeof D.pose(sc,1)==='string',a+' has no pose');if(D.props)D.props(wx,sc,1,I);if(D.end)D.end(sc,I,1);}catch(err){ok(false,a+' in '+s+': '+err.message);}});
     ['snowball','selfie','napside'].forEach(a=>{const D=IDLES[a],I={act:a,phase:'do',pair:sb,role:0,sync:1,dur:9000,start:0,until:1e12};sc.idle=I;sb.idle={act:a,phase:'do',pair:sc,role:1,dur:9000,start:0,until:1e12};
     try{if(D.tick){D.tick(sc,I,5000);D.tick(sc,I,7000);}ok(typeof D.pose(sc,5000)==='string',a+' has no pose');if(D.props)D.props(wx,sc,5000,I);if(D.lean)D.lean(sc,5000);}catch(err){ok(false,a+' in '+s+': '+err.message);}});
@@ -51,6 +51,12 @@ setTimeout(()=>{
   const fx=sc.x;flingClaude(sc,200,60,0);for(let i=0;i<400&&sc.fly;i++)flyTick(sc,.02,i);ok(!sc.fly&&sc.x>=8&&sc.x<=312,'the throw never landed');ok(sc.mood==='dizzy','the thrown Claude is not dizzy');sc.x=fx;sc.resumeAt=0;
   const realRandom=Math.random;Math.random=()=>.9;shaken=[];floorTap({x:150,y:150},performance.now());ok(!shaken.some(x=>x.kind==='paper'),'a sheet fell on every tremble');Math.random=()=>.1;floorTap({x:150,y:150},performance.now());const sheets=shaken.filter(x=>x.kind==='paper').length;floorTap({x:150,y:150},performance.now());ok(shaken.filter(x=>x.kind==='paper').length===sheets,'a desk lost a second sheet');Math.random=realRandom;ok(shaken.some(x=>x.kind==='paper')&&shaken.some(x=>x.kind==='leaf'),'the tremble shook nothing loose');leafGust();ok(shaken.some(x=>x.kind==='tree'),'no gust of leaves');const itF=[];roomItems(itF,wx);itF.forEach(i=>i.f());shaken=[];
   callCleaner.at=0;
+  // charging: one Claude to a socket, and no socket, no charging
+  const keepTh=TH,sockA=[...chars.values()][0],sockB=[...chars.values()][1],keepC1=sockA.idle,keepC2=sockB.idle;
+  sockA.idle={act:'charge'};sockB.idle={act:'charge'};const spotA=chargeSpot(sockA),spotB=chargeSpot(sockB);
+  ok(sockA.idle.socket!==sockB.idle.socket&&spotA.shelf&&spotB.shelf,'two Claudes on one socket');ok(!IDLES.charge.can([...chars.values()][2]),'a third Claude finds a socket');
+  sockA.idle=keepC1;sockB.idle=keepC2;
+  THEME_KEYS.forEach(k=>{TH=THEMES[k];ok(IDLES.charge.can(sockA)===(k!=='retro'),k+': charging does not follow its sockets');});TH=keepTh;
   // at the reset: the gauge is full again and a knocked-out desk gets up, before any session has said so
   const gd=everyDesk[0],keepRate=gd.rate,past=new Date(Date.now()-1000).toISOString();gd.rate={fiveHour:100,fiveResets:past,ms:Date.now()-60000};
   everyDesk.forEach(x=>{if(x!==gd&&x.rate)x.rate=null;});ok(gaugeWindows()[0].left===100&&!gaugeEmpty(),'the gauge stays empty past its reset');gd.rate=keepRate;
