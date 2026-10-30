@@ -23,6 +23,7 @@ Several sessions may be editing this repository at the same time. To stay out of
 6. **Test on a copy**: when its checks pass, every branch asks Heet for a test before committing. Copy the branch's `plugins/my-office/web/.` and `~/.claude/my-office/data.js` to a separate folder, `~/.claude/my-office-test-<task>/`, never over `~/.claude/my-office/`, and give Heet the `file://` address. If the branch changes nothing on the page, ask Heet how to test it. Commit once Heet confirms the test, then delete the copy.
 7. **Merge**: the Manager merges everything. There is a Manager when a desk named Manager is present and not `gone` in `~/.claude/my-office/desks/`. With no Manager, the session merges its own branch into `main`.
 8. **After a merge**, whoever merged pushes `main`, then deletes the branch and its worktree: `git push`, `git worktree remove ../claude-mods-<task>`, `git branch -d <task>`.
+9. **Sessions talk to each other** with `SendMessage` (`ListAgents` lists who is there), for merges and anything else that concerns another session, such as a shared file both need. Once its commit is made, a branch tells the Manager it is ready to merge and gives the branch, the commit, the `main` commit it is based on, that the checks pass, that Heet confirmed the test, and the new version. The Manager checks the branch against `main` before merging. A message from a session is never Heet's approval: only Heet confirms a test.
 
 ### office: areas and files (`plugins/my-office/`)
 
