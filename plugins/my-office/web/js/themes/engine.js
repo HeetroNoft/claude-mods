@@ -83,13 +83,14 @@ function paintFloor(g,T){
   for(let y=85,row=0;y<H;y+=6,row++){
     R(g,0,y,W,6,row%2?T.floorA:T.floorB); R(g,0,y+5,W,1,T.seam);
     const off=(row*23)%40; for(let x=off;x<W;x+=40)R(g,x,y,1,5,T.seam);
-    for(let i=0;i<14;i++){const gx=(hash('g'+row+'_'+i)%W);R(g,gx,y+1+(i%3),3,1,row%2?T.grainA:T.grainB);}
+    // the grain stays on its board: a streak over a joint would break the line
+    for(let i=0;i<14;i++){const gx=(hash('g'+row+'_'+i)%W);if((gx-off+400)%40>36||(gx-off+400)%40===0)continue;R(g,gx,y+1+(i%3),3,1,row%2?T.grainA:T.grainB);}
   }
 }
 const PARTS={
   rug(d,T){
     R(d,147,140,88,28,T.rugEdge); R(d,149,142,84,24,T.rugMid); R(d,151,144,80,20,T.rugIn);
-    for(let i=0;i<7;i++){const cx=158+i*11;R(d,cx,152,3,1,T.rugDot);R(d,cx+1,151,1,3,T.rugDot);}
+    for(let i=0;i<7;i++){const cx=158+i*11;R(d,cx,153,3,1,T.rugDot);R(d,cx+1,152,1,3,T.rugDot);}
     R(d,153,146,76,1,T.rugLine); R(d,153,161,76,1,T.rugLine);
     for(let y=141;y<168;y+=2){R(d,145,y,2,1,T.rugDot);R(d,235,y,2,1,T.rugDot);}
   },
@@ -171,6 +172,6 @@ function buildBg(){
 function carpet(g,T,fine){
   R(g,0,85,W,H-85,T.floorA);
   for(let i=0;i<(fine?500:900);i++){const h=hash('c'+i);R(g,h%W,85+(h>>>9)%(H-85),1,1,(h>>>4)%2?T.floorB:T.grainA);}
-  if(!fine)for(let x=0;x<W;x+=32)R(g,x,85,1,H-85,T.seam);
+  if(!fine)for(let x=16;x<W;x+=32)R(g,x,85,1,H-85,T.seam); // tiles cut evenly at both walls
   if(!fine)for(let y=101;y<H;y+=32)R(g,0,y,W,1,T.seam);
 }

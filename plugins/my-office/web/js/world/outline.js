@@ -44,6 +44,6 @@ function outlinedLive(g,key,box,draw){
 
 // Light comes from the window, high on the right, so every shadow falls down and to the left.
 // A soft contact shadow under something standing on the floor, fading over three rows.
-function floorShadow(g,x,y,w){R(g,x-1,y,w+2,1,'rgba(0,0,0,.28)');R(g,x,y+1,w-1,1,'rgba(0,0,0,.15)');R(g,x+2,y+2,w-6,1,'rgba(0,0,0,.06)');}
+function floorShadow(g,x,y,w){R(g,x-2,y,w+2,1,'rgba(0,0,0,.28)');R(g,x-2,y+1,w,1,'rgba(0,0,0,.15)');R(g,x-1,y+2,w-3,1,'rgba(0,0,0,.06)');} // down and to the left, away from the window
 // The shadow something hung on the wall casts: one row under it, one column on its left.
 function wallShadow(g,x,y,w,h){R(g,x-1,y+h,w,1,'rgba(0,0,0,.16)');R(g,x-1,y+1,1,h,'rgba(0,0,0,.12)');}
