@@ -29,17 +29,28 @@ setTimeout(()=>{
   [...prefsEl.querySelectorAll('button')].forEach(b=>{const r=b.getBoundingClientRect();ok(r.height>=34,'a control is only '+r.height+' px high: '+b.textContent);});
   openPrefs(false);ok(document.activeElement===setBtn,'closing does not hand the focus back');prefsEl.blur();setBtn.blur();
   // the new scenes: every one runs through its begin, tick, pose, props and end, in every season
+  callCleaner.at=Infinity; // nobody is called away while these run by hand
   const sc=[...chars.values()][0],sb=[...chars.values()][1],keepIdle=sc.idle,keepIdleB=sb.idle;
-  SEASONS.forEach(s=>{SEASON=s;['season','clock','doodle','shelfread','share','mop'].forEach(a=>{const D=IDLES[a],I={act:a,phase:'do',start:0,dur:1000,until:1e12};sc.idle=I;stain=stain||{floor:curFloor,x:100,y:176,left:1};
+  SEASONS.forEach(s=>{SEASON=s;['season','sweep','clock','doodle','shelfread','share','mop'].forEach(a=>{const D=IDLES[a],I={act:a,phase:'do',start:0,dur:1000,until:1e12};sc.idle=I;stain=stain||{floor:curFloor,x:100,y:176,left:1,wet:0};if(!lying().length)shaken.push({floor:curFloor,x:150,gy:150,h:0,c:'#D9662E',kind:'tree',seed:0,drift:0,rest:Date.now()});if(D.air)ok(D.air(sc,1)>=0,a+' sinks');
     try{if(D.spot)D.spot(sc);if(D.begin)D.begin(sc,I,0);if(D.tick)D.tick(sc,I,1);ok(typeof D.pose(sc,1)==='string',a+' has no pose');if(D.props)D.props(wx,sc,1,I);if(D.end)D.end(sc,I,1);}catch(err){ok(false,a+' in '+s+': '+err.message);}});
     ['snowball','selfie','napside'].forEach(a=>{const D=IDLES[a],I={act:a,phase:'do',pair:sb,role:0,sync:1,dur:9000,start:0,until:1e12};sc.idle=I;sb.idle={act:a,phase:'do',pair:sc,role:1,dur:9000,start:0,until:1e12};
-    try{if(D.tick){D.tick(sc,I,5000);D.tick(sc,I,7000);}ok(typeof D.pose(sc,5000)==='string',a+' has no pose');if(D.props)D.props(wx,sc,5000,I);}catch(err){ok(false,a+' in '+s+': '+err.message);}});
-    const its=[];floorThing={floor:curFloor,kind:s,until:Date.now()+1e4};try{roomItems(its,wx);its.forEach(i=>i.f());}catch(err){ok(false,'room items in '+s+': '+err.message);}});
-  ok(photos.length>0,'the selfie left no photo');stain={floor:curFloor,x:100,y:176,left:1};ok(IDLES.mop.weight()>0,'a stain does not call for a mop');mopEnd(sc);ok(!stain,'mopping left the stain');
+    try{if(D.tick){D.tick(sc,I,5000);D.tick(sc,I,7000);}ok(typeof D.pose(sc,5000)==='string',a+' has no pose');if(D.props)D.props(wx,sc,5000,I);if(D.lean)D.lean(sc,5000);}catch(err){ok(false,a+' in '+s+': '+err.message);}});
+    const its=[];floorThing=s==='autumn'||s==='summer'?null:{floor:curFloor,kind:s,born:0,until:Date.now()+1e4,u:1,left:1,scarf:'#D9534F'};try{roomItems(its,wx);its.forEach(i=>i.f());}catch(err){ok(false,'room items in '+s+': '+err.message);}});
+  ok(photos.length>0,'the selfie left no photo');stain={floor:curFloor,x:100,y:176,left:1,wet:0};ok(IDLES.mop.weight()>0,'a stain does not call for a mop');mopEnd(sc);ok(stain.left===0&&IDLES.mop.weight()===0,'mopping left the stain');stain=null;
+  // whatever lies on the ground is picked up, one by one, sheets and leaves alike
+  shaken=[];[[150,'paper'],[152,'tree'],[220,'leaf']].forEach(([x,kind])=>shaken.push({floor:curFloor,x,gy:150,h:0,c:'#D9662E',kind,seed:0,drift:0,rest:Date.now()}));
+  ok(IDLES.sweep.weight()>0,'nobody comes for what lies on the ground');
+  const SI={act:'sweep',phase:'do',start:0,dur:40000,until:1e12};sc.idle=SI;sc.path=[];sc.arrived=true;sc.x=150;sc.y=150;sweepTick(sc,SI,1);SI.pick=1;sweepTick(sc,SI,2);
+  ok(shaken.length===1&&SI.sheets===1&&SI.bag===1,'the near ones were not taken');
+  sc.path=[];sc.arrived=true;sc.x=213;SI.pick=1;sweepTick(sc,SI,3);ok(!shaken.length&&SI.until<1e12,'the last one stayed');shaken.push({floor:curFloor,x:220,gy:150,h:0,c:'#D9662E',kind:'tree',seed:0,drift:0,rest:Date.now()});sc.idle={phase:'pick',t:0};ok(choreNow(sc)==='sweep','cleaning does not come first');startIdle(sc,'sweep',null);ok(choreNow(sb)===null||IDLES.mop.can(sb),'two Claudes on one chore');ok(sc.idle.act==='sweep'&&sc.tgt&&Math.abs(sc.tgt.x-213)<20,'the sweep sends nobody to the leaf');sc.path=[];shaken=[];
+  // a photo past its time is unpinned and filed, before anything else on a break
+  photos=[{floor:curFloor,i:1,a:'#D97557',b:'#2A9D8F',until:Date.now()-1,born:0}];sc.idle={phase:'pick',t:0};ok(choreNow(sc)==='unpin','an old photo calls nobody');
+  startIdle(sc,'unpin',null);const UI=sc.idle;UI.phase='do';sc.path=[];sc.arrived=true;unpinTick(sc,UI,1);UI.t=1;unpinTick(sc,UI,2);ok(!photos.length&&UI.stage===1,'the photo was not taken down');sc.path=[];sc.arrived=true;unpinTick(sc,UI,3);ok(UI.stage===2,'the photo was not filed');unpinProps(wx,sc,3,{phase:'do',stage:1});
   floorThing=null;photos=[];sc.idle=keepIdle;sb.idle=keepIdleB;
   // the pointer: a Claude let go in flight lands, dizzy, and the floor can be tapped
   const fx=sc.x;flingClaude(sc,200,60,0);for(let i=0;i<400&&sc.fly;i++)flyTick(sc,.02,i);ok(!sc.fly&&sc.x>=8&&sc.x<=312,'the throw never landed');ok(sc.mood==='dizzy','the thrown Claude is not dizzy');sc.x=fx;sc.resumeAt=0;
-  floorTap({x:150,y:150},performance.now());
+  const realRandom=Math.random;Math.random=()=>.9;shaken=[];floorTap({x:150,y:150},performance.now());ok(!shaken.some(x=>x.kind==='paper'),'a sheet fell on every tremble');Math.random=()=>.1;floorTap({x:150,y:150},performance.now());const sheets=shaken.filter(x=>x.kind==='paper').length;floorTap({x:150,y:150},performance.now());ok(shaken.filter(x=>x.kind==='paper').length===sheets,'a desk lost a second sheet');Math.random=realRandom;ok(shaken.some(x=>x.kind==='paper')&&shaken.some(x=>x.kind==='leaf'),'the tremble shook nothing loose');leafGust();ok(shaken.some(x=>x.kind==='tree'),'no gust of leaves');const itF=[];roomItems(itF,wx);itF.forEach(i=>i.f());shaken=[];
+  callCleaner.at=0;
   // avatars: the first one in is the plain Claude, the rest are drawn, and a refresh changes nobody
   const lookKey=()=>everyDesk.map(d=>{const l=looksFor(String(d.id));return d.id+'='+l.c+':'+l.style;}).join();
   const lookRules=why=>{const pairs=everyDesk.map(d=>{const l=looksFor(String(d.id));return l.c+':'+l.style;});ok(new Set(pairs).size===pairs.length,why+': two sessions share an avatar');
