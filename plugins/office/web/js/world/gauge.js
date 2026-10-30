@@ -58,7 +58,6 @@ function drawGauge(g,now,tp){
     if(v.left==null){pixText(g,'?',bx+Math.floor(bw/2)-1,ry,dim);return;}
     if(v.level===3){if(blink)pixSkull(g,bx+5,ry,'#E5484D');}
     else{const fw=Math.max(1,Math.round(bw*v.left/100)),c=gaugeColour(v.left,tp);R(g,bx,ry+1,fw,3,c);R(g,bx,ry+1,fw,1,shade(c,.4));}
-    for(let k=5;k<bw;k+=5)R(g,bx+k,ry+1,1,3,bg); // a mark every third of the window
     // the percent left, and the reset time every other few seconds
     const t=showReset&&!isNaN(v.reset)?resetPix(v.reset,now):Math.round(v.left)+'%';
     pixText(g,t,x+w-3-pixWidth(t),ry,v.level>=2?readable('#E5484D',bg,3):showReset?dim:ink);

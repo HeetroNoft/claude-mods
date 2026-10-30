@@ -48,9 +48,12 @@ const lookOf=()=>CAT_LOOKS[TH.catLook]||CAT_LOOKS.black;
 function newCat(tp){return {x:150,y:156,z:0,face:1,state:'sleep',until:tp+9000,hop:0,hopH:4,hopDur:420,pet:0,path:[],speed:16,air:null,job:null,
   nextJob:tp+40000+Math.random()*40000,doorCD:0,planeCD:0,seen:new Map(),floor:0,away:false,nextTrip:tp+CAT_TRIP[0]};}
 const clampX=x=>Math.max(6,Math.min(314,x)),clampY=y=>Math.max(88,Math.min(179,y));
+// On the floor it goes round the furniture like everyone: straight when the way is clear, else by the
+// corridor; a theme's table is walked around as well.
+function catRoute(a,t){return avoidFurniture(a,clearFloor(a,t)?[t]:[{x:a.x,y:WALK_Y},{x:t.x,y:WALK_Y},t]);}
 function catGo(x,y,run){
   const t={x:clampX(x),y:cat.z>0?y:clampY(y)};
-  cat.path=cat.z>0?[t]:avoidFurniture({x:cat.x,y:cat.y},[t]);cat.speed=run?34:16;
+  cat.path=cat.z>0?[t]:catRoute({x:cat.x,y:cat.y},t);cat.speed=run?34:16;
 }
 // a leap to (x, y) at height z, over dur ms, arcing h px above the straight line
 // it crouches first (CAT_CROUCH ms) and lands in a short crouch too (CAT_LAND ms)
@@ -364,7 +367,7 @@ function drawCatTag(g,tp){
   if(!cat||!catName||cat.away)return;
   const top=cat.y-cat.z,near=ptr.in&&Math.abs(ptr.x-cat.x)<=6&&ptr.y>=top-10&&ptr.y<=top+1;
   if(!near&&!LABELS&&tp>catTagUntil)return;
-  const t=catName.toUpperCase(),w=pixWidth(t)+4,x=Math.max(2,Math.min(W-w-2,Math.round(cat.x-w/2))),y=Math.round(top-15);
+  const t=catName.toUpperCase(),w=pixWidth(t)+4,x=Math.max(2,Math.min(W-w-2,Math.round(cat.x-w/2))),y=Math.round(top-18);
   R(g,x-1,y+8,w,1,'rgba(0,0,0,.25)');R(g,x+1,y,w-2,8,NAVY);R(g,x,y+1,w,6,NAVY);pixText(g,t,x+2,y+1,'#FFFFFF');
 }
 function catMeow(tp){catTagUntil=tp+2200;cat.hop=tp+420;cat.hopH=4;if(cat.state==='sleep'&&!cat.job){cat.state='sit';cat.until=tp+6000;}emoteAt(cat.x+3,cat.y-cat.z-9,Math.random()<.5?'heart':'note');meowSound();}
