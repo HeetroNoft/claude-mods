@@ -383,7 +383,7 @@ function celebrate(id,line){
   banners.push({id,line:str(line||'All steps done',46),t0:tp});
   const p=charPoint(id);
   for(let i=0;i<80;i++)confetti.push({x:p.x+(Math.random()-.5)*8,y:p.y-4,vx:(Math.random()-.5)*70,vy:-30-Math.random()*55,c:CONF[i%CONF.length],life:2.4+Math.random(),w:Math.random()<.4?2:1});
-  chime(1);
+  if(soundFor('plan'))chime(1);
   sceneHighFive(id);
 }
 
