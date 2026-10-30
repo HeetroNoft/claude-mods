@@ -445,7 +445,7 @@ function drawCat(g,tp){
 }
 // the cat, then a thing it knocked over (falling, on the floor, or carried by a Claude), and the ball
 function catDrawables(items,tp){
-  if(cat&&!cat.away){const L=lookOf(),box=[Math.round(cat.x)-10,Math.round(cat.y-cat.z)-20,21,24],d=cat.z>0?cat.y+.5:cat.y;
+  if(cat&&!cat.away){const L=lookOf(),box=[Math.round(cat.x)-10,Math.round(cat.y-cat.z)-20,21,24],d=cat.z>0?cat.y+2:cat.y; // up on a piece of furniture: in front of it
     items.push({d,f:()=>L.holo?drawHolo(wx,box,tp):outlinedLive(wx,'cat',box,g=>drawCat(g,tp))});}
   const F=fallen;
   if(F&&F.state!=='carried'){const u=F.state==='falling'?Math.min(1,(tp-F.t0)/450):1;

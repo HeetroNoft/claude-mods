@@ -76,6 +76,8 @@ function poseFor(ch,tp){
     default:return 'sit';
   }
 }
+// Depth of what reaches the front of the room: every spot beside it, up to y 179, stays behind it.
+const FRONT={cabinet:179.2,machine:179.3,coffee:179.5};
 let cabOpen=0,doorAmt=0,lastT=performance.now(),spawnT=0,steamT=0;
 function frame(tp){
   const dt=Math.min(.05,Math.max(0,(tp-lastT)/1000)); lastT=tp;
@@ -125,9 +127,9 @@ function frame(tp){
   let mmode='idle'; chars.forEach(c=>{if(!c.hidden&&!c.path.length){if(c.act==='bash')mmode='bash';else if(c.act==='web'&&mmode!=='bash')mmode='web';}});
   cabOpen+=((reading||tp<cabPulse?1:0)-cabOpen)*Math.min(1,dt*7); // the drawer slides rather than jumps
   standingItems(items);
-  items.push({d:176,f:()=>outlinedLive(wx,'cabinet',[18,130,32,51],g=>drawCabinet(g,cabOpen,tp))});
-  items.push({d:177,f:()=>outlinedLive(wx,'machine',[86,132,42,49],g=>drawMachine(g,tp,mmode))});
-  items.push({d:158,f:()=>outlined(wx,'coffee',g=>drawCoffee(g,tp,coffeeBusy),g=>drawCoffee(g,0,false))});
+  items.push({d:FRONT.cabinet,f:()=>outlinedLive(wx,'cabinet',[18,130,32,51],g=>drawCabinet(g,cabOpen,tp))});
+  items.push({d:FRONT.machine,f:()=>outlinedLive(wx,'machine',[86,132,42,49],g=>drawMachine(g,tp,mmode))});
+  items.push({d:FRONT.coffee,f:()=>outlined(wx,'coffee',g=>drawCoffee(g,tp,coffeeBusy),g=>drawCoffee(g,0,false))});
   items.push({d:129,f:()=>outlinedLive(wx,'plant',[290,90,27,43],g=>drawPlant(g,tp))});
   catDrawables(items,tp); // the cat, what it knocked over, its ball (world/cat.js)
   desks.forEach((dk,i)=>{

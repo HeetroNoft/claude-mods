@@ -134,8 +134,8 @@ function paintFixtures(g,T){
 }
 function partOf(T,name){return T.parts&&name in T.parts?T.parts[name]:PARTS[name];}
 // What stands on the floor but is painted with the room: a copy of it, with its rim, goes back over
-// whoever is behind it (standingItems). [x,y,w,h,d]: the part to copy and the depth of its back edge.
-// The counter's goes just under the live coffee maker. Its floor shadow stays out of the copy.
+// whoever is behind it (standingItems). [x,y,w,h,d]: the part to copy and the depth of its front edge,
+// so a Claude standing beside it stays behind it. The counter's goes just under the live coffee maker. Its floor shadow stays out of the copy.
 const standing=document.createElement('canvas'),standingRaw=document.createElement('canvas');
 standing.width=standingRaw.width=W;standing.height=standingRaw.height=H;
 function paintStanding(T){
@@ -146,7 +146,7 @@ function paintStanding(T){
   const rim=traceOutline(x=>x.drawImage(standingRaw,0,0),T.ol);if(rim)c.drawImage(rim.c,rim.x,rim.y);
   c.drawImage(standingRaw,0,0);
 }
-function standingBoxes(T){return [...(partOf(T,'plant')?[[1,148,18,32,156]]:[]),...(partOf(T,'counter')?[[COUNTER.x-2,146,44,34,157.9]]:[]),...(T.standing||[])];}
+function standingBoxes(T){return [...(partOf(T,'plant')?[[1,148,18,32,179.1]]:[]),...(partOf(T,'counter')?[[COUNTER.x-2,146,44,34,179.4]]:[]),...(T.standing||[])];}
 function standingItems(items){standingBoxes(TH).forEach(([x,y,w,h,d])=>items.push({d,f:()=>wx.drawImage(standing,x,y,w,h,x,y,w,h)}));}
 function buildBg(){
   const g=bg.getContext('2d'),T=TH; g.clearRect(0,0,W,H);
