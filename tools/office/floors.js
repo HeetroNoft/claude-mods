@@ -12,6 +12,22 @@ setTimeout(()=>{
   ok(floorsEl.querySelector('[data-f="1"] i.limit'),'no red light for the out-of-usage desk');
   const r=floorsEl.getBoundingClientRect(),st=stage.getBoundingClientRect();
   ok(r.right<st.left+st.width*239/W&&r.left>=st.left+st.width*180/W-1,'panel at '+Math.round((r.left-st.left)/st.width*W)+'..'+Math.round((r.right-st.left)/st.width*W));
+  // avatars: the first one in is the plain Claude, the rest are drawn, and a refresh changes nobody
+  const lookKey=()=>everyDesk.map(d=>{const l=looksFor(String(d.id));return d.id+'='+l.c+':'+l.style;}).join();
+  const lookRules=why=>{const pairs=everyDesk.map(d=>{const l=looksFor(String(d.id));return l.c+':'+l.style;});ok(new Set(pairs).size===pairs.length,why+': two sessions share an avatar');
+    for(let f=0;f<floorCount;f++){const c=floorDesks(f).map(d=>looksFor(String(d.id)).c);ok(new Set(c).size===c.length,why+': a colour twice on floor '+f);}};
+  const a0=looksFor(String(everyDesk[0].id));ok(a0.c===LOOKS[0].c&&a0.style===0,'the first one in is not the plain Claude');
+  ok(everyDesk.slice(1).some(d=>{const l=looksFor(String(d.id));return !LOOKS.some(x=>x.c===l.c&&x.style===l.style);}),'colours and accessories are not mixed');
+  lookRules('at the start');
+  const refresh=()=>{const k=lookKey();lookObj.clear();lookHere=new Set();loadLooks();firstLoad=true;settleLooks(everyDesk);firstLoad=false;return k;};
+  ok(refresh()===lookKey(),'a refresh changed the avatars');
+  const [d1,d2,d3]=everyDesk.map(d=>String(d.id)),keep1=lookKey();
+  Object.assign(lookMem.get(d2),{c:lookMem.get(d1).c,s:lookMem.get(d1).s});settleLooks(everyDesk);
+  ok(lookMem.get(d2).c!==lookMem.get(d1).c&&a0.c===LOOKS[0].c,'two with one avatar: the later one kept it');lookRules('after a clash');
+  const far=String(floorDesks(1)[0].id);Object.assign(lookMem.get(far),{c:lookMem.get(d1).c,s:(lookMem.get(d1).s+1)%10});settleLooks(everyDesk);lookRules('same colour, other floor');
+  ok(lookMem.get(far).c===lookMem.get(d1).c,'the same colour was refused on another floor');
+  const s3=lookMem.get(d3).s;Object.assign(lookMem.get(d3),{c:lookMem.get(d1).c});settleLooks(everyDesk);
+  ok(lookMem.get(d3).s===s3&&lookMem.get(d3).c!==lookMem.get(d1).c,'a colour clash cost it its accessory');lookRules('colour clash on a floor');
   const first=ids().join();
   floorsEl.querySelector('[data-f="1"]').click();
   ok(curFloor===1&&ids().join()!==first,'clicking a floor did not change it');
@@ -75,7 +91,7 @@ setTimeout(()=>{
 
   ok(moveToFloor(up,1),'sending a desk up');ok(floorCount===2,'a hand-placed desk merged back straight away');
   ingest(three,false);ok(floorCount===2&&floorOf.get(up)===1,'a hand-placed desk merged on new data');
-  try{localStorage.removeItem('office.deskFloor');localStorage.removeItem('office.deskPinned');localStorage.removeItem('office.rooms');}catch(e){}
+  try{localStorage.removeItem('office.deskFloor');localStorage.removeItem('office.deskPinned');localStorage.removeItem('office.rooms');localStorage.removeItem('office.looks');}catch(e){}
   // the room comes back from the fade: real pixels on the floor, a moment later
   setTimeout(()=>{
     const d=wx.getImageData(150,150,1,1).data,lit=d[0]+d[1]+d[2];console.log('STATE room pixel '+[...d].slice(0,3)+' fade left '+Math.round(floorFade-performance.now()));

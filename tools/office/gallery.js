@@ -28,7 +28,9 @@ const FILMS=[[7,'cheer',hop,0,0],[3,'cheer',hop,0,0],[9,'stand',still,0,0,null,t
 const CAT_SHOTS=[['sit',{}],['groom',{fid:{k:'groom',until:1e12}}],['yawn',{fid:{k:'yawn',until:1e12}}],['look',{watchUntil:1e12}],['purr',{pet:9}],['sleep',{state:'sleep'}],['stretch',{state:'stretch'}],
   ['walk',{path:[{x:0,y:0}],stride:2.6,state:'walk'}],['walk',{path:[{x:0,y:0}],stride:7.3,state:'walk'}],['run',{path:[{x:0,y:0}],speed:34,v:34,stride:1}],['run',{path:[{x:0,y:0}],speed:34,v:34,stride:5}],
   ['crouch',{state:'crouch'}],['up',{air:{t0:-1000,dur:2000,z0:0,z1:0}}],['down',{air:{t0:-3000,dur:4000,z0:0,z1:0},z:3}],['swipe',{state:'swipe',swipe:9e9}]];
-if(SET==='cat'){gx.fillStyle='#C08A5C';gx.fillRect(0,0,W,H);const tp=performance.now();
+// every colour (rows) with every accessory (columns): run.sh gallery mix
+if(SET==='mix'){gx.fillStyle='#E8DCC8';gx.fillRect(0,0,W,H);LOOKS.forEach((a,j)=>LOOKS.forEach((b,i)=>drawPerson(gx,16+i*31,19+j*17.6|0,{look:{c:a.c,style:b.style},pose:'stand',dir:1,frame:1})));}
+else if(SET==='cat'){gx.fillStyle='#C08A5C';gx.fillRect(0,0,W,H);const tp=performance.now();
   THEME_KEYS.forEach((k,j)=>{themeKey=k;TH=THEMES[k];CAT_SHOTS.forEach(([,o],i)=>{
     gx.fillStyle=(i+j)%2?'#B57F52':'#C08A5C';gx.fillRect(i*21,j*22,21,22);
     const t=o.air?tp:tp;cat=Object.assign(newCat(0),{x:10+i*21,y:19+j*22,state:'sit',hop:0,z:0},JSON.parse(JSON.stringify(o)));

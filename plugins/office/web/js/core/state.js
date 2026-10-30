@@ -3,7 +3,7 @@
 /* ---------- state ---------- */
 let desks=[],gotData=false,firstLoad=true,misses=0,lastCall=0;
 const chars=new Map(),interns=new Map(),animated=new Set(),pendingSent=new Map(),lastDone=new Map();
-const colourOf=new Map(); let colourNext=0;
+const lookMem=new Map(),lookObj=new Map(); let lookAt=0,lookHere=new Set();
 let flying=[];
 let planes=[],decor=[],confetti=[],glyphs=[],steam=[],banners=[],dust=[];
 let lastLaunch=0;
@@ -20,7 +20,46 @@ const NAP_MS=(()=>{const m=Q.match(/nap=(\d+)/);return m?+m[1]*1000:180000;})();
 function newChar(id,lk){return {id,x:DOOR.x,y:DOOR.y,path:[],hidden:true,seated:false,look:lk,blinkT:Math.random()*4,jumpUntil:0,sendT:Math.random()*2,
   sq:0,sqv:0,face:1,nextBlink:0,mood:null,moodUntil:0,pet:0,pokes:[],nextEmote:0,pace:36+Math.random()*10};}
 
-function looksFor(id){if(!colourOf.has(id)){colourOf.set(id,colourNext%LOOKS.length);colourNext++;}return LOOKS[colourOf.get(id)];}
+// Every session's avatar: a colour and an accessory drawn apart, at random, and remembered by desk id
+// (lookMem: indexes into LOOKS for the colour, the accessory's style, and when it arrived). Whoever
+// arrives while nobody has the plain Claude gets it. settleLooks keeps the rules in arrival order: two
+// sessions never share an avatar, and no floor has one colour twice; the later arrival gives way.
+const looksFor=id=>{if(!lookObj.has(id))lookObj.set(id,{c:LOOKS[0].c,style:0});return lookObj.get(id);};
+function loadLooks(){
+  lookMem.clear();lookAt=0;
+  try{Object.entries(JSON.parse(localStorage.getItem('office.looks')||'{}')).forEach(([id,m])=>{if(LOOKS[m.c]&&m.s>=0&&m.s<LOOKS.length){lookMem.set(id,{c:m.c,s:m.s,at:+m.at||0});lookAt=Math.max(lookAt,+m.at||0);}});}catch(e){}
+}
+loadLooks();
+function pickLook(floorCols,held,usedC,usedS,keepS){
+  let best=[],low=9;
+  for(let c=0;c<LOOKS.length;c++){
+    if(floorCols.has(c))continue;
+    for(let s=0;s<LOOKS.length;s++){
+      if((keepS!=null&&s!==keepS)||held.has(c+':'+s)||(!c&&!s)||(c===3&&s===4))continue; // gold glasses on a gold body hardly show
+      const score=(usedC.has(c)?1:0)+(usedS.has(s)?1:0);
+      if(score<low){low=score;best=[];}
+      if(score===low)best.push({c,s});
+    }
+  }
+  return best[(Math.random()*best.length)|0]||null;
+}
+function settleLooks(all){
+  const seen=d=>{const m=lookMem.get(String(d.id));return m?m.at:Infinity;};
+  all.forEach(d=>{const m=lookMem.get(String(d.id));if(m&&!firstLoad&&!lookHere.has(String(d.id)))m.at=++lookAt;}); // back after a while: it arrives now
+  const held=new Set(),usedC=new Set(),usedS=new Set(),floors=new Map();let changed=false;
+  all.map((d,i)=>[d,i]).sort((a,b)=>seen(a[0])-seen(b[0])||a[1]-b[1]).forEach(([d])=>{
+    const id=String(d.id),f=floorOf.get(id),cols=floors.get(f)||new Set();floors.set(f,cols);
+    let m=lookMem.get(id);
+    if(!m){m=held.has('0:0')||cols.has(0)?pickLook(cols,held,usedC,usedS):{c:0,s:0};m.at=++lookAt;lookMem.set(id,m);changed=true;}
+    else if(held.has(m.c+':'+m.s)||cols.has(m.c)){
+      Object.assign(m,(!held.has(m.c+':'+m.s)&&pickLook(cols,held,usedC,usedS,m.s))||pickLook(cols,held,usedC,usedS));changed=true; // only its colour clashes: it keeps its accessory
+    }
+    held.add(m.c+':'+m.s);usedC.add(m.c);usedS.add(m.s);cols.add(m.c);
+    Object.assign(looksFor(id),{c:LOOKS[m.c].c,style:m.s});
+  });
+  lookHere=new Set(all.map(d=>String(d.id)));
+  if(changed)try{localStorage.setItem('office.looks',JSON.stringify(Object.fromEntries([...lookMem].sort((a,b)=>a[1].at-b[1].at).slice(-64))));}catch(e){}
+}
 // Desks and their boards share one lane on the wall, between the door sign (x 31) and the curtains (x 266).
 // A row is centred under the clock (x 160) whenever it fits, and slides left only when it must.
 // Half widths shrink with the count so neighbours never touch: 3 px of wall between boards, 2 px between desks.
@@ -174,6 +213,7 @@ function ingest(d,synthetic){
   real.forEach(x=>Object.values(x.peers||{}).forEach(n=>{const k=String(n).toLowerCase();if(n&&!have.has(k)){have.add(k);sleepers.push({id:'asleep:'+n,name:String(n),activity:'asleep',detail:'Not joined yet',steps:[],interns:[],files:[],sent:[],got:[],asleep:true});}}));
   const all=orderDesks(real.filter(x=>x.activity!=='gone'));
   if(assignFloors(all)&&!firstLoad){leaveFloor(-1,1);floorJump=true;}
+  settleLooks(all);
   const list=all.filter(x=>floorOf.get(String(x.id))===curFloor);
   everyDesk=all;
   if(!synthetic)gotData=true;
