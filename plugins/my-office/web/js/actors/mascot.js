@@ -7,13 +7,15 @@
 //    floor (sits on the floor: the legs fold), spin (tumbling: no shadow, the caller draws it)
 //    held ({kind,...}: a prop in hand, see actors/props.js), lift (raises it), raise (0..1: a drink or a bite on its way to the mouth, else frame), carry (a file's colour, under the arm), breath (0/1)
 const EYE='#141413';
-// A phone with a feed going by: a post every four rows, flicked up by the thumb every 1.6 s.
+// A phone held to the Claude's face: we see its back, a thumb working its edge, and the feed only as the
+// light on the Claude (actors/reactions.js): a post every four rows, flicked up every 1.6 s.
 const FEED=['#FF8FB8','#FF8FB8','#FF8FB8','#FFFFFF','#7FD1FF','#7FD1FF','#7FD1FF','#FFFFFF','#FFD84A','#FFD84A','#FFD84A','#FFFFFF','#8FDB8A','#8FDB8A','#8FDB8A','#FFFFFF'];
 function phoneFeed(t){const n=Math.floor(t/1.6),k=Math.min(1,(t/1.6-n)/.3),e=1-(1-k)*(1-k);return {scroll:n*4+Math.round(e*4),thumb:k<1?5-Math.round(k*3):5};}
 function drawPhone(g,x,y,o,skin){
-  R(g,x,y,5,7,'#1F2230');
-  for(let j=0;j<5;j++)R(g,x+1,y+1+j,3,1,FEED[((o.scroll|0)+j)%FEED.length]);
-  R(g,x+3,y+(o.thumb|0),1,1,skin);
+  R(g,x,y,5,7,'#2B2F3A');R(g,x,y,5,1,'#4A5163');R(g,x,y,1,7,'#3D4352');R(g,x+4,y+1,1,6,'#1F2230');
+  R(g,x+1,y+1,2,2,'#14131C');R(g,x+1,y+1,1,1,'#7F8AA0'); // the camera
+  R(g,x+2,y+4,1,1,'#7F8AA0'); // the maker's mark
+  R(g,x+4,y+(o.thumb|0),1,1,skin);
 }
 function drawPerson(g,cx,fy,o){
   const sm=!!o.small,pose=o.pose,f=o.frame|0;

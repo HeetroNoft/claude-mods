@@ -213,5 +213,4 @@ function drawIdleProps(g,ch,tp){
     const ax=A.x+Math.sign(B.x-A.x)*9,ay=A.y-12,bx=B.x+Math.sign(A.x-B.x)*9,by=B.y-12,x=ax+(bx-ax)*u,y=ay+(by-ay)*u-Math.sin(Math.PI*u)*18;
     if(I.act==='play')ball(g,x,y,TH.ball);else drawPlane(g,x,y,bx>ax?1:-1);}
   if((I.act==='tea'||I.act==='coffee')&&ch.headTop!=null&&Math.floor(tp/300)%2){R(g,Math.round(ch.x-11),Math.round(ch.headTop+3-(tp/150)%4),1,1,'rgba(255,255,255,.7)');}
-  if(I.act==='game'&&ch.headTop!=null){g.fillStyle='rgba(127,232,255,.18)';g.fillRect(Math.round(ch.x-5),Math.round(ch.headTop+6),10,6);}
 }
