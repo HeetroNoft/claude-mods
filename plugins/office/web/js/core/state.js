@@ -85,7 +85,7 @@ function posFor(st,i,dx){
 // The open floor starts in front of the desk row. Open floor is crossed in a straight line, unless
 // something stands in the way: then the walk goes by the corridor at WALK_Y. FLOOR_BLOCK holds the
 // room's fixed furniture, with a margin: cabinet, machine, counter, plants.
-const FLOOR_Y=122,FLOOR_BLOCK=[{x0:14,y0:136,x1:44,y1:181},{x0:84,y0:131,x1:128,y1:181},{x0:237,y0:150,x1:283,y1:181},{x0:1,y0:156,x1:17,y1:181},{x0:290,y0:90,x1:316,y1:134}];
+const FLOOR_Y=122,FLOOR_BLOCK=[{x0:14,y0:136,x1:44,y1:181},{x0:84,y0:131,x1:128,y1:181},{x0:COUNTER.x-3,y0:150,x1:COUNTER.x+43,y1:181},{x0:1,y0:156,x1:17,y1:181},{x0:290,y0:90,x1:316,y1:134}];
 const clearFloor=(a,b)=>!FLOOR_BLOCK.some(o=>crosses(a,b,o));
 // The way past a desk: left of it, midway to its neighbour when the row is tight.
 const aisle=x=>x-Math.min(22,deskSpan(desks.length)/2);

@@ -343,7 +343,7 @@ const catPurring=()=>cat.pet>4||[...chars.values()].some(c=>c.idle&&c.idle.act==
 function restSpot(){
   const n=nightness(Date.now());
   if(Math.random()<.35){
-    if(n<.4&&TH.beam>0&&TH.window!=='painting')return {x:262+Math.random()*16,y:146+Math.random()*8,sleep:true};
+    if(n<.4&&TH.beam>0&&TH.window!=='painting')return {x:COUNTER.x-20+Math.random()*14,y:146+Math.random()*8,sleep:true};
     if(n>.6){const xs=deskXs(desks.length),lit=desks.map((dk,i)=>dk.activity!=='gone'&&!lampOff.has(String(dk.id))?xs[i]:null).filter(x=>x!=null);
       if(lit.length)return {x:lit[(Math.random()*lit.length)|0]+13,y:122,sleep:true};}
   }

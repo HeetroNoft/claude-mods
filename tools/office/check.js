@@ -40,7 +40,7 @@
   const box=(n,x,y,w,h)=>({n,x,y,w,h}),hit=(a,b)=>a.x<b.x+b.w&&b.x<a.x+a.w&&a.y<b.y+b.h&&b.y<a.y+a.h;
   const room=[box('gauge',2,1,30,16),box('sign',1,30,29,7),box('door',3,38,25,46),box('left shelf',6,18,116,6),box('right shelf',198,18,116,6),box('clock',149,2,24,24),
     box('cabinet',18,138,22,42),box('machine',86,133,40,47),box('counter',COUNTER.x-1,152,42,28),box('plant',292,92,22,40),box('small plant',3,158,12,21),
-    box('buttons',284,169,36,11),box('bottom bar',141,169,39,10),box('item bar over the floors',141,158,39,10)];
+    box('settings button',306,169,14,11),box('bottom bar',141,169,39,10),box('item bar over the floors',141,158,39,10)];
   const pairs=[];room.forEach((a,i)=>room.slice(i+1).forEach(b=>{if(hit(a,b))pairs.push(a.n+' / '+b.n);}));
   pairs.forEach(p=>log(false,'overlap: '+p));
   // 7. walking: no leg goes through a desk or fixed furniture, even when redirected halfway
@@ -107,7 +107,7 @@
       log(!n,`${VARIANTS[style]} ${pose} ${extra&&extra.held?extra.held.kind:extra&&extra.carry?'file':''} dir ${dir} raise ${extra&&extra.raise}: ${n} px covered`);}}
   // 12. the settings button stays in its corner, the only button there
   {const r=stage.getBoundingClientRect(),bs=['set'].map(id=>{const b=document.getElementById(id).getBoundingClientRect();return box(id,(b.left-r.left)/r.width*W,(b.top-r.top)/r.height*H,b.width/r.width*W,b.height/r.height*H);});
-    bs.forEach((a,i)=>{log(a.x>=284&&a.y>=169,`button ${a.n} leaves the corner: ${a.x.toFixed(1)},${a.y.toFixed(1)}`);});
+    bs.forEach((a,i)=>{log(a.x>=306&&a.y>=169,`button ${a.n} leaves the corner: ${a.x.toFixed(1)},${a.y.toFixed(1)}`);});
     log(stage.querySelectorAll(':scope>button').length===1,'more than one action button');
     // 13. settings: open, each choice takes effect and is remembered, keys and defaults work
     const b=id=>document.getElementById(id),on=q=>document.querySelector('#prefs '+q);
