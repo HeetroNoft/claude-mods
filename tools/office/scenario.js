@@ -1,5 +1,5 @@
 // Test page script: forces activities so a screenshot shows them (scn=t: the room's own break activities,
-// scn=i: every treat mid-story, scn=a / scn=b: pairs, floating, treats, picking up, a high five, scn=c: a chat and a thought, scn=r: a round of rock, paper, scissors, scn=p: the settings panel, scn=g: the gauge away and the items hidden). Logs ERR and STATE lines.
+// scn=i: every treat mid-story, scn=a / scn=b: pairs, floating, treats, picking up, a high five, scn=c: a chat and a thought, scn=r: a round of rock, paper, scissors, scn=p: the settings panel, scn=g: the gauge away and the items hidden, scn=o: the cat behind the table and the counter). Logs ERR and STATE lines.
 'use strict';
 window.addEventListener('error',e=>console.log('ERR '+e.message+' @'+e.filename.split('/').pop()+':'+e.lineno));
 const SCN=(location.search.match(/scn=(\w+)/)||[])[1]||'a';
@@ -35,6 +35,9 @@ setTimeout(()=>{try{
     startIdle(C('c3'),'chat',C('d4'));tele(C('c3'));tele(C('d4'));
   }else if(SCN==='r'){
     startIdle(C('c3'),'rps',C('d4'));tele(C('c3'));tele(C('d4'));
+  }else if(SCN==='o'){
+    setCatName('Mochi');catTagUntil=1e12;Object.assign(cat,{x:190,y:152,z:0,path:[],state:'sit',until:1e12,nextJob:1e12,nextTrip:1e12});
+    const c=C('e4');if(c){releaseIdle(c);c.idle={phase:'pick',t:1e12};c.path=[];c.x=258;c.y=150;}
   }else if(SCN==='g'){
     setPref('calm',true);setPref('gauge',false);setBar(false);
   }else if(SCN==='p'){

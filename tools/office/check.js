@@ -135,9 +135,19 @@
     // 16. the gauge: its own layer, hidden with its tab left in the room, and back; G does it too
     const us=b('usage'),x0=us.getBoundingClientRect().left;log(wx.canvas!==gcx.canvas,'gauge on the room canvas');
     window.dispatchEvent(new KeyboardEvent('keydown',{key:'g'}));const tab=b('gtab').getBoundingClientRect();
-    log(PREFS.gauge===false&&us.getBoundingClientRect().right<=st.left+1&&tab.right>st.left+2,'gauge not hidden with its tab showing');
+    log(PREFS.gauge===false&&tab.left<=st.left+2&&tab.right>st.left+4,'gauge not hidden with its tab showing');
     b('gtab').click();log(PREFS.gauge===true&&Math.abs(us.getBoundingClientRect().left-x0)<1,'gauge not back');
     setPref('calm',false);
+    // 17. the tab touches the gauge: nothing between the gauge's frame and it
+    const g2=gcx.canvas.getBoundingClientRect(),tb=b('gtab').getBoundingClientRect(),edge=g2.left+g2.width*(GAUGE.x+GAUGE.w)/gcx.canvas.width;
+    log(Math.abs(tb.left-edge)<2,`gauge tab apart from the gauge: ${tb.left} / ${edge}`);
+    // 18. the cat keeps off the furniture, and what is painted with the room covers who is behind it
+    for(const k of THEME_KEYS){themeKey=k;TH=THEMES[k];
+      const spots=CAT_SPOTS.map(s=>{const p={...s};outOfFurniture(p);return p;});
+      spots.forEach(a=>spots.forEach(t=>{let p=a;catRoute(a,t).forEach(q=>{const along=p.y===WALK_Y&&q.y===WALK_Y;
+        FLOOR_BLOCK.concat(TH.obstacles||[]).forEach(o=>{if(!along&&crosses(p,q,o))log(false,`${k}: the cat crosses (${o.x0},${o.y0}) from ${p.x},${p.y} to ${q.x},${q.y}`);});p=q;});}));
+      (TH.obstacles||[]).forEach(o=>log(standingBoxes(TH).some(([x,,w])=>x<o.x1&&x+w>o.x0),`${k}: a table is not sorted with the Claudes`));}
+    themeKey=keep;TH=THEMES[keep];buildBg();
     // 14. the cat's name: kept clean, remembered, and typing it presses no shortcut
     const room=themeKey,cn=on('#pcat');cn.value='Mïmi! the great';cn.dispatchEvent(new Event('input',{bubbles:true}));
     log(catName==='Mimi the g'&&localStorage.getItem('office.catName')===catName,'cat name not cleaned or kept: '+catName);

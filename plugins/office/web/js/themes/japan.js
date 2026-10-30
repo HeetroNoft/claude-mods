@@ -1,7 +1,7 @@
 // Theme "japan": registered with defineTheme, painted by themes/engine.js.
 'use strict';
 defineTheme('japan','pixel',{name:'Japon · ryokan',swatch:['#F3EAD7','#B03A2E','#6E8B5E','#2E2A26'],dark:.55,beam:.8,dust:'sun',
-    window:'round',sillPot:false,petals:true,desk:'zen',catLook:'mike',signLeds:'lantern',signSpan:[4,26],doorKind:'shoji',doorHall:'#3E3226',doorLight:'255,200,140',plantKind:'bonsai',obstacles:[{x0:177,y0:147,x1:203,y1:162}], // the tea table: walked around
+    window:'round',sillPot:false,petals:true,desk:'zen',catLook:'mike',signLeds:'lantern',signSpan:[4,26],doorKind:'shoji',doorHall:'#3E3226',doorLight:'255,200,140',plantKind:'bonsai',obstacles:[{x0:177,y0:147,x1:203,y1:162}],standing:[[178,145,24,14,159]], // the tea table: walked around
     board:'plank',
     wall:'#F3EAD7',stripe:'#DCCDAE',wallTop:'#4A3A2C',wainHi:'#7A5E44',wain:'#5A4330',wainEdge:'#4A3A2C',panelEdge:'#4D3828',base:'#2E2219',
     floorA:'#C9C38E',floorB:'#BDB680',seam:'#3E4A3A',grainA:'#C9C38E',grainB:'#BDB680',

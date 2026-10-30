@@ -127,6 +127,7 @@ function frame(tp){
   const reading=[...chars.values()].some(c=>!c.hidden&&!c.path.length&&(c.act==='read'||(c.idle&&c.idle.act==='files'&&c.idle.phase==='do')));
   let mmode='idle'; chars.forEach(c=>{if(!c.hidden&&!c.path.length){if(c.act==='bash')mmode='bash';else if(c.act==='web'&&mmode!=='bash')mmode='web';}});
   cabOpen+=((reading||tp<cabPulse?1:0)-cabOpen)*Math.min(1,dt*7); // the drawer slides rather than jumps
+  standingItems(items);
   items.push({d:176,f:()=>outlinedLive(wx,'cabinet',[18,130,32,51],g=>drawCabinet(g,cabOpen,tp))});
   items.push({d:177,f:()=>outlinedLive(wx,'machine',[86,132,42,49],g=>drawMachine(g,tp,mmode))});
   items.push({d:158,f:()=>outlined(wx,'coffee',g=>drawCoffee(g,tp,coffeeBusy),g=>drawCoffee(g,0,false))});

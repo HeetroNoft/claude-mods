@@ -1,7 +1,7 @@
 // Theme "paper": registered with defineTheme, painted by themes/engine.js.
 'use strict';
 defineTheme('paper','pixel',{name:'Papeterie 2000',swatch:['#D6D0C2','#7C8796','#5C6B7A','#E8D9A8'],dark:.4,beam:.35,dust:null,
-    window:'blinds',blinds:'#E8E2D0',sillPot:false,desk:'cubicle',catLook:'siamese',signLeds:'tag',doorKind:'swing',doorHall:'#4A505A',doorLight:'235,245,255',obstacles:[{x0:177,y0:147,x1:203,y1:162}], // the doughnut table: walked around
+    window:'blinds',blinds:'#E8E2D0',sillPot:false,desk:'cubicle',catLook:'siamese',signLeds:'tag',doorKind:'swing',doorHall:'#4A505A',doorLight:'235,245,255',obstacles:[{x0:177,y0:147,x1:203,y1:162}],standing:[[179,144,22,16,160]], // the doughnut table: walked around
     plantKind:'ficus',smallPlant:'cactus',board:'white',
     wall:'#D6D0C2',stripe:'#CEC7B8',wallTop:'#E9E6DE',base:'#5C5F66',
     floorA:'#7C8796',floorB:'#717C8B',seam:'#6E7988',grainA:'#8893A2',grainB:'#717C8B',
