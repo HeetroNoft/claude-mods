@@ -5,7 +5,7 @@
 // plays a short alarm (when the sound is on), and brings the gauge out for a moment if it is hidden.
 // It has its own canvas over the room, so the lift leaves it where it is, and it slides out of the way.
 'use strict';
-const GAUGE={x:2,y:1,w:56,h:16}; // ends at y 16, clear of the shelf (y 18); the shelf slots start past it
+const GAUGE={x:2,y:1,w:66,h:16}; // ends at y 16, clear of the shelf (y 18); the shelf slots start past it
 const gcx=document.getElementById('gcv').getContext('2d'),gtx=document.getElementById('gtcv').getContext('2d'),gtip=document.getElementById('gtip');
 let gaugeTip='',gaugePeekT=0;
 const GAUGE_WIN=[['5H','fiveHour','fiveResets'],['7D','sevenDay','sevenResets']];
@@ -65,7 +65,7 @@ function drawGauge(g,now,tp){
   g.save();g.translate(shake,0);
   R(g,x+1,y,w-2,h,frame);R(g,x,y+1,w,h-2,frame);R(g,x+1,y+1,w-2,h-2,bg);R(g,x+w-1,y+3,1,10,bg);
   wins.forEach((v,i)=>{
-    const ry=y+3+i*6,bx=x+12,bw=15;
+    const ry=y+3+i*6,bx=x+12,bw=25; // 4% to the pixel: the bar shows each step, not a jump every 7%
     pixText(g,v.label,x+3,ry,v.level>=2?readable('#E5484D',bg,3):ink);
     R(g,bx,ry+1,bw,3,TH.boardOff);
     if(v.left==null){pixText(g,'?',bx+Math.floor(bw/2)-1,ry,dim);return;}

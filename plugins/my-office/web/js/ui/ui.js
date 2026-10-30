@@ -18,7 +18,7 @@ const OBJECTS=[
   {x:149,y:2,w:24,h:24,go:tp=>{clockSpin=tp;blip(1320,.03,'sine');}},
   {x:3,y:38,w:25,h:46,go:tp=>knockDoor(tp)},
   // the shelf: a click shows a folder's file name (furniture/shelf.js)
-  {x:58,y:7,w:64,h:11,go:tp=>shelfClick(tp)},{x:198,y:7,w:108,h:11,go:tp=>shelfClick(tp)}
+  {x:76,y:7,w:46,h:11,go:tp=>shelfClick(tp)},{x:198,y:7,w:108,h:11,go:tp=>shelfClick(tp)}
 ];
 function objectAt(x,y){
   if(cat&&Math.abs(x-cat.x)<=6&&y>=cat.y-cat.z-10&&y<=cat.y-cat.z+1)return {cat:true,go:catMeow};

@@ -10,7 +10,7 @@
 //   - The shelf is remembered (localStorage), so a reload or a session going home keeps it as it was.
 //   - A click on a folder shows the file's name above it.
 'use strict';
-const SHELF=[64,77,90,103,116,204,216,228,240,252,264,276,288,300];
+const SHELF=[81,93,105,117,204,215,226,237,248,259,270,281,292,303];
 const shelf=new Map();    // slot -> {slot,name,col,ms,t (when it landed),bump (when last touched)}
 const shelfOf=new Map();  // file name -> slot
 const reserved=new Map(); // slot -> file name, while that file is on its way up
