@@ -163,6 +163,10 @@
       log(me.idle.phase==='pick'&&cat.path.length===1,'no room by the cat, yet a Claude goes to pet it');
       Object.assign(cat,{x:60,y:150,path:[]});me.idle={act:'catpet',phase:'do',until:performance.now()+5000};idleTick(me,me.idle,performance.now());
       log(me.idle.until===0,'a Claude goes on petting a cat out of reach');
+      // 22. a Claude up the ladder really reaches the clock, and comes back down to the floor
+      const up=performance.now();me.path=[];me.idle={act:'clock',phase:'do',start:up-4000,until:up+4000};
+      log(sceneAir(me,up)===CLOCK_TOP&&CLOCK_SPOT+10>=CLOCK.x-CLOCK.r&&89-CLOCK_TOP-15<=CLOCK.y+CLOCK.r,'a Claude on the ladder does not reach the clock');
+      me.idle.until=up+10;log(sceneAir(me,up+10)===0,'a Claude stays up the ladder');
       chars.clear();live.forEach(([k,v])=>chars.set(k,v));Object.assign(cat,was);}
     // 14. the cat's name: kept clean, remembered, and typing it presses no shortcut
     showTab('room');const room=themeKey,cn=on('#pcat');cn.value='Mïmi! the great';cn.dispatchEvent(new Event('input',{bubbles:true}));

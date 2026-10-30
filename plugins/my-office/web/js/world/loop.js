@@ -153,12 +153,13 @@ function frame(tp){
     const pose=poseFor(ch,tp);
     let jy=0; if(tp<ch.jumpUntil){jy=-Math.round(Math.abs(Math.sin((ch.jumpUntil-tp)/1000*Math.PI*2.6))*6);}
     const bob=pose==='walk'?(stepOf(ch)?-1:0):0;
-    const rate={walk:6,type:7,press:3,wave:4,sip:.5,talk:5,water:4,juggle:3,catch:2,dance:2.5,eat:3,fold:2,rps:6,dangle:5,clap:5,pet:3,game:1.5}[pose]||2;
+    const rate={climb:4,wind:4,walk:6,type:7,press:3,wave:4,sip:.5,talk:5,water:4,juggle:3,catch:2,dance:2.5,eat:3,fold:2,rps:6,dangle:5,clap:5,pet:3,game:1.5}[pose]||2;
     // how high off the floor: held up by the pointer, or floating in the space station
-    const air=ch.held?7:ch.fly?Math.round(ch.fly.h):sceneAir(ch,tp)||(ch.idle&&ch.idle.act==='float'&&ch.idle.phase==='do')?Math.round(4+2*Math.sin(tp/700)):0;
+    const air=ch.held?7:ch.fly?Math.round(ch.fly.h):sceneAir(ch,tp)||(ch.idle&&ch.idle.act==='float'&&ch.idle.phase==='do'?Math.round(4+2*Math.sin(tp/700)):0);
     const sway=(pose==='dance'?(frameOf(ch,rate)?1:-1):0)+sceneLean(ch,tp);
     // what is in hand: a treat's own state, else what the break activity calls for
     const st=treatNow(ch,tp),I=ch.idle,doing=I&&I.phase==='do'&&!ch.path.length?I.act:null;
+    const scene=doing?IDLES[doing]:null;ch.aloft=!!(scene&&scene.aloft); // up a ladder: over the boards, as a held Claude is
     const held=st?st.held:doing==='donut'?{kind:'donut'}:doing==='tea'?{kind:'teacup'}:null;
     const o={look:ch.look,pose,frame:st&&st.frame!=null?st.frame:pose==='walk'?stepOf(ch):frameOf(ch,rate),blink:blinking(ch,tp),dir:dirOf(ch),sq:sqOf(ch,tp,pose,jy),gaze:gazeOf(ch,tp),
       mood:st&&st.mood?st.mood:moodOf(ch,tp,pose),glow:n>.5,air,held,floor:sceneFloor(ch),
@@ -173,16 +174,18 @@ function frame(tp){
     const body=()=>{
       if(cardId===ch.id)drawRing(wx,ch.x,ch.y,ch.look.c,tp);
       ch.bodyTop=ch.y+jy+bob-air-15;
+      if(scene&&scene.behind)scene.behind(wx,ch,tp,I);
       ch.headTop=ch.fly?drawFlying(wx,ch,o,ch.x+sway,ch.y+jy+bob-air):drawPerson(wx,ch.x+sway,ch.y+jy+bob-air,o);
       if(ch.screen)drawScreenLight(wx,ch.screen,ch.x+sway,ch.y+jy+bob-air,o,n);
       drawIdleProps(wx,ch,tp);
       if(st)drawTreat(wx,ch,tp,st);
       if(tp<(ch.flowerUntil||0)&&ch.bodyTop!=null)drawProp(wx,'blossom',Math.round(ch.x+3+o.sway),HATS.has(ch.look.style)?Math.round(ch.headTop+1-o.pop):Math.round(ch.bodyTop-2)); // tucked in the hat band, or on the head
     };
-    if(ch.held)lifted.push(body);else items.push({d:ch.y,f:body});
+    const top=ch.held||ch.aloft;
+    if(top)lifted.push(body);else items.push({d:ch.y,f:body});
     // the badge steps up out of the way of balls in the air, and comes down after
     ch.badgeUp=(ch.badgeUp||0)+(((st&&(st.juggle||st.caught||st.star))||doing==='juggle'?10:0)-(ch.badgeUp||0))*Math.min(1,dt*10);
-    (ch.held?lifted:over).push(()=>{
+    (top?lifted:over).push(()=>{
       const ht=ch.headTop; if(ht==null)return;
       if(pose==='sit'&&ch.act==='think')drawThought(wx,ch,tp);else ch.thoughtAt=0;
       if(pose==='phone'&&ch.seated)drawPhone(wx,Math.round(ch.x)-2,99,o,ch.look.c); // above the desk, under the eyes
@@ -190,9 +193,9 @@ function frame(tp){
       if(o.mood==='dizzy')drawDizzy(wx,ch.x,ht,tp);
       drawChatBubble(wx,ch,tp);drawRps(wx,ch,tp);
     });
-    (ch.held?lifted:post).push(()=>{
+    (top?lifted:post).push(()=>{
       if(ch.headTop==null)return;const ht=ch.headTop-Math.round(ch.badgeUp);
-      if(!LABELS&&(PREFS.badges||ch.act==='limit'||ch.act==='ask')){const dk=ch.desk||{};const beat=deskBeat(dk,Date.now()),badge=ch.act==='limit'?['skull','#B03A2E']:ch.act==='ask'?['quest',Math.floor(tp/300)%2?AMBER:ch.look.c]:beat?[beat.icon,beat.tone==='bad'?'#B03A2E':beat.tone==='good'?'#2E8A57':beat.tone==='warn'?AMBER:ch.look.c]:[iconFor(dk),ch.look.c];
+      if(!LABELS&&!ch.aloft&&(PREFS.badges||ch.act==='limit'||ch.act==='ask')){const dk=ch.desk||{};const beat=deskBeat(dk,Date.now()),badge=ch.act==='limit'?['skull','#B03A2E']:ch.act==='ask'?['quest',Math.floor(tp/300)%2?AMBER:ch.look.c]:beat?[beat.icon,beat.tone==='bad'?'#B03A2E':beat.tone==='good'?'#2E8A57':beat.tone==='warn'?AMBER:ch.look.c]:[iconFor(dk),ch.look.c];
         drawBadge(wx,badge[0],ch.x,ht,badge[1],tp,ch.id);
         if(tp<ch.jumpUntil+2500&&ch.starT&&tp-ch.starT<4000)drawStar(wx,Math.round(ch.x),Math.round(ht-21+Math.sin(tp/150)),Math.floor(tp/200)%2?'#FFD84A':'#FFFFFF');}
     });
@@ -257,7 +260,7 @@ function frame(tp){
   drawGaugeText(now);
   desks.forEach((dk,i)=>drawBoardText(dk,xs[i]+(boardShift(dk)||0),now));
   // the room's text lives on this upper canvas: a held Claude goes in front of it too
-  chars.forEach(ch=>{if(ch.held&&!ch.hidden&&ch.headTop!=null)ox.clearRect(P(ch.x-10),P(ch.headTop-1),P(20),P(ch.y-ch.headTop-5));});
+  chars.forEach(ch=>{if((ch.held||ch.aloft)&&!ch.hidden&&ch.headTop!=null)ox.clearRect(P(ch.x-10),P(ch.headTop-1),P(20),P(ch.y-ch.headTop-5));});
   }
   // glyphs
   glyphs=glyphs.filter(gl=>{gl.life-=dt;gl.vy+=(gl.ay||0)*dt;gl.y+=gl.vy*dt;gl.x+=gl.vx*dt;if(gl.life<=0)return false;

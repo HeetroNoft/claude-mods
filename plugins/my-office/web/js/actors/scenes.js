@@ -159,11 +159,20 @@ function sweepProps(g,ch,tp,I){
   if(I.bag){const h=3+Math.min(5,I.bag>>1);R(g,x-3,ch.y-h,7,h,'#B8A27A');R(g,x-3,ch.y-h,1,h,'#8E7C58');R(g,x-2,ch.y-h,5,1,'#CDBA92');R(g,x-1,ch.y-h-1,3,1,LEAF_COLS[I.bag%5]);}
   if(I.sheets){const h=Math.min(4,1+(I.sheets>>1));R(g,Math.round(ch.x+d*8)-2,ch.y-9-h,5,h,'#FFFDF8');R(g,Math.round(ch.x+d*8)-2,ch.y-9,5,1,'#D8D2C2');}
 }
-// Winding the clock: a ladder goes up against the wall, the Claude climbs, sets it, and comes down.
-const CLOCK_CLIMB=1100,CLOCK_TOP=40;
-function clockAir(ch,tp){const I=ch.idle,t=tp-I.start,back=I.until-tp;return Math.round(CLOCK_TOP*Math.min(1,Math.max(0,Math.min(t-300,back)/CLOCK_CLIMB)));}
-function clockTick(ch,I,tp){if(!I.set&&tp>I.start+300+CLOCK_CLIMB){I.set=true;clockSpin=tp;emote(ch,'star');blip(1320,.03,'sine');}}
-function clockProps(g,ch,tp,I){if(I.phase==='do')drawLadder(g,160,30,88);}
+// Winding the clock: a ladder slides up the wall left of it, in front of the boards so the climb shows;
+// the Claude goes up rung by rung and winds it with a key, the hands go round, it chimes, and down it comes.
+const CLOCK_SPOT=141,CLOCK_TOP=60,CLOCK_RUNG=5,CLOCK_T={up:500,climb:2000,wind:CLOCK_WIND,stay:600,down:1500,away:400};
+const clockWound=I=>I.start+CLOCK_T.up+CLOCK_T.climb; // when it starts winding
+function clockAir(ch,tp){const I=ch.idle,T=CLOCK_T,k=Math.min((tp-I.start-T.up)/T.climb,(I.until-T.away-tp)/T.down);
+  return Math.round(CLOCK_TOP*Math.max(0,Math.min(1,k))/CLOCK_RUNG)*CLOCK_RUNG;}
+function clockPose(ch,tp){const I=ch.idle,w=tp-clockWound(I);if(w>=0&&w<CLOCK_T.wind)return 'wind';return clockAir(ch,tp)===CLOCK_TOP||!clockAir(ch,tp)?'stand':'climb';}
+function clockTick(ch,I,tp){
+  if(!I.set&&tp>clockWound(I)){I.set=true;clockWindAt=tp;emote(ch,'dots');}
+  if(I.set&&!I.rang&&tp<clockWound(I)+CLOCK_T.wind&&tp>(I.tick||0)){I.tick=tp+320;blip(1900,.012,'square');} // the ratchet
+  if(!I.rang&&tp>clockWound(I)+CLOCK_T.wind){I.rang=true;clockChimeAt=tp;setMood(ch,'happy',1500);emoteAt(CLOCK.x-3,CLOCK.y+8,'note');[0,260,520].forEach(d=>setTimeout(()=>blip(1320,.09,'sine'),d));}
+}
+function clockLadder(g,ch,tp,I){const T=CLOCK_T,k=Math.max(0,Math.min(1,Math.min((tp-I.start)/T.up,(I.until-tp)/T.away)));drawLadder(g,CLOCK_SPOT,Math.round(90-(90-27)*k),90);}
+function clockKey(g,ch,tp,I){const w=tp-clockWound(I);if(w<0||w>=CLOCK_T.wind)return;R(g,149,13,3,1,'#FFD84A');R(g,150,Math.floor(tp/160)%2?12:14,1,1,'#FFD84A');}
 // Drawing on its own board, back to the room; the drawing comes line by line, with chalk dust.
 function doodleBegin(ch){ch.doodle=DOODLES[(Math.random()*DOODLES.length)|0];ch.doodleU=0;}
 function doodleTick(ch,I,tp){ch.doodleU=Math.min(1,(tp-I.start)/(I.dur*.85));if(Math.random()<.1)confetti.push({x:ch.x+Math.random()*10-5,y:60,vx:0,vy:8,c:'rgba(255,255,255,.7)',life:.5,w:1});}
@@ -215,7 +224,7 @@ Object.assign(IDLES,{
   season:{w:1.3,t:[6,9],can:()=>!TH.noWeather&&SEASON!=='autumn'&&!(floorThing&&floorThing.kind===SEASON),spot:()=>({...SEASON_SPOT[SEASON],st:'i-season'}),begin:seasonBegin,tick:seasonTick,pose:()=>SEASON==='spring'?'water':SEASON==='summer'?'hold':'pet',end:seasonEnd,props:seasonProps},
   unpin:{w:0,t:[30,30],can:()=>!!duePhoto(),spot:()=>({x:photoX(duePhoto()),y:89,shelf:true,st:'i-unpin'}),pose:ch=>ch.idle.stage===2?'read':'stretch',tick:unpinTick,props:unpinProps},
   sweep:{w:0,weight:()=>lying().length?6:0,t:[40,40],can:ch=>!!nearestLying(ch),spot:ch=>sweepSpot(nearestLying(ch)),pose:sweepPose,tick:sweepTick,end:sweepEnd,props:sweepProps},
-  clock:{w:.7,t:[5,6],spot:()=>({x:160,y:89,shelf:true,st:'i-clock'}),pose:()=>'stretch',tick:clockTick,props:clockProps,air:clockAir},
+  clock:{w:.7,t:[8,8],spot:()=>({x:CLOCK_SPOT,y:89,dir:1,shelf:true,st:'i-clock'}),pose:clockPose,tick:clockTick,behind:clockLadder,props:clockKey,air:clockAir,aloft:true},
   doodle:{w:1.2,t:[4,6],spot:ch=>({x:ch.dx,y:89,shelf:true,st:'i-doodle'}),begin:doodleBegin,tick:doodleTick,pose:()=>'look'},
   shelfread:{w:1,t:[7,10],emo:'bulb',spot:()=>({x:70+Math.random()*40,y:89,shelf:true,st:'i-shelf'}),pose:()=>'read',tick:shelfTick},
   mop:{w:0,weight:()=>stain&&stain.left>0&&stain.floor===curFloor?7:0,t:[5,7],can:()=>!!(stain&&stain.left>0),spot:()=>({x:stain.x+10,y:stain.y+1,dir:-1,st:'i-mop'}),pose:()=>'pet',tick:mopTick,end:mopEnd,props:mopProps},
