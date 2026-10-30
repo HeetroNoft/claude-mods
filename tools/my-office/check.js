@@ -110,11 +110,11 @@
     bs.forEach((a,i)=>{log(a.x>=306&&a.y>=169,`button ${a.n} leaves the corner: ${a.x.toFixed(1)},${a.y.toFixed(1)}`);});
     log(stage.querySelectorAll(':scope>button').length===1,'more than one action button');
     // 13. settings: open, each choice takes effect and is remembered, keys and defaults work
-    const b=id=>document.getElementById(id),on=q=>document.querySelector('#prefs '+q);
+    const b=id=>document.getElementById(id),on=q=>document.querySelector('#prefs '+q),showTab=k=>on(`[data-tab=${k}]`).click();
     b('set').click();log(b('prefs').classList.contains('open'),'settings do not open');
-    on('[data-sw=calm]').click();log(document.body.classList.contains('calm')&&calmMotion(),'less motion not applied');
+    showTab('display');on('[data-sw=calm]').click();log(document.body.classList.contains('calm')&&calmMotion(),'less motion not applied');
     on('[data-sw=badges]').click();log(PREFS.badges===false,'head icons not switched');
-    on('[data-seg=time][data-v=night]').click();const stored=JSON.parse(localStorage.getItem('office.prefs')||'{}');
+    showTab('room');on('[data-seg=time][data-v=night]').click();showTab('display');const stored=JSON.parse(localStorage.getItem('office.prefs')||'{}');
     log(stored.calm===true&&stored.badges===false&&stored.time==='night','settings not remembered: '+JSON.stringify(stored));
     const w0=b('set').offsetWidth;on('[data-sw=compact]').click();log(b('set').offsetWidth<w0,'compact buttons not smaller');
     on('[data-sw=items]').click();log(barOn===false&&b('items').classList.contains('hide'),'item bar not hidden');
@@ -149,7 +149,7 @@
       (TH.obstacles||[]).forEach(o=>log(standingBoxes(TH).some(([x,,w])=>x<o.x1&&x+w>o.x0),`${k}: a table is not sorted with the Claudes`));}
     themeKey=keep;TH=THEMES[keep];buildBg();
     // 14. the cat's name: kept clean, remembered, and typing it presses no shortcut
-    const room=themeKey,cn=on('#pcat');cn.value='Mïmi! the great';cn.dispatchEvent(new Event('input',{bubbles:true}));
+    showTab('room');const room=themeKey,cn=on('#pcat');cn.value='Mïmi! the great';cn.dispatchEvent(new Event('input',{bubbles:true}));
     log(catName==='Mimi the g'&&localStorage.getItem('office.catName')===catName,'cat name not cleaned or kept: '+catName);
     cn.dispatchEvent(new KeyboardEvent('keydown',{key:'t',bubbles:true}));log(themeKey===room,'typing the name changed the room');
     catTagUntil=performance.now()+1e4;drawCatTag(wx,performance.now());setCatName('');
