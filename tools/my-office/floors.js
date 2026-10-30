@@ -31,12 +31,12 @@ setTimeout(()=>{
   // the new scenes: every one runs through its begin, tick, pose, props and end, in every season
   callCleaner.at=Infinity; // nobody is called away while these run by hand
   const sc=[...chars.values()][0],sb=[...chars.values()][1],keepIdle=sc.idle,keepIdleB=sb.idle;
-  SEASONS.forEach(s=>{SEASON=s;['season','sweep','clock','doodle','shelfread','share','mop'].forEach(a=>{const D=IDLES[a],I={act:a,phase:'do',start:0,dur:1000,until:1e12};sc.idle=I;stain=stain||{floor:curFloor,x:100,y:176,left:1,wet:0};if(!lying().length)shaken.push({floor:curFloor,x:150,gy:150,h:0,c:'#D9662E',kind:'tree',seed:0,drift:0,rest:Date.now()});if(D.air)ok(D.air(sc,1)>=0,a+' sinks');
+  SEASONS.forEach(s=>{SEASON=s;['season','sweep','clock','doodle','shelfread','share','mop'].forEach(a=>{const D=IDLES[a],I={act:a,phase:'do',start:0,dur:1000,until:1e12};sc.idle=I;stain=stain||{floor:curFloor,x:100,y:176,left:1,wet:0,gone:new Set()};if(!lying().length)shaken.push({floor:curFloor,x:150,gy:150,h:0,c:'#D9662E',kind:'tree',seed:0,drift:0,rest:Date.now()});if(D.air)ok(D.air(sc,1)>=0,a+' sinks');
     try{if(D.spot)D.spot(sc);if(D.begin)D.begin(sc,I,0);if(D.tick)D.tick(sc,I,1);ok(typeof D.pose(sc,1)==='string',a+' has no pose');if(D.props)D.props(wx,sc,1,I);if(D.end)D.end(sc,I,1);}catch(err){ok(false,a+' in '+s+': '+err.message);}});
     ['snowball','selfie','napside'].forEach(a=>{const D=IDLES[a],I={act:a,phase:'do',pair:sb,role:0,sync:1,dur:9000,start:0,until:1e12};sc.idle=I;sb.idle={act:a,phase:'do',pair:sc,role:1,dur:9000,start:0,until:1e12};
     try{if(D.tick){D.tick(sc,I,5000);D.tick(sc,I,7000);}ok(typeof D.pose(sc,5000)==='string',a+' has no pose');if(D.props)D.props(wx,sc,5000,I);if(D.lean)D.lean(sc,5000);}catch(err){ok(false,a+' in '+s+': '+err.message);}});
     const its=[];floorThing=s==='autumn'||s==='summer'?null:{floor:curFloor,kind:s,born:0,until:Date.now()+1e4,u:1,left:1,scarf:'#D9534F'};try{roomItems(its,wx);its.forEach(i=>i.f());}catch(err){ok(false,'room items in '+s+': '+err.message);}});
-  ok(photos.length>0,'the selfie left no photo');stain={floor:curFloor,x:100,y:176,left:1,wet:0};ok(IDLES.mop.weight()>0,'a stain does not call for a mop');mopEnd(sc);ok(stain.left===0&&IDLES.mop.weight()===0,'mopping left the stain');stain=null;
+  ok(photos.length>0,'the selfie left no photo');stain={floor:curFloor,x:100,y:176,left:1,wet:0,gone:new Set()};ok(IDLES.mop.weight()>0,'a stain does not call for a mop');mopEnd(sc);ok(stain.left===0&&IDLES.mop.weight()===0,'mopping left the stain');stain=null;
   // whatever lies on the ground is picked up, one by one, sheets and leaves alike
   shaken=[];[[150,'paper'],[152,'tree'],[220,'leaf']].forEach(([x,kind])=>shaken.push({floor:curFloor,x,gy:150,h:0,c:'#D9662E',kind,seed:0,drift:0,rest:Date.now()}));
   ok(IDLES.sweep.weight()>0,'nobody comes for what lies on the ground');

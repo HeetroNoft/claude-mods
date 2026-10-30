@@ -157,6 +157,12 @@
         for(let i=0;i<600;i++){drawCabinet(g,0,0);drawCabinet(g,1,0);const d=cabDrawer;drawCabinet(g,1,0);if(cabDrawer!==d)moved=true;if(d===last)same=true;last=d;seen.add(d);}
         log(seen.size===K.drawers.length&&!same&&!moved,`${k}: drawers opened ${[...seen]}, same twice ${same}, moved ${moved}`);});
       drawCabinet(g,0,0);}
+    // 24. a mopped stain leaves nothing on the floor, and what is wiped stays wiped when another Claude takes over
+    {const c=document.createElement('canvas');c.width=W;c.height=H;const g=c.getContext('2d'),count=()=>{g.clearRect(0,0,W,H);drawStain(g,stain);const d=g.getImageData(0,0,W,H).data;let n=0;for(let i=3;i<d.length;i+=4)if(d[i])n++;return n;},was=stain;
+      stain={floor:curFloor,x:200,y:150,left:1,wet:0,gone:new Set()};log(count()===STAIN_PIXELS,'a fresh stain is not whole');
+      const t=performance.now(),I={until:t+5000,start:t,dur:5000};for(let i=0;i<400;i++)mopTick({},I,t+i*5);const left=stain.left;mopTick({},{until:t+1e4,start:t+9000,dur:1000},t+9000);
+      log(left<1&&left>.3&&stain.left<=left,'the mop is off its pace or lets a stain grow back: '+left);
+      mopEnd({},I,t);log(stain.left===0&&count()===0,'pixels stay after the mop');stain=was;}
     themeKey=keep;TH=THEMES[keep];buildBg();
     // 20. a Claude pets a cat that waits for it, within reach, or gives up: never a stroke from afar
     {cat=cat||newCat(performance.now());const live=[...chars.entries()],was={...cat},mk=(id,x,y)=>{const e={...newChar(id,{c:'#fff'}),hidden:false,x,y,path:[],tgt:{x,y},arrived:true,idle:{phase:'pick',t:0}};chars.set(id,e);return e;};

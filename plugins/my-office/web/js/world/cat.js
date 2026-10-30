@@ -241,7 +241,7 @@ function restoreFallen(){
 // A Claude on a break (never one at work) sees it, goes over, picks it up and puts it back.
 function findFixer(tp){
   if(!fallen||fallen.state!=='down'||fallen.fixer)return;
-  const ch=anyChar(c=>seen(c)&&c.act==='idle'&&c.idle&&!c.idle.pair&&!c.errand&&!c.treat&&['pick','do'].includes(c.idle.phase)&&!['nap','highfive','tidy'].includes(c.idle.act));
+  const ch=anyChar(c=>seen(c)&&c.act==='idle'&&c.idle&&!c.idle.pair&&!c.errand&&!c.treat&&['pick','do'].includes(c.idle.phase)&&!KEEP_DOING.includes(c.idle.act));
   if(!ch)return;
   releaseIdle(ch);fallen.fixer=ch.id;emote(ch,'excl');
   ch.idle={act:'tidy',phase:'go',dur:1e9,last:'tidy',step:'pick'};setTarget(ch,{...fallen.pick,st:'i-tidy'});
