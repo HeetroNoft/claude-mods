@@ -44,4 +44,5 @@ export const COMMANDS = [
   { name: 'my-office-theme', description: 'Change the room on the office page, or list the rooms', argumentHint: '[room]', immediate: true },
 ]
 
-export const PROMPT_HINT = 'OFFICE (my-office mod): your desk shows a live "Done by" clock. For a task of 2+ steps, call mcp__my-office__plan with each step and your honest minutes estimate, then mcp__my-office__step_done as each step finishes.'
+// Sent once a session and again after a compaction, which can lose it (Desk.hinted).
+export const PROMPT_HINT = 'OFFICE (my-office mod): your desk shows a live "Done by" clock. For a task of 2+ steps, call mcp__my-office__plan with each step and your honest minutes estimate. Send plan and mcp__my-office__step_done in the same round as real work, never in a round of their own, and skip the last step: the end of the turn ticks it.'

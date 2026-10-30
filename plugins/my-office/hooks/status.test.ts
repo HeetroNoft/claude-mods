@@ -199,6 +199,19 @@ test('a session stays stopped while the week is empty, whatever the five hours d
   expect(o.submitted.length).toBe(0)
 })
 
+test('the plan hint goes out once a session, and again after a compaction', async () => {
+  const o = engine()
+  await o.fire('session.start', {})
+  const seen = (r: any) => (r.context ?? []).some((c: string) => c.startsWith('OFFICE'))
+  await o.fire('session.compact', { trigger: 'auto' })
+  const first = await o.fire('prompt.submit', {})
+  const second = await o.fire('prompt.submit', {})
+  await o.fire('session.compact', { trigger: 'auto' })
+  const third = await o.fire('prompt.submit', {})
+  const fourth = await o.fire('prompt.submit', {})
+  expect([first, second, third, fourth].map(seen)).toEqual([true, false, true, false])
+})
+
 test('the usage limit knocks the session out until its next prompt or restart', async () => {
   const o = engine()
   await o.fire('session.start', {})
