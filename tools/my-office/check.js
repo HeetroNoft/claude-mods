@@ -97,7 +97,7 @@
   {const cv=document.createElement('canvas');cv.width=cv.height=48;const g=cv.getContext('2d',{willReadFrequently:true});
     const px=o=>{g.clearRect(0,0,48,48);drawPerson(g,24,40,o);return g.getImageData(0,0,48,48).data;},c='#8E6CCF';
     const mug={kind:'mug',fill:1},tea={kind:'teacup'},cookie={kind:'cookie'},donut={kind:'donut'},flower={kind:'flower'},gift={kind:'gift'},ball={kind:'ball'};
-    const CASES=[['walk',0,{carry:'#4FA3E0'}],['walk',1,{carry:'#4FA3E0'}],['read',1],['game',1],['fold',0],['fold',1],['water',1],
+    const CASES=[['walk',0,{carry:'#4FA3E0'}],['walk',1,{carry:'#4FA3E0'}],['read',1],['game',1],['phone',1],['fold',0],['fold',1],['water',1],
       ...[mug,tea].flatMap(h=>[0,.5,1].map(r=>['sip',1,{held:h,raise:r}])),...[cookie,donut].flatMap(h=>[0,.5,1].map(r=>['eat',1,{held:h,raise:r}])),
       ['hold',0,{held:flower}],['hold',0,{held:flower,lift:4}],['hold',0,{held:gift}],['hold',0,{held:ball}]];
     for(let style=1;style<LOOKS.length;style++)for(const dir of [1,-1])for(const [pose,frame,extra] of CASES){

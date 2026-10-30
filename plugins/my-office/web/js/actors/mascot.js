@@ -7,6 +7,14 @@
 //    floor (sits on the floor: the legs fold), spin (tumbling: no shadow, the caller draws it)
 //    held ({kind,...}: a prop in hand, see actors/props.js), lift (raises it), raise (0..1: a drink or a bite on its way to the mouth, else frame), carry (a file's colour, under the arm), breath (0/1)
 const EYE='#141413';
+// A phone with a feed going by: a post every four rows, flicked up by the thumb every 1.6 s.
+const FEED=['#FF8FB8','#FF8FB8','#FF8FB8','#FFFFFF','#7FD1FF','#7FD1FF','#7FD1FF','#FFFFFF','#FFD84A','#FFD84A','#FFD84A','#FFFFFF','#8FDB8A','#8FDB8A','#8FDB8A','#FFFFFF'];
+function phoneFeed(t){const n=Math.floor(t/1.6),k=Math.min(1,(t/1.6-n)/.3),e=1-(1-k)*(1-k);return {scroll:n*4+Math.round(e*4),thumb:k<1?5-Math.round(k*3):5};}
+function drawPhone(g,x,y,o,skin){
+  R(g,x,y,5,7,'#1F2230');
+  for(let j=0;j<5;j++)R(g,x+1,y+1+j,3,1,FEED[((o.scroll|0)+j)%FEED.length]);
+  R(g,x+3,y+(o.thumb|0),1,1,skin);
+}
 function drawPerson(g,cx,fy,o){
   const sm=!!o.small,pose=o.pose,f=o.frame|0;
   let sq=sm?0:Math.max(-2,Math.min(2,o.sq|0));
@@ -75,6 +83,7 @@ function drawPerson(g,cx,fy,o){
     case 'clap':if(f){up(-1,0,3);up(1,0,3);}else{nub(-1,-2,1);nub(1,-2,1);}break;
     case 'game':{const gx=L+(bw>>1)-3,gy=ay+2;if(sm){nub(-1,2);nub(1,2);}else twoHands(gx,6,gy+1);
       extras.push(()=>{R(g,gx,gy,6,3,'#2B2F3A');R(g,gx+1,gy+1,4,1,f?'#7FE8FF':'#5BD08A');if(!sm){R(g,gx,gy+3,6,1,'#1A1D24');thumbs(gx,6,gy+1);}});break;}
+    case 'phone':{const px=L+(bw>>1)-2,py=T+5;if(sm||o.seated){nub(-1,2);nub(1,2);break;}twoHands(px,5,py+3);extras.push(()=>drawPhone(g,px,py,o,c));break;}
     case 'hold':if(sm||!o.held){nub(-1,1,1);nub(1,1,1);hand={x:L+(bw>>1),y:ay+2,side:0};}else holdFront(ay+2-lift,o.held.kind);break;
     case 'fold':{const px=L+(bw>>1)-2;if(sm){nub(-1,1,f?1:0);nub(1,1,f?0:1);}else twoHands(px-(f?1:0),4+(f?1:0),ay);
       extras.push(()=>{R(g,px,ay,4,2,'#FFFFFF');R(g,px+1,ay-1,2,1,'#FFFFFF');R(g,px,ay+1,4,1,'#D5DAE2');});break;}
