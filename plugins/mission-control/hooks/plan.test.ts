@@ -29,6 +29,19 @@ test('a new prompt after a finished plan clears the old plan from the panel', as
   expect(after).not.toContain('Tidy notes.txt')
 })
 
+test('a turn that ends well closes its plan, a question or an interruption does not', async ($, on) => {
+  kit(on)
+  on('turn.complete', async () => ({ text: '' }) as any)
+  const end = (answer: string, isAborted = false) => ({ answer, durationMs: 1000, isAborted, turnId: 't1', reason: isAborted ? 'aborted' : 'answer' }) as any
+  await $.tool.call({ tool: 'mcp__mission-control__set_plan', steps: ['Tidy notes.txt', 'Move the drafts'] } as any)
+  await $.turn.complete(end('Shall I go on?'))
+  expect(await drawn($)).not.toContain('2/2')
+  await $.turn.complete(end('', true))
+  expect(await drawn($)).not.toContain('2/2')
+  await $.turn.complete(end('All done.'))
+  expect(await drawn($)).toContain('2/2')
+})
+
 test('a new prompt during an unfinished plan keeps the plan', async ($, on) => {
   kit(on)
   await $.tool.call({ tool: 'mcp__mission-control__set_plan', steps: ['Tidy notes.txt', 'Move the drafts'] } as any)

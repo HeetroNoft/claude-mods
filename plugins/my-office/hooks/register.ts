@@ -267,11 +267,13 @@ export const register: Register = on => {
     const left = await readLeft($, dir)
     if (desk && left[desk.id]) { delete left[desk.id]; await writeLeft($, dir, left) }
     // the user answered: no more waiting, the usage limit is behind us, and a paused plan goes on
+    let hint = false
     await save($, (d, now) => {
       d.waiting = undefined; d.limited = undefined; d.bg = undefined; resumePlan(d, now)
+      hint = !d.hinted; d.hinted = true
       d.activity = 'think'; d.detail = 'Reading the ask'; d.activityMs = now
     })
-    return next({ ...e, context: [...(e.context ?? []), PROMPT_HINT] })
+    return next(hint ? { ...e, context: [...(e.context ?? []), PROMPT_HINT] } : e)
   })
 
   on('turn.start', async ($, e: any, next) => {
@@ -409,7 +411,7 @@ export const register: Register = on => {
     if (e.agentId || e.trigger === 'precompute') return next(e)
     await save($, (d, now) => { d.task = { kind: 'compact', ms: now, auto: e.trigger === 'auto' }; d.activity = 'think'; d.detail = 'Compacting'; d.activityMs = now; note(d, 'compact', 'Compacting', now) })
     const result = await next(e)
-    await save($, d => { d.task = undefined })
+    await save($, d => { d.task = undefined; d.hinted = false })
     return result
   })
 
@@ -481,7 +483,7 @@ export const register: Register = on => {
   on('session.end', async ($, e, next) => {
     ticker?.cancel()
     resetWatch?.cancel()
-    await save($, (d, now) => { if ((e as any).reason === 'clear') clearPlan(d); d.endedMs = now; d.activity = 'gone'; d.detail = 'Gone home' })
+    await save($, (d, now) => { if ((e as any).reason === 'clear') { clearPlan(d); d.hinted = false } d.endedMs = now; d.activity = 'gone'; d.detail = 'Gone home' })
     return next(e)
   })
 }

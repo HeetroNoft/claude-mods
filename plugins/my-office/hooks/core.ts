@@ -49,6 +49,8 @@ export type Desk = {
   planTurn?: number
   missionSteps?: number
   pausedMs?: number
+  // the plan hint is in this conversation already: it is not sent again until a compaction
+  hinted?: boolean
   // the turn stopped with steps left, by an error or by the user; cleared by the next prompt
   stopped?: { kind: 'error' | 'interrupted'; ms: number; error?: string }
   task?: Task
