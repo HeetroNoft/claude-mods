@@ -1,6 +1,6 @@
 {
   "name": "my-office",
-  "version": "1.9.48",
+  "version": "1.9.49",
   "author": { "name": "Heet" },
   "license": "MIT",
   "description": "A pixel-art office in a local web page where every Claude session is a Claude mascot variant at its own desk, with a live Done-by clock. Based on the office mod from charlie-free-mods."

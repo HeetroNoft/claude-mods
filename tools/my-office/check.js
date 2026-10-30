@@ -163,6 +163,13 @@
       const t=performance.now(),I={until:t+5000,start:t,dur:5000};for(let i=0;i<400;i++)mopTick({},I,t+i*5);const left=stain.left;mopTick({},{until:t+1e4,start:t+9000,dur:1000},t+9000);
       log(left<1&&left>.3&&stain.left<=left,'the mop is off its pace or lets a stain grow back: '+left);
       mopEnd({},I,t);log(stain.left===0&&count()===0,'pixels stay after the mop');stain=was;}
+    // 25. the door: wait for it, step through, gone only once it has shut; and the same way in
+    {const was=doorAmt,e={...newChar('door',{c:'#fff'}),x:DOOR.x,y:DOOR.y,tgt:{exit:true,key:'x'},hidden:false};
+      gateOut(e);doorAmt=0;stepGate(e,.1);log(e.gate.step==='wait'&&gateHolds(e),'someone does not wait for the door to open');
+      doorAmt=1;for(let i=0;i<20;i++)stepGate(e,.05);log(e.gate&&e.gate.step==='shut'&&e.y===GATE.y&&!gateHolds(e)&&!e.hidden,'someone leaves before the door has shut');
+      doorAmt=0;stepGate(e,.05);log(e.hidden&&!e.gate,'someone is still there behind the shut door');
+      const f={...newChar('door2',{c:'#fff'})};gateIn(f);doorAmt=0;stepGate(f,.1);log(f.gate.step==='wait'&&f.y===GATE.y,'someone comes in through the shut door');
+      doorAmt=1;for(let i=0;i<20;i++)if(f.gate)stepGate(f,.05);log(!f.gate&&f.y===DOOR.y,'someone does not reach the room through the door');doorAmt=was;}
     themeKey=keep;TH=THEMES[keep];buildBg();
     // 20. a Claude pets a cat that waits for it, within reach, or gives up: never a stroke from afar
     {cat=cat||newCat(performance.now());const live=[...chars.entries()],was={...cat},mk=(id,x,y)=>{const e={...newChar(id,{c:'#fff'}),hidden:false,x,y,path:[],tgt:{x,y},arrived:true,idle:{phase:'pick',t:0}};chars.set(id,e);return e;};

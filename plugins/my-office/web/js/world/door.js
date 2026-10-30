@@ -18,6 +18,23 @@ function leafCanvas(){
 function leafPart(g,a,w,x,dw,dy){g.drawImage(leafCanvas(),a,DOOR_BOX.y,w,DOOR_BOX.h,x,DOOR_BOX.y+(dy||0),dw==null?w:dw,DOOR_BOX.h);}
 function clipDoor(g,fn){g.save();g.beginPath();g.rect(DOOR_BOX.x,DOOR_BOX.y,DOOR_BOX.w,DOOR_BOX.h);g.clip();fn();g.restore();}
 
+// Going through (e.gate): Claudes, helpers and the cat share these steps. Out: wait in front of the door until it is
+// open, walk in, then stand in the corridor while it shuts in front of them, and they are gone. In: the same the other
+// way. Whoever walks or waits holds the door; it shuts once the last has gone, however many there are.
+const GATE={x:15,y:83,ms:520};
+let doorway=[]; // who is in the doorway this frame: drawn over the corridor, under the door
+function gateOut(e){e.gate={dir:'out',step:'wait',u:0};}
+function gateIn(e){e.gate={dir:'in',step:'wait',u:0};e.x=GATE.x;e.y=GATE.y;}
+function stepGate(e,dt){
+  const G=e.gate;
+  if(G.step==='wait'){if(doorAmt>.8)G.step='walk';return;}
+  if(G.step==='shut'){if(doorAmt<.08){e.gate=null;e.hidden=true;}return;}
+  G.u=Math.min(1,G.u+dt*1000/GATE.ms);e.stride=(e.stride||0)+dt*25;
+  const k=G.dir==='out'?G.u:1-G.u;e.x=DOOR.x+(GATE.x-DOOR.x)*k;e.y=DOOR.y+(GATE.y-DOOR.y)*k;
+  if(G.u>=1){if(G.dir==='out')G.step='shut';else e.gate=null;}
+}
+const gateHolds=e=>!!(e.gate&&e.gate.step!=='shut');
+const inDoorway=e=>!!(e.gate&&(e.gate.dir==='in'||e.gate.step!=='wait'));
 // the corridor behind the door, lit
 function drawHall(g,amt){
   const {x,y,w,h}=DOOR_BOX,hall=TH.doorHall||'#141B2B',lc=TH.doorLight||'255,214,140';
@@ -55,11 +72,13 @@ const DOOR_KINDS={
 
 // called every frame from the loop: someone near the door opens it; a knock rattles it, then a peek
 function drawDoor(g,tp,dt,near){
+  const inside=doorway;doorway=[];
   const since=tp-doorKnock,knocking=since<600,peek=since>=600&&since<1600;
   doorAmt+=((near?1:peek?.3:0)-doorAmt)*Math.min(1,dt*(near?8:5));
   const rattle=knocking&&!near?(Math.floor(since/75)%2?1:-1):0;
   if(doorAmt<.03&&!rattle&&TH.doorKind!=='airlock'&&TH.doorKind!=='pocket')return;
-  if(doorAmt>=.03)drawHall(g,doorAmt);else if(rattle)R(g,DOOR_BOX.x,DOOR_BOX.y,DOOR_BOX.w,DOOR_BOX.h,TH.doorHall||'#141B2B');
+  if(doorAmt>=.03){drawHall(g,doorAmt);g.save();g.beginPath();g.rect(DOOR_BOX.x,DOOR_BOX.y,DOOR_BOX.w,60);g.clip();inside.forEach(f=>f());g.restore();}
+  else if(rattle)R(g,DOOR_BOX.x,DOOR_BOX.y,DOOR_BOX.w,DOOR_BOX.h,TH.doorHall||'#141B2B');
   (DOOR_KINDS[TH.doorKind]||DOOR_KINDS.swing)(g,doorAmt,rattle,tp);
   if(TH.overDoor)clipDoor(g,()=>TH.overDoor(g,TH)); // what hangs in front of the door stays in front
 }

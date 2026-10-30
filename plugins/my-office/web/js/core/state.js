@@ -170,6 +170,7 @@ function setTarget(e,t,instant){
   t.key=(t.st||'')+':'+Math.round(t.x)+':'+Math.round(t.y);
   if(e.tgt&&e.tgt.key===t.key)return;
   if(!e.small&&!t.exit&&!t.seated&&!t.shelf&&!instant)freeSpot(e,t);
+  if(e.gate&&!t.exit)e.gate=null; // called back halfway through the door
   e.tgt=t; e.arrived=false;
   if(instant){
     e.path=[];
@@ -179,8 +180,9 @@ function setTarget(e,t,instant){
     return;
   }
   if(e.hidden&&t.exit){e.arrived=true;e.path=[];return;}
-  const start={x:e.hidden?DOOR.x:e.x,y:e.hidden?DOOR.y:e.y};
+  const start={x:e.hidden?DOOR.x:e.x,y:e.hidden?DOOR.y:e.y},outside=e.hidden;
   e.path=avoidFurniture(start,buildPath(e,t));
+  if(outside)gateIn(e); // waits behind the door, and comes in once it is open
 }
 
 /* ---------- ingest ---------- */

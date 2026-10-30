@@ -19,6 +19,7 @@ function dodge(e,left,dt){
 function stepEntity(e,dt){
   // a Claude held by the pointer hangs under it, a little behind, like on a string
   if(e.held){const k=Math.min(1,dt*16);e.x+=(e.held.x-e.x)*k;e.y+=(e.held.y+16-e.y)*k;return false;}
+  if(e.gate&&!e.hidden){stepGate(e,dt);return true;}
   if(e.hidden||!e.path.length){e.v=0;return false;}
   let left=0,from=e;e.path.forEach(p=>{left+=Math.hypot(p.x-from.x,p.y-from.y);from=p;});
   if(!e.small)dodge(e,left,dt);
@@ -35,7 +36,7 @@ function stepEntity(e,dt){
     e.arrived=true; e.v=0; e.sqv=(e.sqv||0)-8; // a small settle on arriving
     if(e.tgt&&e.tgt.dir)e.face=e.tgt.dir;
     if(e.tgt&&e.tgt.seated){e.seated=true;e.seatX=e.tgt.x;}
-    if(e.tgt&&e.tgt.exit){e.hidden=true;}
+    if(e.tgt&&e.tgt.exit)gateOut(e); // through the door, and gone once it has shut
   }
   return true;
 }
@@ -43,6 +44,7 @@ function stepEntity(e,dt){
 // waving), then what the work or the break calls for.
 function poseFor(ch,tp){
   if(ch.held||ch.fly)return 'dangle';
+  if(ch.gate)return ch.gate.step==='walk'?'walk':ch.gate.step==='shut'?'look':'stand';
   if(ch.path.length)return 'walk';
   if(tp<(ch.getUpUntil||0))return 'slump';
   if(tp<(ch.lampReach||0))return 'press';
@@ -115,10 +117,8 @@ function frame(tp){
   // dust motes in window light, or neon sparks
   if(TH.dust==='sun'&&n<.7)dust.forEach(m=>{m.y-=m.v*dt*.3;m.x+=Math.sin(tp/1000+m.p)*dt*2;if(m.y<86){m.y=136;m.x=250+Math.random()*55;}const a=(.25+.2*Math.sin(tp/600+m.p))*(1-n);wx.fillStyle=`rgba(${DUST_TINT[SEASON]},${a})`;wx.fillRect(Math.round(m.x),Math.round(m.y),1,1);});
   // door open? (someone walking through, or a knock)
-  let doorOpen=false; const near=e=>!e.hidden&&Math.hypot(e.x-DOOR.x,e.y-DOOR.y)<16;
+  let doorOpen=false; const near=e=>!e.hidden&&(gateHolds(e)||!e.gate&&Math.hypot(e.x-DOOR.x,e.y-DOOR.y)<16);
   chars.forEach(c=>{if(near(c))doorOpen=true;});if(cat&&!cat.away&&near(cat))doorOpen=true; interns.forEach(e=>{if(near(e))doorOpen=true;});
-  // the door opens the room's own way as someone comes near, and closes behind them (world/door.js)
-  drawDoor(wx,tp,dt,doorOpen);
   // one light per desk on the door sign, in the room's style; it darkens with the night (world/door.js)
   if(!LABELS)drawSignLeds(wx);
   const xs=deskXs(desks.length);
@@ -182,7 +182,7 @@ function frame(tp){
       if(tp<(ch.flowerUntil||0)&&ch.bodyTop!=null)drawProp(wx,'blossom',Math.round(ch.x+3+o.sway),HATS.has(ch.look.style)?Math.round(ch.headTop+1-o.pop):Math.round(ch.bodyTop-2)); // tucked in the hat band, or on the head
     };
     const top=ch.held||ch.aloft;
-    if(top)lifted.push(body);else items.push({d:ch.y,f:body});
+    if(top)lifted.push(body);else if(inDoorway(ch))doorway.push(body);else items.push({d:ch.y,f:body});
     // the badge steps up out of the way of balls in the air, and comes down after
     ch.badgeUp=(ch.badgeUp||0)+(((st&&(st.juggle||st.caught||st.star))||doing==='juggle'?10:0)-(ch.badgeUp||0))*Math.min(1,dt*10);
     (top?lifted:over).push(()=>{
@@ -195,16 +195,18 @@ function frame(tp){
     });
     (top?lifted:post).push(()=>{
       if(ch.headTop==null)return;const ht=ch.headTop-Math.round(ch.badgeUp);
-      if(!LABELS&&!ch.aloft&&(PREFS.badges||ch.act==='limit'||ch.act==='ask')){const dk=ch.desk||{};const beat=deskBeat(dk,Date.now()),badge=ch.act==='limit'?['skull','#B03A2E']:ch.act==='ask'?['quest',Math.floor(tp/300)%2?AMBER:ch.look.c]:beat?[beat.icon,beat.tone==='bad'?'#B03A2E':beat.tone==='good'?'#2E8A57':beat.tone==='warn'?AMBER:ch.look.c]:[iconFor(dk),ch.look.c];
+      if(!LABELS&&!ch.aloft&&!ch.gate&&(PREFS.badges||ch.act==='limit'||ch.act==='ask')){const dk=ch.desk||{};const beat=deskBeat(dk,Date.now()),badge=ch.act==='limit'?['skull','#B03A2E']:ch.act==='ask'?['quest',Math.floor(tp/300)%2?AMBER:ch.look.c]:beat?[beat.icon,beat.tone==='bad'?'#B03A2E':beat.tone==='good'?'#2E8A57':beat.tone==='warn'?AMBER:ch.look.c]:[iconFor(dk),ch.look.c];
         drawBadge(wx,badge[0],ch.x,ht,badge[1],tp,ch.id);
         if(tp<ch.jumpUntil+2500&&ch.starT&&tp-ch.starT<4000)drawStar(wx,Math.round(ch.x),Math.round(ht-21+Math.sin(tp/150)),Math.floor(tp/200)%2?'#FFD84A':'#FFFFFF');}
     });
   });
   interns.forEach(e=>{
     if(e.hidden)return;
-    const pose=e.path.length?'walk':'type',hop=tp<(e.hopUntil||0)?-Math.round(Math.sin((e.hopUntil-tp)/400*Math.PI)*3):0;
-    items.push({d:e.y,f:()=>{e.headTop=drawPerson(wx,e.x,e.y+hop,{look:e.look,pose,small:true,frame:pose==='walk'?stepOf(e):Math.floor(tp/1000*6+e.blinkT)%2,blink:((tp/1000+e.blinkT)%4)<.12});}});
+    const pose=e.gate?(e.gate.step==='walk'?'walk':'stand'):e.path.length?'walk':'type',hop=tp<(e.hopUntil||0)?-Math.round(Math.sin((e.hopUntil-tp)/400*Math.PI)*3):0;
+    (inDoorway(e)?{push:o=>doorway.push(o.f)}:items).push({d:e.y,f:()=>{e.headTop=drawPerson(wx,e.x,e.y+hop,{look:e.look,pose,small:true,frame:pose==='walk'?stepOf(e):Math.floor(tp/1000*6+e.blinkT)%2,blink:((tp/1000+e.blinkT)%4)<.12});}});
   });
+  // the door opens the room's own way as someone comes near, and shuts behind them (world/door.js)
+  drawDoor(wx,tp,dt,doorOpen);
   items.sort((a,b)=>a.d-b.d).forEach(it=>it.f());
 
   // steam

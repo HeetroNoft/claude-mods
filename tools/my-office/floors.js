@@ -138,12 +138,12 @@ setTimeout(()=>{
   ok(!cat.away&&cat.x>0,'the cat is not back in its room');ok(JSON.parse(localStorage.getItem('office.rooms'))[1].some(f=>f.name==='upstairs.js'),'shelves not remembered per floor');
   // the cat walks out by the door, and comes in by it
   const runCat=(n)=>{let t=performance.now();for(let i=0;i<n&&!cat.away;i++){t+=16;updateCat(.016,t);}return t;};
-  const jobless=()=>{cat.job=null;cat.air=null;cat.path=[];cat.z=0;cat.state='sit';cat.until=1e12;catBall=null;};
+  const jobless=()=>{cat.gate=null;cat.job=null;cat.air=null;cat.path=[];cat.z=0;cat.state='sit';cat.until=1e12;catBall=null;};
   jobless();cat.nextTrip=0;cat.nextJob=1e12;runCat(1);ok(cat.job&&cat.job.kind==='trip','the cat did not set off');
-  let nearDoor=false;{let t=performance.now();for(let i=0;i<4000&&!cat.away;i++){t+=16;const x=cat.x,y=cat.y;updateCat(.016,t);if(Math.hypot(x-DOOR.x,y-DOOR.y)<4)nearDoor=true;}}
+  let nearDoor=false;{let t=performance.now();for(let i=0;i<4000&&!cat.away;i++){t+=16;const x=cat.x,y=cat.y;doorAmt=cat.gate&&cat.gate.step==='shut'?0:1;updateCat(.016,t);if(Math.hypot(x-DOOR.x,y-DOOR.y)<4)nearDoor=true;}}
   ok(cat.away&&cat.floor!==0&&nearDoor,'the cat did not leave by the door: floor '+cat.floor+' away '+cat.away);
   cat.floor=1;cat.nextTrip=0;const rnd=Math.random;Math.random=()=>0;updateCat(.016,performance.now());Math.random=rnd;
-  ok(!cat.away&&cat.floor===0&&Math.hypot(cat.x-DOOR.x,cat.y-DOOR.y)<1&&cat.job&&cat.job.kind==='arrive','the cat did not come in by the door');
+  ok(!cat.away&&cat.floor===0&&cat.gate&&cat.gate.dir==='in'&&Math.hypot(cat.x-GATE.x,cat.y-GATE.y)<1&&cat.job&&cat.job.kind==='arrive','the cat did not come in by the door');
   jobless();cat.nextTrip=1e12;
   // moving a desk: a full floor refuses, a new floor takes it and its Claude leaves by the door
   const id=ids()[0],xs=deskXs(4),at=x=>st.left+x/W*st.width,fire=(t,x,y)=>stage.dispatchEvent(new PointerEvent(t,{bubbles:true,button:0,pointerId:1,clientX:x,clientY:y}));
