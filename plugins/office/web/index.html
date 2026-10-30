@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>The Office</title>
+<link rel="stylesheet" href="office.css">
+</head>
+<body>
+<div id="stage">
+  <canvas id="world" width="320" height="180"></canvas>
+  <canvas id="ov"></canvas>
+  <div id="card" role="dialog" aria-label="Session"></div>
+  <div id="menu" role="menu" aria-label="Theme"></div>
+  <button id="thm" type="button" aria-label="Theme" title="Theme (T)"></button>
+  <button id="snd" type="button" aria-label="Sound" aria-pressed="false" title="Sound on/off (M)"></button>
+  <div id="vol"><div class="pan"><input id="volr" type="range" min="0" max="100" step="5" aria-label="Volume"><span id="volv" aria-hidden="true"></span></div></div>
+  <button id="lbl" type="button" aria-label="Labels"></button>
+  <button id="itm" type="button" aria-label="Items" title="Items (I)"></button>
+  <div id="items" role="toolbar" aria-label="Items to give"></div>
+</div>
+<div id="ghost" aria-hidden="true"></div>
+<script src="js/core/base.js"></script>
+<script src="js/themes/engine.js"></script>
+<script src="js/themes/pixel.js"></script>
+<script src="js/themes/claude.js"></script>
+<script src="js/themes/cosy.js"></script>
+<script src="js/themes/neon.js"></script>
+<script src="js/themes/japan.js"></script>
+<script src="js/themes/paper.js"></script>
+<script src="js/themes/retro.js"></script>
+<script src="js/themes/space.js"></script>
+<script src="js/core/state.js"></script>
+<script src="js/core/plan.js"></script>
+<script src="js/world/outline.js"></script>
+<script src="js/actors/props.js"></script>
+<script src="js/actors/mascot.js"></script>
+<script src="js/actors/icons.js"></script>
+<script src="js/furniture/objects.js"></script>
+<script src="js/furniture/machine.js"></script>
+<script src="js/furniture/coffee.js"></script>
+<script src="js/furniture/desks.js"></script>
+<script src="js/furniture/board.js"></script>
+<script src="js/furniture/shelf.js"></script>
+<script src="js/world/window.js"></script>
+<script src="js/world/door.js"></script>
+<script src="js/world/lighting.js"></script>
+<script src="js/world/cat.js"></script>
+<script src="js/world/gauge.js"></script>
+<script src="js/world/labels.js"></script>
+<script src="js/world/loop.js"></script>
+<script src="js/actors/life.js"></script>
+<script src="js/actors/brain.js"></script>
+<script src="js/actors/reactions.js"></script>
+<script src="js/ui/ui.js"></script>
+<script src="js/ui/play.js"></script>
+<script src="js/core/main.js"></script>
+</body>
+</html>

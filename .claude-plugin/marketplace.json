@@ -1,0 +1,25 @@
+{
+  "name": "lucas-mods",
+  "owner": {
+    "name": "Lucas",
+    "email": "lucas.bize.pro@gmail.com"
+  },
+  "metadata": {
+    "description": "Mes mods personnels pour Claude Code",
+    "version": "1.0.0"
+  },
+  "plugins": [
+    {
+      "name": "office",
+      "source": "./plugins/office",
+      "description": "Bureau pixel-art local avec des variantes de la mascotte Claude (d'après l'office de charlie-free-mods)",
+      "version": "1.9.4"
+    },
+    {
+      "name": "mission-control",
+      "source": "./plugins/mission-control",
+      "description": "Panneau de mission en direct : le plan en barre de progression, ce que fait Claude en français clair, vos demandes cochées (d’après mission-control de charlie-free-mods)",
+      "version": "0.3.3"
+    }
+  ]
+}

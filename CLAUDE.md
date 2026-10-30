@@ -1,0 +1,64 @@
+# claude-mods
+
+Lucas's Claude Code mods, published as the `lucas-mods` marketplace (`.claude-plugin/marketplace.json`).
+
+| Plugin | Folder | What it is |
+| --- | --- | --- |
+| office | `plugins/office` | A pixel-art office page where every Claude session is a mascot at its own desk, with a live plan board |
+| mission-control | `plugins/mission-control` | A live panel of the current turn: plan bar, plain-language activity, ticked asks |
+
+`~/.claude/office/` is **output**, not source: desk files, `data.js` and a copy of the page that the office mod writes at session start. Never edit it by hand; edit `plugins/office/web/` and copy it over to preview (see Testing).
+
+## Working with several Claude sessions at once
+
+Several sessions may be editing this repository at the same time. To stay out of each other's way:
+
+1. **Claim one area per session**, the narrower the better (one theme file, one hooks module), and name your desk after it: `/desk Themes` or the `mcp__office__name_desk` tool. The office page then shows who works on what.
+2. **Only edit files inside your area.** The areas are listed below; each file starts with a one-line comment saying what it owns.
+3. **Shared files** are edited by several areas: the `<script>` list in `plugins/office/web/index.html`, `plugins/office/web/office.css`, both `plugin.json` files and `.claude-plugin/marketplace.json`. Re-read one right before you change it, change only your lines with a targeted edit, and never rewrite it whole.
+4. **Version bumps**: bump a plugin's version in its `plugin.json` **and** in `marketplace.json` once, when your work is finished and checked, not per edit.
+5. **Git** (when the repository is a git repository): give each session its own worktree and branch, `git worktree add ../claude-mods-<task> -b <task>`, and merge when its checks pass. Commit only when Lucas asks.
+
+### office: areas and files (`plugins/office/`)
+
+| Area | Files | Owns |
+| --- | --- | --- |
+| Hooks (engine side) | `hooks/register.ts`, `hooks/room.ts`, `hooks/tools.ts`, `hooks/core.ts`, `hooks/*.test.ts` | What each session writes to its desk file: activity, plan, ETA, messages |
+| One theme | `web/js/themes/<key>.js` | One room: palette, wall, floor, door, window, decor, live touches |
+| Theme engine | `web/js/themes/engine.js` | Theme registry, day/night, the room painter and its replaceable parts |
+| Furniture | `web/js/furniture/*.js` | Desks and chairs per style, wall boards, cabinet/machine/coffee/plant/clock, the file shelf |
+| Characters | `web/js/actors/*.js` | Mascot sprite and poses, icons, springs/moods/gaze, the idle brain and scenes, emotes and sounds |
+| World | `web/js/world/*.js` | Frame loop, window, lighting, outlines and shadows, the cat, label-mode text |
+| UI | `web/js/ui/*.js`, `web/office.css` | Pointer, session card, theme picker, picking Claudes up, the item bar |
+| Core | `web/js/core/*.js` | Constants and helpers, desk layout, reading `data.js`, boot order |
+
+Scripts are plain browser scripts sharing one global scope (the page runs from `file://`, where ES modules are blocked). `index.html` loads them in dependency order; `core/main.js` runs last and is the only place that starts things.
+
+### Adding a theme
+
+1. Create `web/js/themes/<key>.js` with `defineTheme('<key>', '<base theme or null>', {...})`; copy a close theme as a start. Each key is documented where `themes/engine.js` or the furniture reads it.
+2. Add its `<script>` line to `index.html` after the other themes.
+3. Optional: break activities only this room offers, in `THEME_IDLES` (`actors/brain.js`).
+4. Run `tools/office/run.sh check`.
+
+## Rules the office page keeps
+
+- **Eyes stay visible**: nothing on a desk covers x−5..x+4, y 95..98 around a seated Claude (`tools/office/check.js` enforces it).
+- **No overlaps**: desks and boards share the lane x 34..264, at most 6 desks (`MAX_DESKS`); boards keep 3 px apart, desks 2 px.
+- **Outlines** trace pixels with alpha ≥ .6; keep shadows and glows below that so they get no rim.
+- **Light comes from the window** (high, right): every shadow falls down and to the left.
+- **Everything shows and nothing overlaps**, in every theme: `tools/office/check.js` checks that each room element stands out from the wall or floor it sits on (contrast ≥ 1.8, by its colour or its rim) and that room elements, the item bar and the buttons never overlap. The buttons and the item bar scale with the room (`--u` in `office.css`), so they always cover the same corner of it; keep the bottom-right corner (x ≥ 284, y ≥ 169) and the strip under the rug free.
+- **Hooks**: a function imported across files that receives `$` must be a `function` declaration (the validator refuses arrows). `HOME` can be unset on Windows: use `officeDir` in `hooks/room.ts`.
+
+## Testing
+
+```bash
+claude plugin validate plugins/office      # manifest and hooks module
+claude plugin test plugins/office          # hooks unit tests (*.test.ts)
+tools/office/run.sh check                  # page: layout checks, break activities, a screenshot per theme
+tools/office/run.sh shot japan 22          # one screenshot (theme, hour of day)
+tools/office/run.sh gallery                # every mascot pose
+cp -r plugins/office/web/. ~/.claude/office/   # preview the page live (reload it in the browser)
+```
+
+The fake data (`tools/office/mkdata.js`) covers every board state: on time, late, finished, no plan, waiting for the user, knocked out by the usage limit, and a usage reading for the gauge. `run.sh` exits non-zero on any JS error or failed layout check; screenshots land in `$OUT` (default `$TMPDIR/office-shots`). Run `/reload-plugins` in a session to load changed hooks.

@@ -1,0 +1,278 @@
+// What the page knows: desks and characters, the desk layout, walking paths, reading data.js.
+'use strict';
+/* ---------- state ---------- */
+let desks=[],gotData=false,firstLoad=true,misses=0,lastCall=0;
+const chars=new Map(),interns=new Map(),animated=new Set(),pendingSent=new Map(),lastDone=new Map();
+const colourOf=new Map(); let colourNext=0;
+let flying=[];
+let planes=[],decor=[],confetti=[],glyphs=[],steam=[],banners=[],dust=[];
+let lastLaunch=0;
+for(let i=0;i<10;i++)dust.push({x:250+Math.random()*60,y:90+Math.random()*45,v:2+Math.random()*3,p:Math.random()*6});
+const motes=[];for(let i=0;i<18;i++)motes.push({x:Math.random()*W,y:88+Math.random()*90,v:1.5+Math.random()*3,p:Math.random()*6,c:i%3?'45,226,230':'255,61,203'});
+// things you can click, and what the room remembers about them
+const lampOff=new Set();
+let winOpen=false,brewUntil=0,plantT=-1e9,funUntil=0,clockSpin=-1e9,doorKnock=-1e9;
+let emotes=[],leaves=[],cat=null;
+const ptr={x:0,y:0,in:false};
+let hoverCh=null,cardId=null;
+// after a break this long, a nap gets likelier (35% instead of 25%); ?nap=<seconds> to try it
+const NAP_MS=(()=>{const m=Q.match(/nap=(\d+)/);return m?+m[1]*1000:180000;})();
+function newChar(id,lk){return {id,x:DOOR.x,y:DOOR.y,path:[],hidden:true,seated:false,look:lk,blinkT:Math.random()*4,jumpUntil:0,sendT:Math.random()*2,
+  sq:0,sqv:0,face:1,nextBlink:0,mood:null,moodUntil:0,pet:0,pokes:[],nextEmote:0};}
+
+function looksFor(id){if(!colourOf.has(id)){colourOf.set(id,colourNext%LOOKS.length);colourNext++;}return LOOKS[colourOf.get(id)];}
+// Desks and their boards share one lane on the wall, between the door sign (x 31) and the curtains (x 266).
+// A row is centred under the clock (x 160) whenever it fits, and slides left only when it must.
+// Half widths shrink with the count so neighbours never touch: 3 px of wall between boards, 2 px between desks.
+const LANE_L=34,LANE_R=264,ROOM_MID=160,MAX_DESKS=6; // 7 would leave desks touching
+const deskSpan=n=>Math.min(58,(LANE_R-LANE_L)/Math.max(1,n));
+function deskXs(n){const sp=deskSpan(n),gw=sp*n,left=Math.max(LANE_L,Math.min(LANE_R-gw,ROOM_MID-gw/2));
+  const a=[];for(let i=0;i<n;i++)a.push(Math.round(left+(i+.5)*sp));return a;}
+const boardHalf=n=>Math.min(27,Math.floor((deskSpan(n)-3)/2));
+const deskHalf=n=>Math.max(17,Math.min(20,Math.floor((deskSpan(n)-2)/2)));
+function deskX(id){const i=desks.findIndex(d=>String(d.id)===id);return i<0?null:deskXs(desks.length)[i];}
+
+/* ---------- targets & paths ---------- */
+function posFor(st,i,dx){
+  switch(st){
+    case 'desk':return {x:dx,y:SEAT_Y,seated:true};
+    case 'cabinet':return {x:50+i*11,y:177};
+    case 'machine':return [{x:82,y:178,dir:1},{x:129,y:178,dir:-1},{x:72,y:178,dir:1},{x:139,y:178,dir:-1}][i%4];
+    case 'coffee':return [6,16,26,36].map(d=>({x:COUNTER.x-d,y:178}))[i%4]; // the queue for coffee, left of the counter
+    case 'door':return i<2?{x:33+i*9,y:100}:{x:33+(i-2)*9,y:124};
+    default:return {x:DOOR.x,y:DOOR.y,exit:true};
+  }
+}
+function buildPath(e,t){
+  const pts=[];
+  if(e.hidden){e.hidden=false;e.x=DOOR.x;e.y=DOOR.y;}
+  let cx=e.x,cy=e.y;
+  const SHELF_Y=89, lane=x=>{const xs=deskXs(desks.length);let best=x;let d=1e9;xs.forEach(dx=>{const l=dx-22;if(Math.abs(l-x)<d){d=Math.abs(l-x);best=l;}});return best;};
+  if(t.shelf){
+    if(e.seated){pts.push({x:e.seatX-22,y:SEAT_Y},{x:e.seatX-22,y:SHELF_Y});e.seated=false;}
+    else if(cy>SHELF_Y+2){const l=lane(cx);if(Math.abs(cy-WALK_Y)>.5)pts.push({x:cx,y:WALK_Y});pts.push({x:l,y:WALK_Y},{x:l,y:SHELF_Y});}
+    pts.push({x:t.x,y:SHELF_Y});return pts;
+  }
+  if(cy<SHELF_Y+2){
+    if(t.seated){pts.push({x:t.x-22,y:SHELF_Y},{x:t.x-22,y:SEAT_Y},{x:t.x,y:SEAT_Y});return pts;}
+    const l=lane(cx);pts.push({x:l,y:SHELF_Y},{x:l,y:WALK_Y});cx=l;cy=WALK_Y;
+  }
+  if(e.seated){pts.push({x:e.seatX-22,y:SEAT_Y});cx=e.seatX-22;e.seated=false;}
+  if(Math.abs(cy-WALK_Y)>.5)pts.push({x:cx,y:WALK_Y});
+  if(t.seated){pts.push({x:t.x-22,y:WALK_Y},{x:t.x-22,y:SEAT_Y},{x:t.x,y:SEAT_Y});}
+  else{pts.push({x:t.x,y:WALK_Y},{x:t.x,y:t.y});}
+  return pts;
+}
+// Furniture standing on the floor (a theme's table, TH.obstacles: feet boxes {x0,y0,x1,y1}) is walked
+// around, never through; a rug is not an obstacle. Each leg of a path that would cross a box goes
+// round its nearer side.
+function crosses(a,b,o){const n=Math.ceil(Math.hypot(b.x-a.x,b.y-a.y));for(let i=0;i<=n;i++){const k=n?i/n:0,x=a.x+(b.x-a.x)*k,y=a.y+(b.y-a.y)*k;if(x>o.x0&&x<o.x1&&y>o.y0&&y<o.y1)return true;}return false;}
+function around(a,b,o,depth){
+  if(depth>3||!crosses(a,b,o))return [b];
+  let via;
+  if(Math.abs(b.x-a.x)>=Math.abs(b.y-a.y)){const y=a.y<=o.y0?o.y0:a.y>=o.y1?o.y1:(Math.abs(a.y-o.y0)<Math.abs(a.y-o.y1)?o.y0:o.y1);via=[{x:a.x,y},{x:b.x,y}];}
+  else{const x=a.x<=o.x0?o.x0:a.x>=o.x1?o.x1:(Math.abs(a.x-o.x0)<Math.abs(a.x-o.x1)?o.x0:o.x1);via=[{x,y:a.y},{x,y:b.y}];}
+  const out=[];let p=a;[...via,b].forEach(q=>{out.push(...around(p,q,o,depth+1));p=q;});return out;
+}
+// a spot inside a box (petting the cat asleep under the table) moves out to the box's nearest edge
+function outOfFurniture(t){((TH&&TH.obstacles)||[]).forEach(o=>{if(t.x>o.x0&&t.x<o.x1&&t.y>o.y0&&t.y<o.y1){
+  const d=[[t.x-o.x0,'x',o.x0],[o.x1-t.x,'x',o.x1],[t.y-o.y0,'y',o.y0],[o.y1-t.y,'y',o.y1]].sort((a,b)=>a[0]-b[0])[0];t[d[1]]=d[2];}});}
+function avoidFurniture(start,pts){
+  const obs=(TH&&TH.obstacles)||[];if(!obs.length)return pts;
+  let out=pts;
+  obs.forEach(o=>{const r=[];let p=start;out.forEach(q=>{r.push(...around(p,q,o,0));p=q;});out=r;});
+  return out;
+}
+function setTarget(e,t,instant){
+  if(!t.exit&&!t.seated&&!t.shelf)outOfFurniture(t);
+  t.key=(t.st||'')+':'+Math.round(t.x)+':'+Math.round(t.y);
+  if(e.tgt&&e.tgt.key===t.key)return;
+  e.tgt=t; e.arrived=false;
+  if(instant){
+    e.path=[];
+    if(t.exit){e.hidden=true;e.arrived=true;return;}
+    e.hidden=false;e.x=t.x;e.y=t.y;e.arrived=true;
+    if(t.seated){e.seated=true;e.seatX=t.x;} else e.seated=false;
+    return;
+  }
+  if(e.hidden&&t.exit){e.arrived=true;e.path=[];return;}
+  const start={x:e.hidden?DOOR.x:e.x,y:e.hidden?DOOR.y:e.y};
+  e.path=avoidFurniture(start,buildPath(e,t));
+}
+
+/* ---------- ingest ---------- */
+window.__office=function(d){try{misses=0;lastCall=Date.now();ingest(d,false);}catch(err){console.error('office ingest',err);}};
+
+function ingest(d,synthetic){
+  const now=Date.now();
+  const real=(d&&Array.isArray(d.desks)?d.desks:[]).filter(x=>x&&x.id!=null);
+  // A teammate a Claude has named (CEO, Writer) but who has no desk yet sleeps at an empty desk.
+  const have=new Set(real.map(x=>String(x.name||'').toLowerCase()));
+  const sleepers=[];
+  real.forEach(x=>Object.values(x.peers||{}).forEach(n=>{const k=String(n).toLowerCase();if(n&&!have.has(k)){have.add(k);sleepers.push({id:'asleep:'+n,name:String(n),activity:'asleep',detail:'Not joined yet',steps:[],interns:[],files:[],sent:[],got:[],asleep:true});}}));
+  const list=real.filter(x=>x.activity!=='gone').slice(0,MAX_DESKS);
+  if(!synthetic)gotData=true;
+  desks=list;
+  const xs=deskXs(list.length);
+  const instant=firstLoad&&!synthetic;
+  const cnt={};
+  const live=new Set();
+  list.forEach((dk,i)=>{
+    const id=String(dk.id); live.add(id);
+    const lk=looksFor(id);
+    let ch=chars.get(id);
+    if(!ch){ch=newChar(id,lk);chars.set(id,ch);if(!instant)greetNewcomer(ch);}
+    ch.desk=dk; ch.dx=xs[i]; ch.removed=false;
+    let act=String(dk.activity||'think'); if(!STATION[act])act='think';
+    // a session out of usage stays knocked out at its desk; one waiting for you calls from its desk
+    if(dk.limited)act='limit';else if(dk.waiting&&act!=='gone')act='ask';
+    if(ch.act&&ch.act!==act)onActChange(ch,ch.act,act);
+    ch.act=act;
+    const st=STATION[act]; const n=cnt[st]=(cnt[st]||0); cnt[st]=n+1;
+    const t=posFor(st,n,xs[i]); t.st=st;
+    // a Claude on a break runs its own little life (the idle brain); everyone else goes where the work is
+    if(act==='idle'){ch.want=null;if(!ch.idle)ch.idle={phase:'pick',t:performance.now()+(instant?2000+Math.random()*4000:300)};if(instant&&!ch.errand)setTarget(ch,t,true);}
+    else{ch.want=t;if(!ch.errand)setTarget(ch,t,instant||!!dk.asleep);}
+    // interns
+    const ins=(Array.isArray(dk.interns)?dk.interns:[]).filter(x=>x&&x.key!=null).slice().sort((a,b)=>(a.startMs||0)-(b.startMs||0)).slice(0,3);
+    const keep=new Set();
+    ins.forEach((it,j)=>{
+      const k=id+'|'+String(it.key); keep.add(k);
+      let e=interns.get(k);
+      const hsh=hash(k);
+      if(!e){e={k,pid:id,x:DOOR.x,y:DOOR.y,path:[],hidden:true,small:true,look:{c:shade(lk.c,.12+(hsh%3)*.08),style:0},blinkT:Math.random()*4};interns.set(k,e);}
+      e.label=str(it.label||'Intern',16); e.leaving=false;
+      const t2={x:xs[i]-8+j*8,y:126,st:'intern'}; // in front of their own desk, never on a neighbour's
+      setTarget(e,t2,instant);
+    });
+    interns.forEach((e,k)=>{if(e.pid===id&&!keep.has(k)&&!e.leaving){e.leaving=true;setTarget(e,{x:DOOR.x,y:DOOR.y,exit:true,st:'exit'},instant);}});
+  });
+  // desks that vanished
+  chars.forEach((ch,id)=>{if(!live.has(id)){releaseIdle(ch);ch.removed=true;ch.act='gone';setTarget(ch,{x:DOOR.x,y:DOOR.y,exit:true,st:'exit'},instant);}});
+  interns.forEach((e)=>{if(!live.has(e.pid)&&!e.leaving){e.leaving=true;setTarget(e,{x:DOOR.x,y:DOOR.y,exit:true,st:'exit'},instant);}});
+  if(synthetic)return;
+
+  // messages
+  if(firstLoad){
+    list.forEach(dk=>{
+      (dk.sent||[]).forEach(s=>{if(s&&now-(+s.ms||0)>20000)animated.add(norm(s.key));});
+      (dk.got||[]).forEach(g=>{if(g&&now-(+g.ms||0)>20000)animated.add(norm(g.key));});
+    });
+  }
+  list.forEach(R_=>{
+    (R_.got||[]).forEach(g=>{
+      if(!g)return; const k=norm(g.key); if(!k||animated.has(k))return;
+      let S_=null,sm=null;
+      for(const dk of list){if(dk===R_)continue;const f=(dk.sent||[]).find(s=>s&&keyMatch(norm(s.key),k));if(f){S_=dk;sm=f;break;}}
+      animated.add(k);
+      if(S_){animated.add(norm(sm.key));pendingSent.delete(norm(sm.key));
+        launch(String(S_.id),String(R_.id),str(S_.name||'Claude',12)+' > '+str(R_.name||'Claude',12),str(g.words||sm.words,44),looksFor(String(S_.id)).c);}
+      else{const nd=list.find(x=>x!==R_&&g.from&&String(x.name||'').toLowerCase()===String(g.from).toLowerCase());
+        if(nd)launch(String(nd.id),String(R_.id),str(nd.name,12)+' > '+str(R_.name||'Claude',12),str(g.words,44),looksFor(String(nd.id)).c);
+        else launch(null,String(R_.id),'Message in',str(g.from||'Someone',14)+': '+str(g.words,40),'#2A9D8F');}
+    });
+  });
+  list.forEach(S_=>{(S_.sent||[]).forEach(s=>{if(!s)return;const k=norm(s.key);if(!k||animated.has(k)||pendingSent.has(k))return;pendingSent.set(k,{t:now,id:String(S_.id),words:s.words,to:s.to});});});
+
+  // files: a newly written file is carried to the shelf by the Claude who wrote it
+  list.forEach(dk=>{
+    const id=String(dk.id),col=looksFor(id).c,ch=chars.get(id);
+    const marks=(Array.isArray(dk.files)?dk.files:[]).filter(f=>f&&f.kind==='edit').sort((a,b)=>(+a.ms||0)-(+b.ms||0));
+    marks.forEach(f=>{
+      const k=id+'|'+f.name+'|'+f.ms; if(seenFiles.has(k))return; seenFiles.add(k);
+      shelfOnFile(ch,String(f.name),col,+f.ms||0,instant||now-(+f.ms||0)>90000); // furniture/shelf.js
+    });
+  });
+
+  // done detection
+  list.forEach(dk=>{
+    const id=String(dk.id),dm=+dk.doneMs||0,prev=lastDone.get(id);
+    if(prev===undefined){lastDone.set(id,dm);return;}
+    if(dm>prev){lastDone.set(id,dm);if(now-dm<=30000)celebrate(id,dk.doneLine);}
+  });
+  firstLoad=false;
+}
+
+function charPoint(id){
+  const ch=chars.get(id);
+  if(ch&&!ch.hidden)return {x:ch.x,y:ch.y-14};
+  const dx=deskX(id); return dx==null?{x:DOOR.x,y:DOOR.y-14}:{x:dx,y:SEAT_Y-14};
+}
+function launch(fromId,toId,head,words,col){
+  const t0=Math.max(performance.now(),lastLaunch+1600); lastLaunch=t0;
+  planes.push({fromId,toId,head,words,col,t0,dur:1900,hold:2600});
+}
+function checkPending(){
+  const now=Date.now();
+  pendingSent.forEach((p,k)=>{
+    if(now-p.t<6000)return;
+    let matched=false;
+    for(const dk of desks){if((dk.got||[]).some(g=>g&&keyMatch(norm(g.key),k))){matched=true;break;}}
+    pendingSent.delete(k);
+    if(matched||animated.has(k))return;
+    animated.add(k);
+    const dk=desks.find(d=>String(d.id)===p.id);
+    const td=desks.find(d=>p.to&&String(d.id)!==p.id&&String(d.name||'').toLowerCase()===String(p.to).toLowerCase());
+    launch(p.id,td?String(td.id):null,str(dk?dk.name:'Claude',12)+' > '+str(td?td.name:(p.to||'outside'),14),str(p.words,44),looksFor(p.id).c);
+  });
+}
+
+/* ---------- done ---------- */
+const lbtn=document.getElementById('lbl'); lbtn.classList.toggle('on',LABELS);
+lbtn.addEventListener('click',()=>{LABELS=!LABELS;lbtn.classList.toggle('on',LABELS);});
+window.addEventListener('keydown',e=>{if(e.key==='l'||e.key==='L')lbtn.click();});
+
+// Sound: the button mutes and unmutes (M), the slider that shows on hovering it sets the volume.
+// Every sound goes through one master gain; the volume and the mute are remembered (localStorage).
+let actx=null,master=null,soundOn=false,volume=70;
+const btn=document.getElementById('snd'),volBox=document.getElementById('vol'),volR=document.getElementById('volr'),volV=document.getElementById('volv');
+try{const v=+localStorage.getItem('office.volume');if(localStorage.getItem('office.volume')!==null&&v>=0&&v<=100)volume=v;soundOn=localStorage.getItem('office.sound')==='on'&&volume>0;}catch(e){}
+const gainOf=v=>1.8*(v/100)*(v/100); // heard loudness grows roughly with the square
+function soundOut(){return master||actx.destination;}
+// the audio context needs a click or key first; a sound left on last time starts at the first one
+function wakeAudio(){
+  try{if(!actx){actx=new (window.AudioContext||window.webkitAudioContext)();master=actx.createGain();master.connect(actx.destination);}
+    master.gain.value=gainOf(volume);actx.resume();}catch(e){}
+}
+function showSound(){
+  const level=!soundOn||!volume?0:volume<50?1:2;
+  btn.dataset.level=level;btn.classList.toggle('on',soundOn);btn.setAttribute('aria-pressed',String(soundOn));
+  volR.value=volume;volR.setAttribute('aria-valuetext',soundOn?volume+'%':'muted');
+  volV.textContent=soundOn?volume+'%':'off';volBox.classList.toggle('muted',!soundOn);
+  if(master&&actx)master.gain.setTargetAtTime(soundOn?gainOf(volume):0,actx.currentTime,.02);
+  try{localStorage.setItem('office.volume',String(volume));localStorage.setItem('office.sound',soundOn?'on':'off');}catch(e){}
+}
+function setSound(on){
+  soundOn=on;if(on&&!volume)volume=50; // unmuting at 0 would stay silent
+  if(on)wakeAudio();showSound();if(on)chime(.6);
+}
+btn.addEventListener('click',()=>setSound(!soundOn));
+volR.addEventListener('input',()=>{volume=+volR.value;if(!volume)soundOn=false;else if(!soundOn){soundOn=true;wakeAudio();}else wakeAudio();showSound();});
+volR.addEventListener('change',()=>{if(soundOn)blip(660,.04,'triangle');}); // a tick at the chosen level
+window.addEventListener('keydown',e=>{if((e.key==='m'||e.key==='M')&&!e.ctrlKey&&!e.metaKey&&e.target!==volR)setSound(!soundOn);});
+['pointerdown','keydown'].forEach(ev=>window.addEventListener(ev,()=>{if(soundOn&&!actx)wakeAudio();},{once:true,capture:true}));
+showSound();
+function chime(vol){
+  if(!soundOn||!actx)return; vol=vol||1;
+  try{const t=actx.currentTime;[523.25,659.25,783.99].forEach((f,i)=>{const o=actx.createOscillator(),g=actx.createGain();o.type='triangle';o.frequency.value=f;g.gain.setValueAtTime(0,t+i*.12);g.gain.linearRampToValueAtTime(.16*vol,t+i*.12+.015);g.gain.exponentialRampToValueAtTime(.001,t+i*.12+.45);o.connect(g);g.connect(soundOut());o.start(t+i*.12);o.stop(t+i*.12+.5);});}catch(e){}
+}
+function celebrate(id,line){
+  const ch=chars.get(id); const tp=performance.now();
+  if(ch){ch.jumpUntil=tp+1500;ch.starT=tp;setMood(ch,'happy',2600);}
+  banners=banners.filter(b=>b.id!==id);
+  banners.push({id,line:str(line||'All steps done',46),t0:tp});
+  const p=charPoint(id);
+  for(let i=0;i<80;i++)confetti.push({x:p.x+(Math.random()-.5)*8,y:p.y-4,vx:(Math.random()-.5)*70,vy:-30-Math.random()*55,c:CONF[i%CONF.length],life:2.4+Math.random(),w:Math.random()<.4?2:1});
+  chime(1);
+  sceneHighFive(id);
+}
+
+/* ---------- polling (script injection works on file://) ---------- */
+let tag=null;
+function poll(){
+  if(tag&&tag.parentNode)tag.parentNode.removeChild(tag);
+  const s=document.createElement('script');
+  s.src='data.js?t='+Date.now();
+  s.onerror=()=>{misses++;if(misses>=3&&desks.length){ingest({desks:[]},true);}};
+  document.head.appendChild(s); tag=s;
+}
