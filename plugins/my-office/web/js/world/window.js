@@ -144,7 +144,7 @@ function drawRound(g,tp,n){
   }
   ring(g,WIN.r,WIN.r+2,T.trim); ring(g,WIN.r+1,WIN.r+2,shade(T.trim,-.25)); ring(g,WIN.r-1,WIN.r,shade(T.trim,.25));
   glint(g,tp,WIN.x-WIN.r,WIN.y-WIN.r,2*WIN.r,2*WIN.r);
-  const p=winAmt<.5?.02:0; if(T.petals&&SEASON==='spring'&&Math.random()<p)leaves.push({x:288+Math.random()*14,y:40+Math.random()*12,vx:-10-Math.random()*12,vy:3,life:4,p:Math.random()*6,w:Math.random()<.5?2:1,c:Math.random()<.6?'#F7B6C8':'#FFD9E4'});
+  windowDrift(winAmt<.5,n,288,14,40);
   beamAndBreeze(g,tp,n,false);
 }
 // The porthole: a riveted metal ring, a blast shutter whose two halves close towards the middle,
@@ -163,10 +163,26 @@ function drawPorthole(g,tp,n){
   glint(g,tp,WIN.x-WIN.r,WIN.y-WIN.r,2*WIN.r,2*WIN.r);
   beamAndBreeze(g,tp,n,false);
 }
+// What comes in by an open window, by season: petals, pollen by day and fireflies by night, dead leaves,
+// snowflakes. Every room with a real outside gets the same; the porthole and the painting have none.
+// The motes in the sunbeam take the season's light (world/loop.js).
+const DUST_TINT={spring:'255,236,240',summer:'255,240,190',autumn:'255,214,160',winter:'224,238,255'};
+const SEASON_DRIFT={
+  spring:{p:.03,life:3.6,vy:3,w:2,cols:()=>['#F7B6C8','#FFD9E4','#FFFFFF']},
+  summer:{p:.02,life:2.6,vy:-1,w:1,cols:n=>n>.5?['#E8F06A','#D8E85A']:['#FFE9A8','#FFF6D0']},
+  autumn:{p:.03,life:3.4,vy:4,w:2,cols:()=>LEAF_COLS},
+  winter:{p:.07,life:2.6,vy:9,w:1,cols:()=>['#FFFFFF','#DCEBF7']},
+};
+function windowDrift(open,n,x0,span,y0){
+  if(!open||TH.noWeather)return;
+  const D=SEASON_DRIFT[SEASON];if(Math.random()>=D.p)return;
+  const cols=D.cols(n);
+  leaves.push({x:x0+Math.random()*span,y:y0+Math.random()*12,vx:-10-Math.random()*14,vy:D.vy,life:D.life,p:Math.random()*6,w:D.w===2&&Math.random()<.5?1:D.w,c:cols[(Math.random()*cols.length)|0]});
+}
 function beamAndBreeze(g,tp,n,breeze){
   const T=TH,day=(1-n)*(T.beam||0)*windowLight();
   if(day>.01){g.fillStyle=`rgba(255,246,220,${.10*day})`;g.beginPath();g.moveTo(276,85);g.lineTo(314,85);g.lineTo(302,138);g.lineTo(246,138);g.closePath();g.fill();}
-  if(breeze&&!T.rain&&!T.petals&&Math.random()<.02)leaves.push({x:300,y:50+Math.random()*10,vx:-14-Math.random()*10,vy:2,life:3,p:Math.random()*6,w:Math.random()<.5?2:1,c:Math.random()<.5?T.leafB:'#F2B8C6'});
+  windowDrift(breeze,n,296,14,50);
   if(winAmt>.5&&T.rain&&SEASON!=='winter'&&(T.window||'curtains')==='curtains'&&Math.random()<.3)leaves.push({x:277+Math.random()*36,y:63,vx:0,vy:-8,life:.25,p:0,w:1,c:'rgba(170,195,240,.8)'});
 }
 // Three calm paintings in a heavy frame with gilded corners and a small picture lamp above (on in the
