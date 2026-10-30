@@ -266,7 +266,7 @@ function watchDoor(tp){
   // the Claudes already there when the page opens are not newcomers
   if(!cat.seenReady){chars.forEach(ch=>cat.seen.set(ch.id,!ch.hidden));cat.seenReady=true;return;}
   chars.forEach(ch=>{const was=cat.seen.get(ch.id),now=!ch.hidden;cat.seen.set(ch.id,now);
-    if(cat.job||catMoving()||cat.z>0||tp<cat.doorCD)return;
+    if(cat.job||catMoving()||cat.z>0||tp<cat.doorCD||catPetted())return;
     const arriving=now&&!was&&Math.hypot(ch.x-DOOR.x,ch.y-DOOR.y)<30,leaving=now&&ch.tgt&&ch.tgt.exit&&ch.path.length&&Math.hypot(ch.x-DOOR.x,ch.y-DOOR.y)>30;
     if(!arriving&&!leaving)return;cat.doorCD=tp+45000;
     startJob('door',[STEP.go(36,104,true),STEP.face(-1),STEP.wait(300,'sit'),
@@ -274,7 +274,7 @@ function watchDoor(tp){
   });
 }
 function watchPlanes(tp){
-  if(cat.job||catMoving()||cat.z>0||tp<cat.planeCD)return;
+  if(cat.job||catMoving()||cat.z>0||tp<cat.planeCD||catPetted())return;
   const p=decor.find(p=>p.life>1.2&&Math.abs(p.x-cat.x)<70);if(!p)return;cat.planeCD=tp+25000;
   const lx=clampX(p.x+p.vx*.7),ly=121;
   startJob('plane',[STEP.go(lx-8,ly,true),STEP.act(tp=>{cat.state='crouch';}),STEP.wait(120,'crouch'),STEP.jump(lx,ly,0,520,26),

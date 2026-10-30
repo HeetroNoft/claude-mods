@@ -62,10 +62,13 @@ function idleBegins(ch,I,tp){
   if(I.act==='highfive'){const f=chars.get(I.with);I.sparkAt=tp+380;
     if(f&&!f.hidden){f.hfUntil=tp+1500;f.face=Math.sign(ch.x-f.x)||1;setMood(f,'happy',2000);}}
 }
+// Beside the cat, close enough to reach it: a Claude never strokes the air.
+const catReach=p=>cat&&!cat.away&&Math.abs(Math.abs(p.x-cat.x)-10)<=4&&Math.abs(p.y-cat.y)<=4;
 function idleTick(ch,I,tp){
   if(I.act==='arcade')funUntil=Math.max(funUntil,tp+300);
   if(I.act==='tidy')tidyTick(ch,I,tp);
-  if(I.act==='catpet'&&cat&&tp>(I.nextPurr||0)){I.nextPurr=tp+1800+Math.random()*1500;emoteAt(cat.x+3,cat.y-9,'heart');purr();cat.until=Math.max(cat.until,tp+4000);}
+  if(I.act==='catpet'&&!catReach(ch)){I.until=0;return;}
+  if(I.act==='catpet'&&tp>(I.nextPurr||0)){I.nextPurr=tp+1800+Math.random()*1500;emoteAt(cat.x+3,cat.y-9,'heart');purr();cat.until=Math.max(cat.until,tp+4000);}
   if(I.act==='highfive'&&I.sparkAt&&tp>I.sparkAt){I.sparkAt=0;const f=chars.get(I.with);
     const x=f?(ch.x+f.x)/2:ch.x,y=(ch.headTop!=null?ch.headTop:ch.y-18)-4;
     emoteAt(x-2,y,'star');for(let i=0;i<12;i++)confetti.push({x,y,vx:(Math.random()-.5)*40,vy:-10-Math.random()*20,c:CONF[i%CONF.length],life:.8,w:1});blip(1046,.05,'triangle');}
@@ -122,10 +125,12 @@ function startIdle(ch,act,partner){
     case 'files':t={x:46,y:177,dir:-1,st:'i-files'};break;
     case 'tinker':t={x:131,y:178,dir:-1,st:'i-tinker'};break;
     case 'arcade':t={x:81,y:178,dir:1,st:'i-arcade'};break;
-    case 'catpet':{const s=cat.x>160?-10:10;t={x:cat.x+s,y:Math.max(132,cat.y),dir:-Math.sign(s),st:'i-cat'};cat.state='sit';cat.until=performance.now()+20000;break;}
+    case 'catpet':{const s=cat.x>160?-10:10;t={x:cat.x+s,y:Math.max(FLOOR_Y+2,cat.y+1),dir:-Math.sign(s),st:'i-cat'};break;}
     default:{const free=ROAM.filter(p=>![...chars.values()].some(o=>o!==ch&&o.tgt&&Math.hypot(o.tgt.x-p.x,o.tgt.y-p.y)<14)),pool=free.length?free:ROAM,p=pool[(Math.random()*pool.length)|0];t={x:p.x,y:p.y,st:'i-roam'};}
   }
   setTarget(ch,t);
+  // the cat waits where it is; with its side taken (setTarget stepped aside), the Claude finds something else to do
+  if(act==='catpet'){if(catReach(ch.tgt)){cat.path=[];cat.state='sit';cat.until=performance.now()+20000;}else ch.idle={phase:'pick',t:performance.now()+800,last:act};}
 }
 // A nap: a yawn, a walk back to the desk, then 15 to 30 s asleep in the chair.
 function startNap(ch,tp){releaseIdle(ch);ch.idle={act:'nap',phase:'pre',until:tp+1600,dur:(NAP_SECONDS[0]+Math.random()*(NAP_SECONDS[1]-NAP_SECONDS[0]))*1000,last:'nap'};emote(ch,'dots');}
