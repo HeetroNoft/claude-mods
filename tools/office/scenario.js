@@ -1,5 +1,5 @@
 // Test page script: forces activities so a screenshot shows them (scn=t: the room's own break activities,
-// scn=i: every treat mid-story, scn=a / scn=b: pairs, floating, treats, picking up, a high five, scn=c: a chat and a thought, scn=r: a round of rock, paper, scissors, scn=p: the settings panel). Logs ERR and STATE lines.
+// scn=i: every treat mid-story, scn=a / scn=b: pairs, floating, treats, picking up, a high five, scn=c: a chat and a thought, scn=r: a round of rock, paper, scissors, scn=p: the settings panel, scn=g: the gauge away and the items hidden). Logs ERR and STATE lines.
 'use strict';
 window.addEventListener('error',e=>console.log('ERR '+e.message+' @'+e.filename.split('/').pop()+':'+e.lineno));
 const SCN=(location.search.match(/scn=(\w+)/)||[])[1]||'a';
@@ -19,11 +19,10 @@ setTimeout(()=>{try{
     step(800);shelfErrands(a,tp);shelfOnFile(a,'f5.js','#E5484D',6000,false);shelfErrands(a,tp);a.path=[];a.arrived=true;shelfErrands(a,tp);step(600);r.push('re-edit same place '+(shelfOf.get('f5.js')===5)+' size '+shelf.size);
     shelfOnFile(b,'gone.js','#5BD08A',7000,false);shelfErrands(b,tp);b.removed=true;shelfErrands(b,tp);step(600);r.push('carrier left, file landed '+shelfOf.has('gone.js')+' size '+shelf.size+' reserved '+reserved.size);
     b.removed=false;console.log('STATE shelf '+r.join(' | '));}
-  else if(SCN==='v'){ // the volume slider: drag it, mute with the button, unmute; then show the pop-up for the screenshot
-    const ev=v=>{volR.value=v;volR.dispatchEvent(new Event('input'));},r=[];
-    ev(40);r.push(soundOn+'/'+volume+'/'+btn.dataset.level);ev(90);r.push(soundOn+'/'+volume+'/'+btn.dataset.level);btn.click();r.push(soundOn+'/'+btn.dataset.level+'/'+volV.textContent);
-    btn.click();r.push(soundOn+'/'+btn.dataset.level);ev(0);r.push(soundOn+'/'+btn.dataset.level);btn.click();r.push(soundOn+'/'+volume);ev(70);
-    console.log('STATE volume '+r.join(' | ')+' gain '+(master?master.gain.value.toFixed(2):'none'));volBox.style.cssText='visibility:visible;opacity:1;transform:none';}
+  else if(SCN==='v'){ // the volume: change it, mute, unmute, and 0 mutes
+    const r=[];setVolume(40);r.push(soundOn+'/'+volume);setVolume(90);r.push(soundOn+'/'+volume);setSound(false);r.push(soundOn+'/'+volume);
+    setSound(true);r.push(soundOn+'/'+volume);setVolume(0);r.push(soundOn+'/'+volume);setSound(true);r.push(soundOn+'/'+volume);setVolume(70);
+    console.log('STATE volume '+r.join(' | ')+' gain '+(master?master.gain.value.toFixed(2):'none'));}
   else if(SCN==='k'){knockDoor(performance.now());setTimeout(()=>console.log('STATE knock: looking at the door '+[...chars.values()].filter(c=>c.lookDoor).length),200);} // a knock on the door
   else if(SCN==='d1'||SCN==='d2'){const od=drawDoor,amt=SCN==='d1'?.4:1;drawDoor=(g,tp,dt,n)=>{doorAmt=amt;od(g,tp,0,n);};} // the door ajar, then wide open
   else if(SCN==='i'){
@@ -36,8 +35,10 @@ setTimeout(()=>{try{
     startIdle(C('c3'),'chat',C('d4'));tele(C('c3'));tele(C('d4'));
   }else if(SCN==='r'){
     startIdle(C('c3'),'rps',C('d4'));tele(C('c3'));tele(C('d4'));
+  }else if(SCN==='g'){
+    setPref('calm',true);setPref('gauge',false);setBar(false);
   }else if(SCN==='p'){
-    document.body.classList.add('calm');openPrefs(true); // calm: the screenshot shows the panel at rest
+    document.body.classList.add('calm');setCatName('Mochi');catTagUntil=1e12;openPrefs(true); // calm: the screenshot shows the panel at rest
   }else if(SCN==='a'){
     startIdle(C('c3'),'rps',C('d4'));tele(C('c3'));tele(C('d4'));
     startIdle(C('e4'),'float',null);tele(C('e4'));

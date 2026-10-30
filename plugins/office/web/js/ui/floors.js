@@ -27,6 +27,7 @@ function renderFloors(){
     const lights=many?'':dk.map(d=>`<i class="${deskState(d)}" style="background:${looksFor(String(d.id)).c}"></i>`).join('');
     return `<button type="button" data-f="${f}" class="${f===curFloor?'cur ':''}${st}${drag&&dk.length>=MAX_DESKS?' full':''}" aria-label="${name}" aria-pressed="${f===curFloor}" title="${name}"><b>${f+1}</b>${lights}</button>`;
   }).join('')+(drag?`<button type="button" data-f="${floorCount}" class="new" aria-label="A new floor" title="A new floor"><b>+</b></button>`:'');
+  layoutBars();
   const cur=floorChips.querySelector('.cur');
   floorPill.style.opacity=cur?1:0;if(cur){floorPill.style.width=cur.offsetWidth+'px';floorPill.style.height=cur.offsetHeight+'px';floorPill.style.transform=`translate(${cur.offsetLeft}px,${cur.offsetTop}px)`;}
 }

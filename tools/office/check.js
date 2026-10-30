@@ -40,7 +40,7 @@
   const box=(n,x,y,w,h)=>({n,x,y,w,h}),hit=(a,b)=>a.x<b.x+b.w&&b.x<a.x+a.w&&a.y<b.y+b.h&&b.y<a.y+a.h;
   const room=[box('gauge',2,1,30,16),box('sign',1,30,29,7),box('door',3,38,25,46),box('left shelf',6,18,116,6),box('right shelf',198,18,116,6),box('clock',149,2,24,24),
     box('cabinet',18,138,22,42),box('machine',86,133,40,47),box('counter',COUNTER.x-1,152,42,28),box('plant',292,92,22,40),box('small plant',3,158,12,21),
-    box('buttons',284,169,36,11),box('item bar',141,169,39,10),box('floors',182,169,54,10)];
+    box('buttons',284,169,36,11),box('bottom bar',141,169,39,10),box('item bar over the floors',141,158,39,10)];
   const pairs=[];room.forEach((a,i)=>room.slice(i+1).forEach(b=>{if(hit(a,b))pairs.push(a.n+' / '+b.n);}));
   pairs.forEach(p=>log(false,'overlap: '+p));
   // 7. walking: no leg goes through a desk or fixed furniture, even when redirected halfway
@@ -105,9 +105,10 @@
       for(let i=0;i<A.length;i+=4){if(!A[i+3])continue;const added=A[i]!==base[i]||A[i+1]!==base[i+1]||A[i+2]!==base[i+2]||A[i+3]!==base[i+3];
         if(added&&(A[i]!==B[i]||A[i+1]!==B[i+1]||A[i+2]!==B[i+2]))n++;}
       log(!n,`${VARIANTS[style]} ${pose} ${extra&&extra.held?extra.held.kind:extra&&extra.carry?'file':''} dir ${dir} raise ${extra&&extra.raise}: ${n} px covered`);}}
-  // 12. the action buttons stay in their corner, apart, whatever their number
-  {const r=stage.getBoundingClientRect(),bs=['set','snd','lbl','thm','itm'].map(id=>{const b=document.getElementById(id).getBoundingClientRect();return box(id,(b.left-r.left)/r.width*W,(b.top-r.top)/r.height*H,b.width/r.width*W,b.height/r.height*H);});
-    bs.forEach((a,i)=>{log(a.x>=284&&a.y>=169,`button ${a.n} leaves the corner: ${a.x.toFixed(1)},${a.y.toFixed(1)}`);bs.slice(i+1).forEach(b=>log(!hit(a,b),`buttons ${a.n} and ${b.n} overlap`));});
+  // 12. the settings button stays in its corner, the only button there
+  {const r=stage.getBoundingClientRect(),bs=['set'].map(id=>{const b=document.getElementById(id).getBoundingClientRect();return box(id,(b.left-r.left)/r.width*W,(b.top-r.top)/r.height*H,b.width/r.width*W,b.height/r.height*H);});
+    bs.forEach((a,i)=>{log(a.x>=284&&a.y>=169,`button ${a.n} leaves the corner: ${a.x.toFixed(1)},${a.y.toFixed(1)}`);});
+    log(stage.querySelectorAll(':scope>button').length===1,'more than one action button');
     // 13. settings: open, each choice takes effect and is remembered, keys and defaults work
     const b=id=>document.getElementById(id),on=q=>document.querySelector('#prefs '+q);
     b('set').click();log(b('prefs').classList.contains('open'),'settings do not open');
@@ -118,6 +119,30 @@
     const w0=b('set').offsetWidth;on('[data-sw=compact]').click();log(b('set').offsetWidth<w0,'compact buttons not smaller');
     on('[data-sw=items]').click();log(barOn===false&&b('items').classList.contains('hide'),'item bar not hidden');
     on('.reset').click();log(barOn&&PREFS.badges&&!PREFS.calm&&!PREFS.compact&&PREFS.time==='auto'&&b('set').offsetWidth===w0,'defaults not restored');
+    // 15. the bars, centred, in all four cases: floors at the edge with the items above, either alone
+    // at that edge. Measured with no motion, so nothing is on its way
+    setPref('calm',true);
+    const fl=b('floors'),st=stage.getBoundingClientRect(),hadShow=fl.classList.contains('show'),mid=e=>{const q=e.getBoundingClientRect();return q.left+q.width/2;};
+    const place=(fs,it)=>{fl.classList.toggle('show',fs);setBar(it);layoutBars();return {f:fl.getBoundingClientRect(),i:b('items').getBoundingClientRect()};};
+    const onlyF=place(true,false),onlyI=place(false,true),both=place(true,true);
+    log(Math.abs(mid(fl)-(st.left+st.width/2))<1.5,'floors not centred');log(Math.abs(mid(b('items'))-(st.left+st.width/2))<1.5,'items not centred');
+    log(Math.abs(onlyI.i.bottom-onlyF.f.bottom)<1.5,'items alone are not in the floors place');
+    log(Math.abs(both.f.bottom-onlyF.f.bottom)<1.5,'floors moved for the items');
+    const rise=onlyI.i.bottom-both.i.bottom,fh=onlyI.i.height; // the floors are empty here: a full bar is as tall as the items
+    log(rise>=fh&&rise<=fh+10,`items not just above the floors: up ${rise} for ${fh}`);
+    place(false,false);log(!stage.classList.contains('two'),'no bars still counted as two');
+    fl.classList.toggle('show',hadShow);setBar(true);layoutBars();
+    // 16. the gauge: its own layer, hidden with its tab left in the room, and back; G does it too
+    const us=b('usage'),x0=us.getBoundingClientRect().left;log(wx.canvas!==gcx.canvas,'gauge on the room canvas');
+    window.dispatchEvent(new KeyboardEvent('keydown',{key:'g'}));const tab=b('gtab').getBoundingClientRect();
+    log(PREFS.gauge===false&&us.getBoundingClientRect().right<=st.left+1&&tab.right>st.left+2,'gauge not hidden with its tab showing');
+    b('gtab').click();log(PREFS.gauge===true&&Math.abs(us.getBoundingClientRect().left-x0)<1,'gauge not back');
+    setPref('calm',false);
+    // 14. the cat's name: kept clean, remembered, and typing it presses no shortcut
+    const room=themeKey,cn=on('#pcat');cn.value='Mïmi! the great';cn.dispatchEvent(new Event('input',{bubbles:true}));
+    log(catName==='Mimi the g'&&localStorage.getItem('office.catName')===catName,'cat name not cleaned or kept: '+catName);
+    cn.dispatchEvent(new KeyboardEvent('keydown',{key:'t',bubbles:true}));log(themeKey===room,'typing the name changed the room');
+    catTagUntil=performance.now()+1e4;drawCatTag(wx,performance.now());setCatName('');
     window.dispatchEvent(new KeyboardEvent('keydown',{key:'Escape'}));log(!b('prefs').classList.contains('open'),'Esc does not close settings');}
   // one line per failure: the browser log keeps only the first line of a message
   if(!fails.length)console.log('CHECK OK all layout checks passed');

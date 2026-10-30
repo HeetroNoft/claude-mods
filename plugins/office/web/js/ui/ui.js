@@ -1,4 +1,4 @@
-// Pointer basics (hover, pet, poke, click things), the session card and the theme picker.
+// Pointer basics (hover, pet, poke, click things), the session card and the room.
 'use strict';
 /* ---------- pointer: hover, pet, poke, click things ---------- */
 function toWorld(e){const r=stage.getBoundingClientRect();return {x:(e.clientX-r.left)/r.width*W,y:(e.clientY-r.top)/r.height*H};}
@@ -37,7 +37,7 @@ function poke(c,tp){
   else{setMood(c,'happy',1000);emote(c,'note');c.sqv+=18;}
   blip(700+Math.random()*300,.04);
 }
-const overUi=e=>!!(e.target.closest&&e.target.closest('#card,#menu,#items,#floors,#prefs,button'));
+const overUi=e=>!!(e.target.closest&&e.target.closest('#card,#items,#floors,#prefs,#usage,button'));
 stage.addEventListener('pointermove',e=>{
   const p=toWorld(e),dx=p.x-ptr.x;ptr.x=p.x;ptr.y=p.y;ptr.in=true;
   if(overUi(e)){hoverCh=null;stage.classList.remove('hand');return;}
@@ -51,7 +51,7 @@ stage.addEventListener('pointermove',e=>{
 stage.addEventListener('pointerleave',()=>{ptr.in=false;hoverCh=null;stage.classList.remove('hand');});
 stage.addEventListener('click',e=>{
   if(overUi(e)||performance.now()<suppressClickUntil)return;
-  closeMenu();openPrefs(false);
+  openPrefs(false);
   const p=toWorld(e),tp=performance.now();
   const c=charAt(p.x,p.y);
   if(c){poke(c,tp);if(cardId===c.id)closeCard();else openCard(c.id);return;}
@@ -70,7 +70,7 @@ function statusOf(ch){
   const I=ch.idle,dk=ch.desk||{};
   if(ch.act==='limit'){const rs=dk.limited&&dk.limited.resetsAt?Date.parse(dk.limited.resetsAt):NaN;return 'Out of usage'+(isNaN(rs)?'':' · resumes at '+hhmm(rs));}
   if(ch.act==='ask'&&dk.waiting)return 'Waiting for you · '+str(dk.waiting.text,80);
-  if(ch.act==='idle'&&I&&I.act)return 'On a break · '+IDLE_TEXT[I.act]+(I.pair?str((I.pair.desk||{}).name||'Claude',14):'');
+  if(ch.act==='idle'&&I&&I.act)return 'On a break · '+IDLE_TEXT[I.act].replace('the cat',catName||'the cat')+(I.pair?str((I.pair.desk||{}).name||'Claude',14):'');
   return ACT_TEXT[ch.act]||'Working';
 }
 function openCard(id){cardId=id;card.classList.remove('open');void card.offsetWidth;card._h='';card.classList.add('open');renderCard();}
@@ -101,18 +101,13 @@ function placeCard(ch){
 }
 card.addEventListener('click',e=>{if(e.target.closest('.x'))closeCard();});
 
-/* ---------- theme picker ---------- */
-const menu=document.getElementById('menu'),tbtn=document.getElementById('thm');
-function renderMenu(){menu.innerHTML=THEME_KEYS.map(k=>{const t=THEMES[k];return `<button type="button" role="menuitemradio" aria-checked="${k===themeKey}" class="${k===themeKey?'on':''}" data-k="${k}"><span class="sw">${t.swatch.map(c=>`<i style="background:${c}"></i>`).join('')}</span>${esc(t.name)}</button>`;}).join('');}
-function closeMenu(){menu.classList.remove('open');tbtn.classList.remove('on');}
+/* ---------- the room ---------- */
 // A /office-theme from a session: the page follows each one once, then T goes on working as usual.
 let roomSeen=null;
 function followRoom(r){if(!r||!r.theme||!r.ms)return;if(roomSeen===null)try{roomSeen=+localStorage.getItem('office.roomMs')||0;}catch(e){roomSeen=0;}
   if(r.ms<=roomSeen)return;roomSeen=r.ms;try{localStorage.setItem('office.roomMs',String(r.ms));}catch(e){}setTheme(r.theme);}
-function setTheme(k){if(!THEMES[k])return;themeKey=k;TH=THEMES[k];resetCatWorld();buildBg();try{localStorage.setItem('office.theme',k);}catch(e){}renderMenu();}
-tbtn.addEventListener('click',()=>{const o=!menu.classList.contains('open');menu.classList.toggle('open',o);tbtn.classList.toggle('on',o);});
-menu.addEventListener('click',e=>{const b=e.target.closest('button[data-k]');if(b)setTheme(b.dataset.k);});
+function setTheme(k){if(!THEMES[k])return;themeKey=k;TH=THEMES[k];resetCatWorld();buildBg();try{localStorage.setItem('office.theme',k);}catch(e){}}
 window.addEventListener('keydown',e=>{
-  if(e.key==='Escape'){closeCard();closeMenu();}
+  if(e.key==='Escape')closeCard();
   else if((e.key==='t'||e.key==='T')&&!e.ctrlKey&&!e.metaKey)setTheme(THEME_KEYS[(THEME_KEYS.indexOf(themeKey)+1)%THEME_KEYS.length]);
 });
