@@ -8,12 +8,14 @@ function bubbleBox(p){
   let x=P(p.x)-w/2,y=P(p.y)-h-P(4); x=Math.max(4,Math.min(cssW-4-w,x)); y=Math.max(4,y);
   return {x,y,w,h,fs,fsH,pad,lines,head};
 }
-function drawBubble(p,a){
-  const b=bubbleBox(p),{x,y,w,h,fs,fsH,pad}=b;
+function drawBubble(p,a,age){
+  const b=bubbleBox(p),{x,y,w,h,fs,fsH,pad}=b,tx=Math.max(x+12,Math.min(x+w-12,P(p.x)));
   ox.save(); ox.globalAlpha=a;
+  // it opens from its tail, with a small overshoot
+  const u=Math.min(1,age/180)-1,sc=1+u*u*(2.7*u+1.7);ox.translate(tx,y+h);ox.scale(sc,sc);ox.translate(-tx,-(y+h));
   ox.fillStyle='rgba(0,0,0,.25)'; rr(x+2,y+3,w,h,fs*.5); ox.fill();
   ox.fillStyle='#FFFFFF'; rr(x,y,w,h,fs*.5); ox.fill(); ox.lineWidth=2; ox.strokeStyle=p.col; ox.stroke();
-  const tx=Math.max(x+12,Math.min(x+w-12,P(p.x))); ox.beginPath(); ox.moveTo(tx-6,y+h-1); ox.lineTo(tx,y+h+8); ox.lineTo(tx+6,y+h-1); ox.closePath(); ox.fillStyle='#FFFFFF'; ox.fill();
+  ox.beginPath(); ox.moveTo(tx-6,y+h-1); ox.lineTo(tx,y+h+8); ox.lineTo(tx+6,y+h-1); ox.closePath(); ox.fillStyle='#FFFFFF'; ox.fill(); ox.stroke(); ox.fillRect(tx-5,y+h-3,10,3);
   text(b.head,x+pad,y+pad*.8+fsH/2,fsH,shade(p.col,-.15),'left');
   b.lines.forEach((l,i)=>text(l,x+pad,y+pad*.8+fsH+fs*.15+fs/2+i*fs*1.2,fs,NAVY,'left'));
   ox.restore();

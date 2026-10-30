@@ -66,6 +66,11 @@
     log(min>=6,'walkers meet at '+min.toFixed(1)+' px');log(!a.path.length&&!b.path.length,'walkers never arrived');
     const c=mk('c',200,150,100);stepEntity(c,1/60);log(dirOf(c)===-1,'a walker going left faces '+dirOf(c));
     chars.clear();live.forEach(([k,v])=>chars.set(k,v));}
+  // 9. a chat line stays in the room, clear of both Claudes' badges and of the other Claude's head
+  CHAT.forEach((s,i)=>{const o=CHAT[1-i],t=s.y-15,b=speechBox({x:s.x,bodyTop:t},Math.sign(o.x-s.x),7,7),rimmed=box('bubble',b.x-1,b.y,b.w+1,b.h+2);
+    log(b.x>=3&&b.x+b.w<=W-3&&b.y>=2,`chat bubble ${i} leaves the room`);
+    [s,o].forEach(c=>log(!hit(rimmed,box('badge',c.x-7,t-26,14,26)),`chat bubble ${i} on the badge at ${c.x}`));
+    log(!hit(rimmed,box('head',o.x-8,t,16,15)),`chat bubble ${i} on the other Claude`);});
   themeKey=keep;TH=THEMES[keep];desks=keepDesks;
   // one line per failure: the browser log keeps only the first line of a message
   if(!fails.length)console.log('CHECK OK all layout checks passed');

@@ -163,7 +163,7 @@ function playPose(ch,tp){const L=leadOf(ch);if(!L||!L.sync)return 'stand';const 
   if(ch.idle.role===leg%2)return u<.18?'throw':'stand';return u>.8?'catch':'stand';}
 // Rock, paper, scissors: three pumps, then both hands show; the winner cheers, the loser sweats.
 const RPS_ROUND=2600,RPS_SHOW=1200;
-const RPS_ICONS=[['.111.','11111','11111','.111.'],['1111','1111','1111','1111'],['1...1','.1.1.','..1..','.1.1.','1...1']];
+const RPS_ICONS=[['.111.','11111','11111','.111.'],['1111','1..1','1..1','1111'],['1...1','.1.1.','..1..','.1.1.','1...1']];
 function rpsHand(ch,round){const L=leadOf(ch),leadCh=ch.idle.role===0?ch:ch.idle.pair;return hash(String(leadCh.id)+':'+round+':'+ch.idle.role+(L?L.dur:0))%3;}
 function rpsState(ch,tp){const L=leadOf(ch);if(!L||!L.sync)return null;const t=tp-L.sync,round=Math.floor(t/RPS_ROUND),u=t-round*RPS_ROUND;
   const mine=rpsHand(ch,round),theirs=rpsHand(ch.idle.pair,round),res=(mine-theirs+3)%3;return {round,u,mine,win:res===1,lose:res===2};}
@@ -197,8 +197,6 @@ function drawIdleProps(g,ch,tp){
   if((I.act==='play'||I.act==='planes')&&I.role===0&&I.sync&&I.pair){const o=I.pair,k=(tp-I.sync)/1700,leg=Math.floor(k),u=k-leg,A=leg%2?o:ch,B=leg%2?ch:o;
     const ax=A.x+Math.sign(B.x-A.x)*9,ay=A.y-12,bx=B.x+Math.sign(A.x-B.x)*9,by=B.y-12,x=ax+(bx-ax)*u,y=ay+(by-ay)*u-Math.sin(Math.PI*u)*18;
     if(I.act==='play')ball(g,x,y,TH.ball);else drawPlane(g,x,y,bx>ax?1:-1);}
-  if(I.act==='rps'&&ch.headTop!=null){const s=rpsState(ch,tp);if(s&&s.u>=RPS_SHOW){const ic=RPS_ICONS[s.mine],w=ic[0].length,x=Math.round(ch.x-w/2),y=Math.round(ch.headTop-ic.length-3);
-    R(g,x-2,y-2,w+4,ic.length+4,'#FFFFFF');pattern(g,ic,x,y,s.win?'#2E8A57':s.lose?'#B03A2E':NAVY);}}
   if((I.act==='tea'||I.act==='coffee')&&ch.headTop!=null&&Math.floor(tp/300)%2){R(g,Math.round(ch.x-11),Math.round(ch.headTop+3-(tp/150)%4),1,1,'rgba(255,255,255,.7)');}
   if(I.act==='game'&&ch.headTop!=null){g.fillStyle='rgba(127,232,255,.18)';g.fillRect(Math.round(ch.x-5),Math.round(ch.headTop+6),10,6);}
 }

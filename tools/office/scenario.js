@@ -1,9 +1,9 @@
 // Test page script: forces activities so a screenshot shows them (scn=t: the room's own break activities,
-// scn=i: every treat mid-story, scn=a / scn=b: pairs, floating, treats, picking up, a high five). Logs ERR and STATE lines.
+// scn=i: every treat mid-story, scn=a / scn=b: pairs, floating, treats, picking up, a high five, scn=c: a chat and a thought, scn=r: a round of rock, paper, scissors). Logs ERR and STATE lines.
 'use strict';
 window.addEventListener('error',e=>console.log('ERR '+e.message+' @'+e.filename.split('/').pop()+':'+e.lineno));
 const SCN=(location.search.match(/scn=(\w+)/)||[])[1]||'a';
-const orig=window.__office;window.__office=d=>{d.desks.forEach((x,i)=>{if(i>=2)x.activity='idle';});orig(d);};
+const orig=window.__office;window.__office=d=>{d.desks.forEach((x,i)=>{if(i>=2)x.activity='idle';});if(SCN==='c')d.desks[0].activity='think';orig(d);};
 const tele=ch=>{if(ch&&ch.tgt){ch.x=ch.tgt.x;ch.y=ch.tgt.y;ch.path=[];ch.arrived=true;}};
 setTimeout(()=>{try{
   const C=id=>chars.get(id);
@@ -32,6 +32,10 @@ setTimeout(()=>{try{
   }else if(SCN==='t'){
     const acts=Object.keys(THEME_IDLES[themeKey]||{});['c3','d4','e4','e5'].forEach((id,i)=>{const a=acts[i%acts.length]||'read';if(a==='catpet'&&!cat)return;startIdle(C(id),a,null);tele(C(id));});
     ['a1','b2'].forEach((id,i)=>giveItem(C(id),['coffee','ball'][i]));
+  }else if(SCN==='c'){
+    startIdle(C('c3'),'chat',C('d4'));tele(C('c3'));tele(C('d4'));
+  }else if(SCN==='r'){
+    startIdle(C('c3'),'rps',C('d4'));tele(C('c3'));tele(C('d4'));
   }else if(SCN==='a'){
     startIdle(C('c3'),'rps',C('d4'));tele(C('c3'));tele(C('d4'));
     startIdle(C('e4'),'float',null);tele(C('e4'));
@@ -47,6 +51,8 @@ setTimeout(()=>{try{
   }
   // headless virtual time barely runs frames: step the idle brain by hand so activities start
   for(let k=0;k<4;k++)chars.forEach(c=>{if(c.idle&&!c.removed)thinkIdle(c,performance.now(),Date.now());});
+  if(SCN==='c'){C('c3').idle.sync=performance.now()-80;C('a1').thoughtAt=1;const od=drawThought;drawThought=(g,ch,tp)=>{ch.thoughtAt=1;od(g,ch,tp);};} // mid-line when the screenshot is taken
+  if(SCN==='r')C('c3').idle.sync=performance.now()-1200;
   console.log('SCENARIO started '+SCN);
   setTimeout(()=>{const s=[...chars.values()].map(c=>c.id+':'+(c.idle?c.idle.act+'/'+c.idle.phase:'-')+(c.held?'/held':'')+(c.treat?'/'+c.treat.kind:'')).join(' ');console.log('STATE '+s);},1500);
 }catch(err){console.log('ERR scenario '+err.message);}},3000);

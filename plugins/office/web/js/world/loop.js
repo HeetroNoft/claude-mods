@@ -140,7 +140,7 @@ function frame(tp){
     items.push({d:116,f:()=>outlined(wx,'desk'+x+'/'+desks.length+off,g=>drawDesk(g,x,dk,dim,typing,tp,!lampOff.has(String(dk.id))&&!(dk.waiting&&!dk.limited&&Math.floor(tp/450)%2)),g=>drawDesk(g,x,dk,false,false,0,true))});
   });
   // things drawn after the lights are applied: badges, bubbles and reactions stay bright at night
-  const post=[];
+  const post=[],over=[]; // over: what a Claude is saying or doing, above everyone's badges
   const frameOf=(e,rate)=>Math.floor(tp/1000*rate+(e.blinkT||0))%2;
   const stepOf=e=>Math.floor((e.stride||0)/6.5)%2; // legs follow the ground covered, so feet never slide
   chars.forEach(ch=>{
@@ -170,14 +170,19 @@ function frame(tp){
       if(st)drawTreat(wx,ch,tp,st);
       if(tp<(ch.flowerUntil||0)&&ch.bodyTop!=null)drawProp(wx,'blossom',Math.round(ch.x+3+o.sway),HATS.has(ch.look.style)?Math.round(ch.headTop+1-o.pop):Math.round(ch.bodyTop-2)); // tucked in the hat band, or on the head
     }});
-    post.push(()=>{
+    // the badge steps up out of the way of balls in the air, and comes down after
+    ch.badgeUp=(ch.badgeUp||0)+(((st&&(st.juggle||st.caught||st.star))||doing==='juggle'?10:0)-(ch.badgeUp||0))*Math.min(1,dt*10);
+    over.push(()=>{
       const ht=ch.headTop; if(ht==null)return;
-      if(pose==='sit'&&ch.act==='think')drawThought(wx,ch.x,ht,tp);
+      if(pose==='sit'&&ch.act==='think')drawThought(wx,ch,tp);else ch.thoughtAt=0;
       if(pose==='sleep')drawZz(wx,ch.x,ht,tp);
       if(o.mood==='dizzy')drawDizzy(wx,ch.x,ht,tp);
-      drawChatBubble(wx,ch,tp);
+      drawChatBubble(wx,ch,tp);drawRps(wx,ch,tp);
+    });
+    post.push(()=>{
+      if(ch.headTop==null)return;const ht=ch.headTop-Math.round(ch.badgeUp);
       if(!LABELS){const dk=ch.desk||{};const badge=ch.act==='limit'?['skull','#B03A2E']:ch.act==='ask'?['quest',Math.floor(tp/300)%2?AMBER:ch.look.c]:[iconFor(dk),ch.look.c];
-        drawBadge(wx,badge[0],ch.x,ht-(pose==='sit'&&ch.act==='think'?9:0),badge[1],tp,ch.id);
+        drawBadge(wx,badge[0],ch.x,ht,badge[1],tp,ch.id);
         if(tp<ch.jumpUntil+2500&&ch.starT&&tp-ch.starT<4000)drawStar(wx,Math.round(ch.x),Math.round(ht-21+Math.sin(tp/150)),Math.floor(tp/200)%2?'#FFD84A':'#FFFFFF');}
     });
   });
@@ -202,7 +207,7 @@ function frame(tp){
   if(TH.live)TH.live(wx,tp);
   desks.forEach((dk,i)=>{const c=looksFor(String(dk.id)).c;outlined(wx,'board'+xs[i]+'/'+desks.length,g=>drawBoard(g,xs[i],c,dk.activity==='gone',tp),g=>drawBoard(g,xs[i],c,false,0));if(!LABELS)boardPixels(wx,xs[i],dk,now,tp);});
   if(TH.neon)drawNeon(wx,tp);
-  post.forEach(f=>f());
+  post.forEach(f=>f());over.forEach(f=>f());
   drawEmotes(wx,tp);
   leaves=leaves.filter(l=>{l.life-=dt;l.vy+=8*dt;l.x+=(l.vx+Math.sin(tp/250+l.p)*6)*dt;l.y+=l.vy*dt;if(l.life<=0||l.y>178)return false;wx.globalAlpha=Math.min(1,l.life);R(wx,l.x,l.y,l.w,1,l.c);wx.globalAlpha=1;return true;});
   // decorative send planes
@@ -269,7 +274,7 @@ function frame(tp){
     return true;
   });
   // message bubbles
-  if(LABELS)planes.forEach(p=>{if(p.x==null||tp<p.t0)return;const age=tp-p.t0;const a=age>p.dur+p.hold-500?(p.dur+p.hold-age)/500:1;drawBubble(p,Math.max(0,a));});
+  if(LABELS)planes.forEach(p=>{if(p.x==null||tp<p.t0)return;const age=tp-p.t0;const a=age>p.dur+p.hold-500?(p.dur+p.hold-age)/500:1;drawBubble(p,Math.max(0,a),age);});
   // empty state
   if(LABELS&&!desks.length&&![...chars.values()].some(c=>!c.hidden)){
     pill('Empty office · start a Claude Code session to join',cssW/2,P(118),Math.max(15,3*S*TS),{bg:'rgba(0,19,47,.9)',border:ORANGE,maxW:cssW*.8});
