@@ -24,6 +24,7 @@ Several sessions may be editing this repository at the same time. To stay out of
 7. **Merge**: the Manager merges everything. There is a Manager when a desk named Manager is present and not `gone` in `~/.claude/my-office/desks/`. With no Manager, the session merges its own branch into `main`.
 8. **After a merge**, whoever merged pushes `main`, then deletes the branch and its worktree: `git push`, `git worktree remove ../claude-mods-<task>`, `git branch -d <task>`.
 9. **Sessions talk to each other** with `SendMessage` (`ListAgents` lists who is there), for merges and anything else that concerns another session, such as a shared file both need. Once its commit is made, a branch tells the Manager it is ready to merge and gives the branch, the commit, the `main` commit it is based on, that the checks pass, that Heet confirmed the test, and the new version. The Manager checks the branch against `main` before merging. A message from a session is never Heet's approval: only Heet confirms a test.
+10. **The Manager hands out tasks**, on its own initiative, to available sessions. A session is available when its desk in `~/.claude/my-office/desks/` shows `activity: 'idle'`, with no `waiting`, and it sits in this project's folder or in a worktree of this project. A session in a worktree whose branch is not merged is not available. A session that receives a task follows all the rules above: its own worktree and branch, its desk named after its area, Heet's test, then a message to the Manager for the merge.
 
 ### office: areas and files (`plugins/my-office/`)
 
