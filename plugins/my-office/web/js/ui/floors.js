@@ -2,6 +2,12 @@
 // red when one is out of usage), the lift between floors, and sending a desk to another floor.
 'use strict';
 const floorsEl=document.getElementById('floors'),FLOOR_FADE=240,BASE_TITLE=document.title;
+// The office's name, for the tab's title; empty keeps the page's own. Like the cat's name, kept apart from
+// PREFS: the settings redraw when PREFS change, which would move the caret while it is typed.
+const OFFICE_NAME_MAX=40;
+let officeName='';
+try{officeName=localStorage.getItem('office.name')||'';}catch(e){}
+function setOfficeName(s){officeName=String(s||'').replace(/\s+/g,' ').trim().slice(0,OFFICE_NAME_MAX);try{localStorage.setItem('office.name',officeName);}catch(e){}renderFloors();}
 floorsEl.innerHTML='<span class="pill"></span><div class="chips"></div>'; // the pill slides under the floor you are on
 const floorPill=floorsEl.firstChild,floorChips=floorsEl.lastChild;
 let floorsKey='',floorSlide=null;
@@ -16,7 +22,7 @@ function floorName(f){
 }
 function renderFloors(){
   const drag=!!(boardDrag&&boardDrag.on),waiting=everyDesk.filter(d=>d.waiting&&!d.limited).length;
-  document.title=(waiting?`(${waiting}) `:'')+BASE_TITLE;
+  document.title=(waiting?`(${waiting}) `:'')+(officeName||BASE_TITLE);
   const many=floorCount>4,fs=[...Array(floorCount).keys()];
   const catF=cat&&floorCount>1?cat.floor:-1;
   const key=[drag,curFloor,floorCount,catF,...everyDesk.map(d=>[d.id,d.name,floorOf.get(String(d.id)),deskState(d)].join(':'))].join('|');

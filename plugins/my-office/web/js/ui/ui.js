@@ -145,7 +145,7 @@ card.addEventListener('click',e=>{if(e.target.closest('.x'))closeCard();if(e.tar
 let roomSeen=null;
 function followRoom(r){if(!r||!r.theme||!r.ms)return;if(roomSeen===null)try{roomSeen=+localStorage.getItem('office.roomMs')||0;}catch(e){roomSeen=0;}
   if(r.ms<=roomSeen)return;roomSeen=r.ms;try{localStorage.setItem('office.roomMs',String(r.ms));}catch(e){}setTheme(r.theme);}
-function setTheme(k){if(!THEMES[k])return;themeKey=k;TH=THEMES[k];resetCatWorld();buildBg();try{localStorage.setItem('office.theme',k);}catch(e){}}
+function setTheme(k){if(!THEMES[k])return;themeKey=k;TH=THEMES[k];resetCatWorld();buildBg();showFavicon();try{localStorage.setItem('office.theme',k);}catch(e){}}
 window.addEventListener('keydown',e=>{
   if(e.key==='Escape')closeCard();
   else if((e.key==='t'||e.key==='T')&&!e.ctrlKey&&!e.metaKey)setTheme(THEME_KEYS[(THEME_KEYS.indexOf(themeKey)+1)%THEME_KEYS.length]);

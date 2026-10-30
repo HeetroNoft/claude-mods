@@ -169,6 +169,12 @@
     log(catName==='Mimi the g'&&localStorage.getItem('office.catName')===catName,'cat name not cleaned or kept: '+catName);
     cn.dispatchEvent(new KeyboardEvent('keydown',{key:'t',bubbles:true}));log(themeKey===room,'typing the name changed the room');
     catTagUntil=performance.now()+1e4;drawCatTag(wx,performance.now());setCatName('');
+    // 21. the office's name: kept clean, in the tab's title, and typing it presses no shortcut; the tab's icon follows the room
+    const pn=on('#poffice'),keepName=officeName,keepTheme=themeKey;pn.value='  Ma   boîte ';pn.dispatchEvent(new Event('input',{bubbles:true}));
+    log(officeName==='Ma boîte'&&document.title.endsWith('Ma boîte'),'office name not in the title: '+document.title);
+    pn.dispatchEvent(new KeyboardEvent('keydown',{key:'t',bubbles:true}));log(themeKey===keepTheme,'typing the office name changed the room');
+    setOfficeName('');log(document.title.endsWith(BASE_TITLE),'an empty office name loses the title');setOfficeName(keepName);
+    const icons=new Set(THEME_KEYS.map(k=>faviconFor(THEMES[k].catLook)));log(faviconEl.href.startsWith('data:image/png')&&icons.size===new Set(THEME_KEYS.map(k=>THEMES[k].catLook)).size,'each cat should have its own tab icon');
     window.dispatchEvent(new KeyboardEvent('keydown',{key:'Escape'}));log(!b('prefs').classList.contains('open'),'Esc does not close settings');}
   // one line per failure: the browser log keeps only the first line of a message
   if(!fails.length)console.log('CHECK OK all layout checks passed');
