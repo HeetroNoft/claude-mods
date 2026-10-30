@@ -53,8 +53,8 @@ const bgDecor=document.createElement('canvas'); bgDecor.width=W; bgDecor.height=
 // The wall clock: centred on pixel (160, 13) so every hand starts from one pixel and runs straight.
 // Rim at 9.5..10.5, the plan ring at 8.5..9.5, the face inside; rows 3..23, clear of the boards (y 25).
 const CLOCK={x:160.5,y:13.5,r:10.5};
-// The coffee counter's left edge: left enough that the buttons over the room's bottom right never cover it.
-const COUNTER={x:240};
+// The coffee counter's left edge: it ends at x 300, clear of the settings button in the room's corner.
+const COUNTER={x:260};
 function paintWall(g,T){
   R(g,0,0,W,84,T.wall);
   for(let x=0;x<W;x+=10)R(g,x,2,1,67,T.stripe);
