@@ -25,7 +25,7 @@ function collectLights(tp,n,doorOpen){
   if(T.lights)for(let x=6;x<264;x+=18)Ls.push({x,y:28,r:12,a:.45,c:'255,200,130'});
   if(T.neon)for(let x=20;x<W;x+=40)Ls.push({x,y:69,r:22,a:.5,c:(x/40|0)%2?'255,61,203':'45,226,230'});
   if(T.signGlow&&!LABELS)signSlots().forEach(l=>Ls.push({x:l.x+l.w/2,y:33,r:5,a:.85,c:hexRgb(l.c).join(',')})); // the door sign's lights
-  if(cat&&CAT_LOOKS[T.catLook]&&CAT_LOOKS[T.catLook].holo)Ls.push({x:cat.x,y:cat.y-cat.z-5,r:10,a:.7,c:'45,226,230'}); // the hologram cat glows
+  if(cat&&!cat.away&&CAT_LOOKS[T.catLook]&&CAT_LOOKS[T.catLook].holo)Ls.push({x:cat.x,y:cat.y-cat.z-5,r:10,a:.7,c:'45,226,230'}); // the hologram cat glows
   if(T.liveLights)T.liveLights(Ls,tp);
   chars.forEach(ch=>{if(!ch.hidden&&ch.look.style===2&&ch.headTop!=null)Ls.push({x:ch.x,y:ch.headTop+2,r:9,a:.7,c:'255,216,74'});});
   return Ls;

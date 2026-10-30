@@ -3,10 +3,13 @@
 // two or three minutes it gets up to something (CAT_JOBS): hops on a desk to wake a sleeper or bother
 // a worker, lies on a keyboard, rubs a colleague's legs, begs at the coffee counter, knocks a thing
 // over (a Claude on a break puts it back, see tidyTick). It also greets whoever comes in or leaves,
-// leaps after paper planes, and plays with a ball dropped on the floor from the item bar.
+// leaps after paper planes, and plays with a ball dropped on the floor from the item bar. There is one
+// cat in the whole office: now and then it leaves by the door for another floor, and it comes in by the
+// door too. Off the floor on show it is `away`, parked outside the room, and only keeps time.
 'use strict';
 const CAT_SPOTS=[{x:190,y:156},{x:170,y:150},{x:248,y:150},{x:130,y:172},{x:60,y:150},{x:212,y:172},{x:236,y:132}];
 const CAT_REST=[120000,180000]; // ms between two of its doings ("rarely")
+const CAT_TRIP=[120000,240000]; // ms between two changes of floor
 let fallen=null,catBall=null,bgHide=[],deskOff=false;
 
 /* ---------- looks: one per room ---------- */
@@ -43,7 +46,7 @@ const lookOf=()=>CAT_LOOKS[TH.catLook]||CAT_LOOKS.black;
 
 /* ---------- moving about ---------- */
 function newCat(tp){return {x:150,y:156,z:0,face:1,state:'sleep',until:tp+9000,hop:0,hopH:4,hopDur:420,pet:0,path:[],speed:16,air:null,job:null,
-  nextJob:tp+40000+Math.random()*40000,doorCD:0,planeCD:0,seen:new Map()};}
+  nextJob:tp+40000+Math.random()*40000,doorCD:0,planeCD:0,seen:new Map(),floor:0,away:false,nextTrip:tp+CAT_TRIP[0]};}
 const clampX=x=>Math.max(6,Math.min(314,x)),clampY=y=>Math.max(88,Math.min(179,y));
 function catGo(x,y,run){
   const t={x:clampX(x),y:cat.z>0?y:clampY(y)};
@@ -69,6 +72,39 @@ function stepCat(dt,tp){
 }
 const catMoving=()=>cat.path.length>0||!!cat.air;
 function meowSound(){if(lookOf().float){blip(990,.08,'sine');setTimeout(()=>blip(740,.12,'sine'),90);return;}blip(880,.12,'sine');setTimeout(()=>blip(660,.16,'sine'),110);}
+
+/* ---------- one cat, many floors ---------- */
+const nextTrip=tp=>tp+CAT_TRIP[0]+Math.random()*(CAT_TRIP[1]-CAT_TRIP[0]);
+function otherFloor(){const f=Math.floor(Math.random()*(floorCount-1));return f>=cat.floor?f+1:f;}
+function catGone(){
+  if(cat.job&&cat.job.onEnd)cat.job.onEnd(performance.now());
+  cat.job=null;cat.air=null;cat.path=[];cat.z=0;cat.away=true;cat.x=-50;cat.y=150;catBall=null;
+}
+// In by the door, and off to a place to rest.
+function catEnter(tp){
+  const p=restSpot();Object.assign(cat,{floor:curFloor,away:false,x:DOOR.x,y:DOOR.y,z:0,face:1,nextTrip:nextTrip(tp)});
+  startJob('arrive',[STEP.go(20,124),STEP.go(p.x,p.y),STEP.wait(400,'sit')]);
+  renderFloors();
+}
+// The floor on show has changed: the cat is here (already in the room, or by the door) or it is not.
+function catOnFloor(byDoor){
+  if(!cat)return;cat.seenReady=false;
+  if(cat.floor!==curFloor){if(!cat.away)catGone();}
+  else if(cat.away){
+    if(byDoor){catEnter(performance.now());return;}
+    const p=restSpot();Object.assign(cat,{away:false,x:p.x,y:p.y,z:0,state:p.sleep?'sleep':'sit',until:performance.now()+5000});
+  }
+}
+// Its turn to go: over to the door and out.
+function catLeaves(tp){
+  const f=otherFloor();cat.nextTrip=nextTrip(tp);
+  startJob('trip',[STEP.go(20,124),STEP.go(DOOR.x,DOOR.y),STEP.act(()=>{cat.floor=f;catGone();renderFloors();})]);
+}
+function catElsewhere(tp){
+  if(tp<cat.nextTrip||floorCount<2)return;
+  const f=otherFloor();
+  if(f===curFloor)catEnter(tp);else{cat.floor=f;cat.nextTrip=nextTrip(tp);renderFloors();}
+}
 
 /* ---------- a job: steps run one after another; a step returns true when done, 'abort' to give up ---------- */
 const STEP={
@@ -245,6 +281,7 @@ function watchPlanes(tp){
 }
 // a ball dropped on the floor from the item bar: the cat chases it and bats it about
 function dropBallForCat(x,y){const tp=performance.now();catBall={x:clampX(x),y:clampY(y),z:0,vx:0,vy:0,vz:0,until:tp+14000};
+  if(cat&&cat.away)catEnter(tp); // it hears the ball, wherever it is
   if(cat&&cat.job&&cat.z===0&&cat.job.kind!=='ball'){const J=cat.job;cat.job=null;if(J.onEnd)J.onEnd(tp);}
   blip(760,.06,'triangle');}
 function stepBall(dt,tp){
@@ -253,7 +290,7 @@ function stepBall(dt,tp){
   if(b.z>0||b.vz>0){b.vz-=120*dt;b.z+=b.vz*dt;if(b.z<=0){b.z=0;b.vz=Math.abs(b.vz)>12?-b.vz*.45:0;}}
   if(b.x<6||b.x>314){b.vx=-b.vx;b.x=clampX(b.x);}if(b.y<88||b.y>179){b.vy=-b.vy;b.y=clampY(b.y);}
   if(tp>b.until){catBall=null;if(cat.job&&cat.job.kind==='ball')cat.job=null;return;}
-  if(cat.job||cat.z>0)return;
+  if(cat.job||cat.z>0||cat.away)return;
   startJob('ball',[(tp)=>{const B=catBall;if(!B)return 'abort';const d=Math.hypot(B.x-cat.x,B.y-cat.y);
     if(d>5){if(tp>(cat.job.rep||0)){catGo(B.x-Math.sign(B.x-cat.x||1)*4,B.y,true);cat.job.rep=tp+250;}return false;}
     cat.path=[];cat.face=B.x>cat.x?1:-1;cat.hop=tp+380;cat.hopH=5;
@@ -263,18 +300,20 @@ function stepBall(dt,tp){
 
 /* ---------- the frame ---------- */
 function updateCat(dt,tp){
-  if(!cat)cat=newCat(tp);
-  stepCat(dt,tp);stepBall(dt,tp);
+  if(!cat){cat=newCat(tp);renderFloors();}
+  if(!cat.away){stepCat(dt,tp);stepBall(dt,tp);}
   cat.pet=Math.max(0,cat.pet-dt*30);
   if(cat.pet>40){cat.pet=0;emoteAt(cat.x+3,cat.y-cat.z-9,'heart');purr();if(!cat.job&&cat.path.length){cat.path=[];cat.state='sit';cat.until=tp+5000;}}
   if(fallen&&fallen.state==='falling'&&tp-fallen.t0>450)fallen.state='down';
   if(fallen&&fallen.kind==='shelf'&&shelf.get(fallen.slot)!==fallen.f){const ch=fallen.fixer&&chars.get(fallen.fixer);if(ch&&ch.idle&&ch.idle.act==='tidy')ch.idle.until=0;fallen=null;} // its file was filed again meanwhile
   checkFixer();findFixer(tp);
+  if(cat.away){catElsewhere(tp);return;}
   watchDoor(tp);watchPlanes(tp);
   if(cat.job){runJob(tp);return;}
   if(catMoving()){cat.state='walk';return;}
   if(cat.state==='walk'){cat.state=cat.restState||'sit';cat.until=tp+7000+Math.random()*12000;}
   if(cat.state==='sit')catFidget(tp);
+  if(floorCount>1&&tp>cat.nextTrip&&!catPetted()&&!catBall){catLeaves(tp);return;}
   // its next doing, now and then; if nothing fits right now, it looks again a little later
   if(tp>cat.nextJob&&!catPetted()){
     const keys=Object.keys(CAT_JOBS).sort(()=>Math.random()-.5);
@@ -311,7 +350,8 @@ function restSpot(){
 function resetCatWorld(){
   if(fallen){if(fallen.kind==='shelf')fallen.f.gone=false;const ch=fallen.fixer&&chars.get(fallen.fixer);if(ch&&ch.idle&&ch.idle.act==='tidy')ch.idle={phase:'pick',t:0};}
   fallen=null;bgHide=[];catBall=null;
-  if(!cat)return;if(cat.job&&cat.job.onEnd)cat.job.onEnd(performance.now());
+  rooms.forEach(r=>{if(r.fallen&&r.fallen.f)r.fallen.f.gone=false;r.fallen=null;});
+  if(!cat||cat.away)return;if(cat.job&&cat.job.onEnd)cat.job.onEnd(performance.now());
   cat.job=null;cat.air=null;cat.path=[];cat.z=0;const p={x:clampX(cat.x),y:Math.max(121,clampY(cat.y))};outOfFurniture(p);cat.x=p.x;cat.y=p.y;cat.state='sit';
 }
 function catMeow(tp){cat.hop=tp+420;cat.hopH=4;if(cat.state==='sleep'&&!cat.job){cat.state='sit';cat.until=tp+6000;}emoteAt(cat.x+3,cat.y-cat.z-9,Math.random()<.5?'heart':'note');meowSound();}
@@ -389,7 +429,7 @@ function drawCat(g,tp){
 }
 // the cat, then a thing it knocked over (falling, on the floor, or carried by a Claude), and the ball
 function catDrawables(items,tp){
-  if(cat){const L=lookOf(),box=[Math.round(cat.x)-10,Math.round(cat.y-cat.z)-20,21,24],d=cat.z>0?cat.y+.5:cat.y;
+  if(cat&&!cat.away){const L=lookOf(),box=[Math.round(cat.x)-10,Math.round(cat.y-cat.z)-20,21,24],d=cat.z>0?cat.y+.5:cat.y;
     items.push({d,f:()=>L.holo?drawHolo(wx,box,tp):outlinedLive(wx,'cat',box,g=>drawCat(g,tp))});}
   const F=fallen;
   if(F&&F.state!=='carried'){const u=F.state==='falling'?Math.min(1,(tp-F.t0)/450):1;

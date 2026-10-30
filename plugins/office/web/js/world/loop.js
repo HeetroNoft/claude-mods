@@ -114,7 +114,7 @@ function frame(tp){
   if(TH.dust==='sun'&&n<.7)dust.forEach(m=>{m.y-=m.v*dt*.3;m.x+=Math.sin(tp/1000+m.p)*dt*2;if(m.y<86){m.y=136;m.x=250+Math.random()*55;}const a=(.25+.2*Math.sin(tp/600+m.p))*(1-n);wx.fillStyle=`rgba(255,250,230,${a})`;wx.fillRect(Math.round(m.x),Math.round(m.y),1,1);});
   // door open? (someone walking through, or a knock)
   let doorOpen=false; const near=e=>!e.hidden&&Math.hypot(e.x-DOOR.x,e.y-DOOR.y)<16;
-  chars.forEach(c=>{if(near(c))doorOpen=true;}); interns.forEach(e=>{if(near(e))doorOpen=true;});
+  chars.forEach(c=>{if(near(c))doorOpen=true;});if(cat&&!cat.away&&near(cat))doorOpen=true; interns.forEach(e=>{if(near(e))doorOpen=true;});
   // the door opens the room's own way as someone comes near, and closes behind them (world/door.js)
   drawDoor(wx,tp,dt,doorOpen);
   // one light per desk on the door sign, in the room's style; it darkens with the night (world/door.js)

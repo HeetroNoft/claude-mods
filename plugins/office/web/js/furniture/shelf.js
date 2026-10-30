@@ -18,11 +18,7 @@ const seenFiles=new Set();
 const CABINET={x:29,y:142}; // where archived folders go (furniture/objects.js draws the cabinet)
 let cabPulse=0,shelfTag=null;
 
-(function loadShelf(){
-  try{JSON.parse(localStorage.getItem('office.shelf')||'[]').forEach(f=>{
-    if(f&&f.name&&SHELF[f.slot]!=null&&!shelf.has(f.slot)&&!shelfOf.has(f.name)){shelf.set(f.slot,{slot:f.slot,name:String(f.name),col:f.col,ms:+f.ms||0,t:0,bump:0});shelfOf.set(String(f.name),f.slot);}});}catch(e){}
-})();
-function saveShelf(){try{localStorage.setItem('office.shelf',JSON.stringify([...shelf.values()].map(({slot,name,col,ms})=>({slot,name,col,ms}))));}catch(e){}}
+function saveShelf(){saveRooms();} // every floor has its own shelf (world/rooms.js)
 
 // The place for a file: its own, the one kept for it, a free one, else the one untouched the longest.
 function slotFor(name){

@@ -73,3 +73,4 @@ body.clean #vol{display:none}
 #floors button.over:not(.full){background:#D97557}
 @keyframes floorBlink{from{opacity:1}to{opacity:.25}}
 @media (prefers-reduced-motion:reduce){#floors i.wait,#floors.many button.wait{animation:none}}
+#floors u{display:block;flex:none;width:calc(10px*var(--u,1));height:calc(9px*var(--u,1));background:#FFD84A;clip-path:polygon(0 0,28% 28%,72% 28%,100% 0,100% 100%,0 100%)}

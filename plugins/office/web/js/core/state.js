@@ -143,12 +143,12 @@ function assignFloors(all){
   const before=JSON.stringify([...floorOf]),count=[];
   all.forEach(d=>{const id=String(d.id),f=floorOf.get(id);if(f!=null&&(count[f]||0)<MAX_DESKS)count[f]=(count[f]||0)+1;else floorOf.delete(id);});
   all.forEach(d=>{const id=String(d.id);if(floorOf.has(id))return;let f=0;while((count[f]||0)>=MAX_DESKS)f++;floorOf.set(id,f);count[f]=(count[f]||0)+1;});
-  let followed=false;
+  let followed=false;const was=curFloor,merged=[];
   for(let f=count.length-1;f>0;f--){
     if(!count[f])continue;
     const dk=all.filter(d=>floorOf.get(String(d.id))===f);if(dk.some(d=>floorPinned.has(String(d.id))))continue;
     for(let g=0;g<f;g++)if(count[g]&&count[g]+count[f]<=MAX_DESKS){
-      dk.forEach(d=>floorOf.set(String(d.id),g));count[g]+=count[f];count[f]=0;
+      dk.forEach(d=>floorOf.set(String(d.id),g));count[g]+=count[f];count[f]=0;merged.push([f,g]);
       if(curFloor===f){curFloor=g;followed=true;} // you go down with them
       break;
     }
@@ -157,6 +157,7 @@ function assignFloors(all){
   all.forEach(d=>{const id=String(d.id);floorOf.set(id,used.indexOf(floorOf.get(id)));});
   floorCount=used.length;
   const at=used.indexOf(curFloor);curFloor=at>=0?at:Math.min(curFloor,floorCount-1);
+  if(merged.length||used.some((f,i)=>f!==i)||rooms.length>floorCount)reshapeRooms(was,merged,used); // world/rooms.js
   if(JSON.stringify([...floorOf])!==before)saveFloors();
   return followed;
 }
@@ -245,7 +246,9 @@ function ingest(d,synthetic){
     const marks=(Array.isArray(dk.files)?dk.files:[]).filter(f=>f&&f.kind==='edit').sort((a,b)=>(+a.ms||0)-(+b.ms||0));
     marks.forEach(f=>{
       const k=id+'|'+f.name+'|'+f.ms; if(seenFiles.has(k))return; seenFiles.add(k);
-      shelfOnFile(ch,String(f.name),col,+f.ms||0,instant||now-(+f.ms||0)>90000); // furniture/shelf.js
+      const fl=floorOf.get(id);
+      if(fl===curFloor)shelfOnFile(ch,String(f.name),col,+f.ms||0,instant||now-(+f.ms||0)>90000); // furniture/shelf.js
+      else{fileInRoom(fl,String(f.name),col,+f.ms||0);saveRooms();} // world/rooms.js
     });
   });
 

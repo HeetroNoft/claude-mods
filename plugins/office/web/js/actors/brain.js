@@ -95,7 +95,7 @@ function chooseIdle(ch,tp,now){
     if(!w||a===last||a==='coffee')continue; // coffee and naps are picked above
     if(D.pair){if(!partner||busyPair(D.pair)||(D.pair==='chat'&&busyPlace('table')))continue;}
     else if(PLACE[a]&&(busyPlace(PLACE[a])||(PLACE[a]==='table'&&busyPair('chat'))))continue;
-    if(a==='catpet'&&(!cat||cat.job||cat.z>0))continue;
+    if(a==='catpet'&&(!cat||cat.away||cat.job||cat.z>0))continue;
     ok.push([a,w]);
   }
   let r=Math.random()*ok.reduce((s,o)=>s+o[1],0),pick=ok.length?ok[0][0]:'coffee';
