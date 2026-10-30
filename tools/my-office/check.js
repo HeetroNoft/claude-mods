@@ -146,7 +146,11 @@
       const spots=CAT_SPOTS.map(s=>{const p={...s};outOfFurniture(p);return p;});
       spots.forEach(a=>spots.forEach(t=>{let p=a;catRoute(a,t).forEach(q=>{const along=p.y===WALK_Y&&q.y===WALK_Y;
         FLOOR_BLOCK.concat(TH.obstacles||[]).forEach(o=>{if(!along&&crosses(p,q,o))log(false,`${k}: the cat crosses (${o.x0},${o.y0}) from ${p.x},${p.y} to ${q.x},${q.y}`);});p=q;});}));
-      (TH.obstacles||[]).forEach(o=>log(standingBoxes(TH).some(([x,,w])=>x<o.x1&&x+w>o.x0),`${k}: a table is not sorted with the Claudes`));}
+      (TH.obstacles||[]).forEach(o=>log(standingBoxes(TH).some(([x,,w])=>x<o.x1&&x+w>o.x0),`${k}: a table is not sorted with the Claudes`));
+      // 19. what stands on the floor sorts at its front edge, so nobody beside it is painted over it
+      paintStanding(TH);const bottom=f=>{const c=document.createElement('canvas');c.width=W;c.height=H;const g=c.getContext('2d');f(g);const d=g.getImageData(0,0,W,H).data;for(let y=H-1;y>=0;y--)for(let x=0;x<W;x++)if(d[(y*W+x)*4+3]>150)return y;return 0;};
+      standingBoxes(TH).forEach(([x,y,w,h,d])=>{const b=bottom(g=>g.drawImage(standing,x,y,w,h,x,y,w,h));log(b<=d,`${k}: what is painted at ${x},${y} reaches ${b} but sorts at ${d}`);});
+      [['cabinet',g=>drawCabinet(g,0,0)],['machine',g=>drawMachine(g,0,'idle')]].forEach(([n,f])=>{const b=bottom(f);log(b<=FRONT[n]&&FRONT[n]>=179,`${k}: the ${n} reaches ${b} but sorts at ${FRONT[n]}`);});}
     themeKey=keep;TH=THEMES[keep];buildBg();
     // 14. the cat's name: kept clean, remembered, and typing it presses no shortcut
     showTab('room');const room=themeKey,cn=on('#pcat');cn.value='Mïmi! the great';cn.dispatchEvent(new Event('input',{bubbles:true}));
