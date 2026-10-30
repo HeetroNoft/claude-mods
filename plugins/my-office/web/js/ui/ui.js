@@ -108,6 +108,7 @@ function renderCard(){
   let eta='';
   if(inf.mode==='ontime')eta=`Done by <b>${hhmm(inf.fin)}</b> · ${about(inf.left)} left`;
   else if(inf.mode==='late')eta=`Now done by ${hhmm(inf.fin)} · <b style="color:#B26A00">${about(inf.late*60000)} behind plan</b>`;
+  else if(inf.mode==='stopped')eta=`<b style="color:${inf.kind==='error'?'#B03A2E':'#B26A00'}">${inf.kind==='error'?'Ended on an error':'Interrupted'} at ${hhmm(inf.at)}</b> · ${inf.done} of ${inf.total} steps`;
   else if(inf.mode==='finished')eta=`<b style="color:#2E8A57">Finished at ${hhmm(inf.at)}</b>`;
   else if(!inf.total)eta='No plan yet';
   if(eta)h+=`<div class="eta">${eta}</div>`;

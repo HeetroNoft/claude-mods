@@ -74,6 +74,50 @@ test('a turn that ends on a question waits for the reply, and the plan pauses me
   expect(o.deskNow().eta.paused).toBeUndefined()
 })
 
+test('a turn that ends without a question ticks the steps left and finishes the plan', async () => {
+  const o = engine()
+  await o.fire('session.start', {})
+  await o.fire('prompt.submit', {})
+  await o.fire('turn.start', {})
+  await o.fire('tool.call', { tool: 'mcp__my-office__plan', steps: [{ label: 'One', minutes: 5 }, { label: 'Two', minutes: 5 }] })
+  await o.fire('turn.complete', { answer: 'All done.', isAborted: false })
+  const d = o.deskNow()
+  expect(d.steps.every((s: any) => s.doneMs)).toBe(true)
+  expect(d.pausedMs).toBeUndefined()
+  expect(d.eta.allDone).toBe(true)
+  expect(d.stopped).toBeUndefined()
+})
+
+test('an interrupted turn keeps its steps, frozen until the next prompt', async () => {
+  const o = engine()
+  await o.fire('session.start', {})
+  await o.fire('prompt.submit', {})
+  await o.fire('turn.start', {})
+  await o.fire('tool.call', { tool: 'mcp__my-office__plan', steps: [{ label: 'One', minutes: 5 }, { label: 'Two', minutes: 5 }] })
+  await o.fire('turn.complete', { answer: '', isAborted: true })
+  const d = o.deskNow()
+  expect(d.stopped.kind).toBe('interrupted')
+  expect(d.steps.some((s: any) => s.doneMs)).toBe(false)
+  await o.fire('prompt.submit', {})
+  expect(o.deskNow().stopped).toBeUndefined()
+  expect(o.deskNow().eta.paused).toBeUndefined()
+})
+
+test('an error keeps the steps left and reads as no success', async () => {
+  const o = engine()
+  await o.fire('session.start', {})
+  await o.fire('prompt.submit', {})
+  await o.fire('turn.start', {})
+  await o.fire('tool.call', { tool: 'mcp__my-office__plan', steps: [{ label: 'One', minutes: 5 }, { label: 'Two', minutes: 5 }] })
+  const line = o.deskNow().doneLine
+  await o.fire('classic.StopFailure', { error: 'server_error' })
+  await o.fire('turn.complete', { answer: '', isAborted: false })
+  const d = o.deskNow()
+  expect(d.stopped.kind).toBe('error')
+  expect(d.steps.some((s: any) => s.doneMs)).toBe(false)
+  expect(d.doneLine).toBe(line)
+})
+
 test('the usage limit knocks the session out until its next prompt or restart', async () => {
   const o = engine()
   await o.fire('session.start', {})

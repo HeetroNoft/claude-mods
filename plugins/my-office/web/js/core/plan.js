@@ -5,6 +5,7 @@ function etaInfo(dk,now){
   const total=steps.length,done=steps.filter(s=>s.doneMs).length,cur=steps.find(s=>!s.doneMs);
   const e=dk.eta;
   const r={steps,total,done,cur};
+  if(dk.stopped&&total){r.mode='stopped';r.kind=dk.stopped.kind;r.at=+dk.stopped.ms;return r;} // an error or the user stopped the turn
   if(!e||!e.finishMs){r.mode=total?'steps':'none';return r;}
   if(e.allDone){r.mode='finished';const last=Math.max(0,...steps.map(s=>+s.doneMs||0));r.at=last||+dk.doneMs||e.finishMs;return r;}
   if(e.paused){r.mode='paused';r.fin=+e.finishMs;r.left=+e.finishMs-(+dk.pausedMs||now);return r;}
