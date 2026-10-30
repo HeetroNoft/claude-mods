@@ -151,6 +151,12 @@
       paintStanding(TH);const bottom=f=>{const c=document.createElement('canvas');c.width=W;c.height=H;const g=c.getContext('2d');f(g);const d=g.getImageData(0,0,W,H).data;for(let y=H-1;y>=0;y--)for(let x=0;x<W;x++)if(d[(y*W+x)*4+3]>150)return y;return 0;};
       standingBoxes(TH).forEach(([x,y,w,h,d])=>{const b=bottom(g=>g.drawImage(standing,x,y,w,h,x,y,w,h));log(b<=d,`${k}: what is painted at ${x},${y} reaches ${b} but sorts at ${d}`);});
       [['cabinet',g=>drawCabinet(g,0,0)],['machine',g=>drawMachine(g,0,'idle')]].forEach(([n,f])=>{const b=bottom(f);log(b<=FRONT[n]&&FRONT[n]>=179,`${k}: the ${n} reaches ${b} but sorts at ${FRONT[n]}`);});}
+    // 23. the cabinet opens a drawer at random, each in turn of every kind, stays on it while open, and never the same twice running
+    {const g=document.createElement('canvas').getContext('2d');
+      Object.entries(CABINETS).forEach(([k,K])=>{if(K.drawers.length<2)return;TH={...THEMES[keep],cabinetKind:k};const seen=new Set();let last=-1,same=false,moved=false;
+        for(let i=0;i<600;i++){drawCabinet(g,0,0);drawCabinet(g,1,0);const d=cabDrawer;drawCabinet(g,1,0);if(cabDrawer!==d)moved=true;if(d===last)same=true;last=d;seen.add(d);}
+        log(seen.size===K.drawers.length&&!same&&!moved,`${k}: drawers opened ${[...seen]}, same twice ${same}, moved ${moved}`);});
+      drawCabinet(g,0,0);}
     themeKey=keep;TH=THEMES[keep];buildBg();
     // 20. a Claude pets a cat that waits for it, within reach, or gives up: never a stroke from afar
     {cat=cat||newCat(performance.now());const live=[...chars.entries()],was={...cat},mk=(id,x,y)=>{const e={...newChar(id,{c:'#fff'}),hidden:false,x,y,path:[],tgt:{x,y},arrived:true,idle:{phase:'pick',t:0}};chars.set(id,e);return e;};

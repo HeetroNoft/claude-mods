@@ -150,11 +150,15 @@ const CABINETS={
       R(g,x+w-4,y+2,2,1,Math.floor(tp/900+i)%2?'#5BD08A':'#2E6A48');R(g,x+w-4,y+5,2,3,'#7C8796');}
   },
 };
+// The drawer that slides out: drawn once as it starts to open, kept until it is shut, never the same one twice running.
+let cabDrawer=-1,cabLast=-1;
+function pickDrawer(n){const r=Math.floor(Math.random()*(n-1));return cabLast>=0&&cabLast<n?(r>=cabLast?r+1:r):Math.floor(Math.random()*n);}
 function drawCabinet(g,open,tp){
-  const T=TH,K=CABINETS[T.cabinetKind]||CABINETS.metal;
+  const T=TH,K=CABINETS[T.cabinetKind]||CABINETS.metal,n=K.drawers.length;
+  if(open<=.05)cabDrawer=-1;else if(cabDrawer<0||cabDrawer>=n)cabLast=cabDrawer=pickDrawer(n);
   K.body(g,T,tp); floorShadow(g,20,177,18);
-  K.drawers.forEach(([x,y,w,h],i)=>{if(i||open<=.05)K.drawer(g,T,x,y,w,h,tp,i);});
-  if(open>.05){const [x,y,w,h]=K.drawers[0],o=Math.round(Math.min(7,open*7));
-    R(g,x,y,o,h,'#1A1410');K.drawer(g,T,x+o,y,w,h,tp,0);
+  K.drawers.forEach(([x,y,w,h],i)=>{if(i!==cabDrawer)K.drawer(g,T,x,y,w,h,tp,i);});
+  if(open>.05){const [x,y,w,h]=K.drawers[cabDrawer],o=Math.round(Math.min(7,open*7));
+    R(g,x,y,o,h,'#1A1410');K.drawer(g,T,x+o,y,w,h,tp,cabDrawer);
     R(g,x+o+1,y-2,Math.min(3,w-2),3,'#FFFFFF');if(w>6)R(g,x+o+5,y-3,3,4,'#F4F1EA');}
 }
