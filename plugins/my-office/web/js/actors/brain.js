@@ -24,6 +24,7 @@ const THEME_IDLES={japan:{tea:2.6,origami:1.8},paper:{donut:2.6,files:1.6},retro
 // table sits between the chat spots, so it also waits while a pair is chatting there.
 const PLACE={window:'win',plant:'win',tea:'table',donut:'table',files:'cab',tinker:'mach',arcade:'mach',catpet:'cat'};
 function onActChange(ch,from,to){
+  sceneAct(ch,from,to); // actors/scenes.js
   if(to==='ask'){blip(880,.08,'sine');setTimeout(()=>blip(1175,.1,'sine'),140);}
   if(to==='limit'){blip(220,.3,'triangle');setMood(ch,'surprised',600);}
   if(from!=='idle')return;
@@ -43,18 +44,21 @@ function thinkIdle(ch,tp,now){
     if(!lead.sync){if(p.idle.phase!=='do')return;lead.sync=tp;I.until=p.idle.until=tp+lead.dur;}
     if(I.act==='rps')rpsTick(ch,I,tp);
     if(I.act==='duet'&&tp>ch.nextEmote){ch.nextEmote=tp+2500+Math.random()*2500;emote(ch,'note');}
+    if(IDLES[I.act].tick)IDLES[I.act].tick(ch,I,tp);
     if(I.role===0&&tp>I.until){ch.idle={phase:'pick',t:tp+800+Math.random()*1500,last:I.act};p.idle={phase:'pick',t:tp+1200+Math.random()*1500,last:I.act};}
     return;
   }
   // a nap ends on its own: the Claude wakes with a stretch and finds something else to do
   if(I.act==='nap'){if(tp>I.until){setMood(ch,'happy',900);emote(ch,'note');ch.sqv+=14;ch.idle={phase:'pick',t:tp+900+Math.random()*1200,last:'nap'};}return;}
   idleTick(ch,I,tp);
-  const emo=(IDLES[I.act]||{}).emo;
+  const D=IDLES[I.act]||{};if(D.tick)D.tick(ch,I,tp);
+  const emo=D.emo;
   if(emo&&tp>ch.nextEmote){ch.nextEmote=tp+3500+Math.random()*5000;if(Math.random()<.45)emote(ch,emo);}
   if(tp>I.until){idleEnds(ch,I,tp);ch.idle={phase:'pick',t:tp+500+Math.random()*1500,last:I.act};}
 }
 // The moment an activity starts, while it runs, and as it ends.
 function idleBegins(ch,I,tp){
+  const D=IDLES[I.act];if(D&&D.begin)D.begin(ch,I,tp);
   if(I.act==='plant')plantT=tp;
   if(I.act==='tidy')I.stepUntil=tp+900; // crouched over what the cat knocked down, then it goes back (world/cat.js)
   if(I.act==='window')openForAView(); // a Claude come to look out opens what is in the way
@@ -74,6 +78,7 @@ function idleTick(ch,I,tp){
     emoteAt(x-2,y,'star');for(let i=0;i<12;i++)confetti.push({x,y,vx:(Math.random()-.5)*40,vy:-10-Math.random()*20,c:CONF[i%CONF.length],life:.8,w:1});blip(1046,.05,'triangle');}
 }
 function idleEnds(ch,I,tp){
+  const D=IDLES[I.act];if(D&&D.end)D.end(ch,I,tp);
   if(I.act==='doze'){setMood(ch,'surprised',900);ch.jumpUntil=tp+380;emote(ch,'excl');}
   if(I.act==='origami'){const y=(ch.headTop!=null?ch.headTop:ch.y-18)+6;leaves.push({x:ch.x,y,vx:-14,vy:-26,life:2.6,p:0,w:2,c:'#FFFFFF'});emote(ch,'star');}
   if(I.act==='tea'||I.act==='donut')setMood(ch,'happy',1200);
@@ -94,8 +99,8 @@ function chooseIdle(ch,tp,now){
   const partner=others.find(o=>o.act==='idle'&&o.idle&&!o.errand&&!o.held&&!o.path.length&&!o.idle.pair&&o.idle.act!=='nap'&&o.idle.act!=='highfive'&&(o.idle.phase==='pick'||o.idle.phase==='do'));
   const extra=THEME_IDLES[themeKey]||{},ok=[];
   for(const a in IDLES){
-    const D=IDLES[a],w=extra[a]!=null?extra[a]:D.w;
-    if(!w||a===last||a==='coffee')continue; // coffee and naps are picked above
+    const D=IDLES[a],w=D.weight?D.weight():extra[a]!=null?extra[a]:D.w;
+    if(!w||a===last||a==='coffee'||(D.can&&!D.can(ch)))continue; // coffee and naps are picked above
     if(D.pair){if(!partner||busyPair(D.pair)||(D.pair==='chat'&&busyPlace('table')))continue;}
     else if(PLACE[a]&&(busyPlace(PLACE[a])||(PLACE[a]==='table'&&busyPair('chat'))))continue;
     if(a==='catpet'&&(!cat||cat.away||cat.job||cat.z>0))continue;
@@ -108,7 +113,7 @@ function chooseIdle(ch,tp,now){
 function startIdle(ch,act,partner){
   const D=IDLES[act],dur=(D.t[0]+Math.random()*(D.t[1]-D.t[0]))*1000;
   if(D.pair){
-    const spots=D.pair==='chat'?CHAT:PLAY,swap=Math.abs(ch.x-spots[1].x)<Math.abs(ch.x-spots[0].x);
+    const spots=D.spots||(D.pair==='chat'?CHAT:PLAY),swap=Math.abs(ch.x-spots[1].x)<Math.abs(ch.x-spots[0].x);
     releaseIdle(partner);
     ch.idle={act,phase:'go',dur,pair:partner,role:0,last:act};
     partner.idle={act,phase:'go',dur,pair:ch,role:1,last:act};
@@ -117,6 +122,7 @@ function startIdle(ch,act,partner){
     return;
   }
   ch.idle={act,phase:'go',dur,last:act};
+  if(D.spot){setTarget(ch,D.spot(ch));return;}
   let t;
   switch(act){
     case 'coffee':{const used=new Set([...chars.values()].filter(o=>o!==ch&&o.idle&&o.idle.act==='coffee').map(o=>o.idle.spot));let s=0;while(used.has(s)&&s<3)s++;ch.idle.spot=s;t={...posFor('coffee',s),st:'i-coffee'+s};break;}
@@ -138,6 +144,7 @@ function idlePose(ch,tp){
   const I=ch.idle; if(!I)return 'stand';
   if(I.phase==='pre')return 'yawn';
   if(I.phase!=='do')return 'stand';
+  if(IDLES[I.act]&&IDLES[I.act].pose)return IDLES[I.act].pose(ch,tp);
   switch(I.act){
     case 'coffee':case 'tea':return 'sip';
     case 'window':return 'look';
@@ -197,6 +204,7 @@ function drawJuggle(g,ch,tp,t0,col){if(ch.headTop==null)return;for(let j=0;j<2;j
   ball(g,ch.x+(u<.5?-5+u*20:5-(u-.5)*20),ch.headTop+3-Math.sin(Math.PI*h)*9,col||(j?TH.ball:shade(TH.ball,.35)));}}
 function drawIdleProps(g,ch,tp){
   const I=ch.idle;if(I&&I.act==='tidy')drawCarried(g,ch);
+  if(I&&IDLES[I.act]&&IDLES[I.act].props)IDLES[I.act].props(g,ch,tp,I);
   if(!I||I.phase!=='do'||ch.path.length)return;
   if(I.act==='juggle')drawJuggle(g,ch,tp,I.start);
   if((I.act==='play'||I.act==='planes')&&I.role===0&&I.sync&&I.pair){const o=I.pair,k=(tp-I.sync)/1700,leg=Math.floor(k),u=k-leg,A=leg%2?o:ch,B=leg%2?ch:o;
