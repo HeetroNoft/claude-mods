@@ -4,19 +4,20 @@
 // A blocky Claude mascot: wide body, two slit eyes, stubby side arms, four little legs.
 // o: look, pose, frame, blink, dir, small, sq (-2..2: + is taller and thinner, - is squashed),
 //    gaze (-1..1: where the eyes look), mood (happy|love|surprised|dizzy|sleep), sway, pop (px: what it wears trails the head, see trailOf), glow
+//    floor (sits on the floor: the legs fold), spin (tumbling: no shadow, the caller draws it)
 //    held ({kind,...}: a prop in hand, see actors/props.js), lift (raises it), raise (0..1: a drink or a bite on its way to the mouth, else frame), carry (a file's colour, under the arm), breath (0/1)
 const EYE='#141413';
 function drawPerson(g,cx,fy,o){
   const sm=!!o.small,pose=o.pose,f=o.frame|0;
   let sq=sm?0:Math.max(-2,Math.min(2,o.sq|0));
   if(pose==='sleep'&&!sm)sq=Math.min(sq,-1);
-  const bw=(sm?8:14)-sq,bh=(sm?6:11)+sq,lh=sm?2:4,aw=sm?1:2,ah=sm?1:2;
+  const bw=(sm?8:14)-sq,bh=(sm?6:11)+sq,lh=sm?2:o.floor?1:4,aw=sm?1:2,ah=sm?1:2;
   const L=Math.round(cx-bw/2),T=Math.round(fy-bh-lh),ly=T+bh,ay=T+(sm?3:Math.round(bh*.45));
   const lk=o.look,c=lk.c,hi=shade(c,.2),shd=shade(c,-.22),dk=shade(c,-.45),rim=shade(c,-.1),ol=shade(c,-.62),shine=shade(c,.45);
   const back=pose==='look',ey=T+2;
   // the shadow stays on the ground (o.air px below the feet) and shrinks as the body rises
   const air=Math.max(0,o.air|0),sh=Math.min(Math.floor(air/3),(bw>>1)-2);
-  R(g,L-1+sh,fy+air,bw+2-2*sh,1,air?'rgba(0,0,0,.18)':'rgba(0,0,0,.24)'); R(g,L+1+sh,fy+air+1,bw-2-2*sh,1,'rgba(0,0,0,.1)');
+  if(!o.spin){R(g,L-1+sh,fy+air,bw+2-2*sh,1,air?'rgba(0,0,0,.18)':'rgba(0,0,0,.24)'); R(g,L+1+sh,fy+air+1,bw-2-2*sh,1,'rgba(0,0,0,.1)');}
 
   // Arms are chains of small squares from the shoulder to the hand, with a dark rim. Arms at the
   // sides go behind the body's edge (they grow out of it); arms reaching in front cross the body.

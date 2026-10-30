@@ -88,6 +88,7 @@ function idleEnds(ch,I,tp){
 // long break, 10% right after one), and otherwise one of the other activities, by their weights.
 const NAP_SECONDS=[15,30];
 function chooseIdle(ch,tp,now){
+  const chore=choreNow(ch);if(chore){startIdle(ch,chore,null);return;} // cleaning comes first (actors/scenes.js)
   const last=ch.idle&&ch.idle.last,dk=ch.desk||{},longBreak=(now||Date.now())-(+dk.activityMs||now||Date.now())>NAP_MS;
   const drinking=[...chars.values()].filter(o=>o!==ch&&o.idle&&o.idle.act==='coffee'&&o.idle.phase!=='pick').length;
   const pCoffee=!last?1:drinking>=4?0:last==='coffee'?.25:.45,pNap=last==='nap'?.1:longBreak?.35:.25,r0=Math.random();

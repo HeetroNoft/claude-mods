@@ -124,7 +124,9 @@ function boardPixels(g,x,dk,now,tp){
   else if(inf.mode==='stopped')pixMarquee(g,inf.label,L,47,CW,inf.kind==='error'?red:warn,tp,seed);
   else if(beat)pixMarquee(g,beat.text,L,47,CW,beat.tone==='bad'?red:beat.tone==='warn'?warn:beat.tone==='good'?readable(GREEN,bg,3.5):ink,tp,seed);
   else if(!n&&dk.tasks&&dk.tasks.total)pixMarquee(g,`TASKS ${dk.tasks.done} OF ${dk.tasks.total}`,L,47,CW,ink,tp,seed);
-  else if(chars.get(String(dk.id))&&chars.get(String(dk.id)).doodle)drawIcon(g,chars.get(String(dk.id)).doodle,centre(7),46,nameCol); // drawn on a break (actors/scenes.js)
+  else if(chars.get(String(dk.id))&&chars.get(String(dk.id)).doodle){ // drawn on a break, stroke by stroke (actors/scenes.js)
+    const dd=chars.get(String(dk.id));g.save();g.beginPath();g.rect(centre(7),46,Math.ceil(7*(dd.doodleU==null?1:dd.doodleU)),7);g.clip();drawIcon(g,dd.doodle,centre(7),46,nameCol);g.restore();
+  }
   else pixMarquee(g,live?dk.detail:n?(inf.cur?inf.cur.label:'ALL STEPS DONE'):'NO PLAN YET',L,47,CW,live?soft:n&&inf.cur?ink:dimInk,tp,seed);
   // row 4: a draining bar and the finish time; a narrow board shows the time alone, centred
   const T5=19,wide=CW>=T5+20,barW=CW-T5-4,tx=wide?L+CW-T5:centre(T5);

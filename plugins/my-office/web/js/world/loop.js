@@ -44,6 +44,8 @@ function stepEntity(e,dt){
 function poseFor(ch,tp){
   if(ch.held||ch.fly)return 'dangle';
   if(ch.path.length)return 'walk';
+  if(tp<(ch.getUpUntil||0))return 'slump';
+  if(tp<(ch.lampReach||0))return 'press';
   // the cat: a stroke for it, a stop while it sits on the desk, a nap broken for a moment
   if(tp<(ch.catPetUntil||0))return 'pet';
   if(ch.seated&&tp<(ch.catBlockUntil||0))return ch.catBlockPose||'sit';
@@ -152,13 +154,13 @@ function frame(tp){
     const bob=pose==='walk'?(stepOf(ch)?-1:0):0;
     const rate={walk:6,type:7,press:3,wave:4,sip:.5,talk:5,water:4,juggle:3,catch:2,dance:2.5,eat:3,fold:2,rps:6,dangle:5,clap:5,pet:3,game:1.5}[pose]||2;
     // how high off the floor: held up by the pointer, or floating in the space station
-    const air=ch.held?7:ch.fly?Math.round(ch.fly.h):(ch.idle&&ch.idle.act==='float'&&ch.idle.phase==='do')?Math.round(4+2*Math.sin(tp/700)):0;
-    const sway=pose==='dance'?(frameOf(ch,rate)?1:-1):0;
+    const air=ch.held?7:ch.fly?Math.round(ch.fly.h):sceneAir(ch,tp)||(ch.idle&&ch.idle.act==='float'&&ch.idle.phase==='do')?Math.round(4+2*Math.sin(tp/700)):0;
+    const sway=(pose==='dance'?(frameOf(ch,rate)?1:-1):0)+sceneLean(ch,tp);
     // what is in hand: a treat's own state, else what the break activity calls for
     const st=treatNow(ch,tp),I=ch.idle,doing=I&&I.phase==='do'&&!ch.path.length?I.act:null;
     const held=st?st.held:doing==='donut'?{kind:'donut'}:doing==='tea'?{kind:'teacup'}:null;
     const o={look:ch.look,pose,frame:st&&st.frame!=null?st.frame:pose==='walk'?stepOf(ch):frameOf(ch,rate),blink:blinking(ch,tp),dir:dirOf(ch),sq:sqOf(ch,tp,pose,jy),gaze:gazeOf(ch,tp),
-      mood:st&&st.mood?st.mood:moodOf(ch,tp,pose),glow:n>.5,air,held,
+      mood:st&&st.mood?st.mood:moodOf(ch,tp,pose),glow:n>.5,air,held,floor:sceneFloor(ch),
       carry:ch.errand&&ch.errand.phase==='go'?ch.errand.col:null,breath:((tp/1000+ch.blinkT)%2.8)<1.4?0:1};
     // a treat says when the arm goes up; a snack on a break is a bite now and then, not a chew a beat
     const raiseTo=pose!=='sip'&&pose!=='eat'?0:st&&st.raise!=null?st.raise:(st||pose==='sip')?o.frame:((tp/1000+ch.blinkT)%1.6<.5?1:0);
@@ -167,7 +169,7 @@ function frame(tp){
     const body=()=>{
       if(cardId===ch.id)drawRing(wx,ch.x,ch.y,ch.look.c,tp);
       ch.bodyTop=ch.y+jy+bob-air-15;
-      ch.headTop=drawPerson(wx,ch.x+sway,ch.y+jy+bob-air,o);
+      ch.headTop=ch.fly?drawFlying(wx,ch,o,ch.x+sway,ch.y+jy+bob-air):drawPerson(wx,ch.x+sway,ch.y+jy+bob-air,o);
       drawIdleProps(wx,ch,tp);
       if(st)drawTreat(wx,ch,tp,st);
       if(tp<(ch.flowerUntil||0)&&ch.bodyTop!=null)drawProp(wx,'blossom',Math.round(ch.x+3+o.sway),HATS.has(ch.look.style)?Math.round(ch.headTop+1-o.pop):Math.round(ch.bodyTop-2)); // tucked in the hat band, or on the head

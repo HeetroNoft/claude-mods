@@ -3,7 +3,7 @@
 // Mascot life: springs, moods, the idle brain, emotes and sound effects.
 const BREATHE=new Set(['sit','stand','sip','look','talk','sleep','read']);
 function animChar(ch,tp,dt,now){
-  if(ch.fly)flyTick(ch,dt,tp); // actors/scenes.js
+  sceneFrame(ch,dt,tp); // actors/scenes.js
   if(!ch.removed&&ch.idle&&!ch.errand)thinkIdle(ch,tp,now);
   if(ch.hidden)return;
   // squash and stretch: a damped spring that pokes, jumps and landings kick
