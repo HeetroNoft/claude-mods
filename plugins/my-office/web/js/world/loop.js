@@ -74,6 +74,7 @@ function poseFor(ch,tp){
     case 'agent':return 'wave';
     case 'ask':return ((tp/1000+ch.blinkT)%2.2)<1.5?'wave':'cheer';
     case 'limit':return 'slump';
+    case 'wait':return 'phone';
     case 'idle':return 'sip';
     default:return 'sit';
   }
@@ -163,6 +164,8 @@ function frame(tp){
       mood:st&&st.mood?st.mood:moodOf(ch,tp,pose),glow:n>.5,air,held,floor:sceneFloor(ch),
       carry:ch.errand&&ch.errand.phase==='go'?ch.errand.col:null,breath:((tp/1000+ch.blinkT)%2.8)<1.4?0:1};
     // a treat says when the arm goes up; a snack on a break is a bite now and then, not a chew a beat
+    // on the phone: the feed goes by, and a post gets a like now and then
+    if(pose==='phone'){Object.assign(o,phoneFeed(tp/1000+ch.blinkT*3),{seated:ch.seated});if(tp>(ch.nextLike||0)){if(ch.nextLike)emote(ch,'heart');ch.nextLike=tp+4000+Math.random()*6000;}}
     const raiseTo=pose!=='sip'&&pose!=='eat'?0:st&&st.raise!=null?st.raise:(st||pose==='sip')?o.frame:((tp/1000+ch.blinkT)%1.6<.5?1:0);
     const tr=trailOf(ch,ch.x+sway,ch.y+jy+bob-air,pose,o.mood,raiseTo,st&&st.lift||0,tp);
     o.sway=Math.round(tr.x);o.pop=Math.round(-tr.y);o.raise=tr.raise;o.lift=Math.round(tr.lift);
@@ -180,6 +183,7 @@ function frame(tp){
     (ch.held?lifted:over).push(()=>{
       const ht=ch.headTop; if(ht==null)return;
       if(pose==='sit'&&ch.act==='think')drawThought(wx,ch,tp);else ch.thoughtAt=0;
+      if(pose==='phone'&&ch.seated)drawPhone(wx,Math.round(ch.x)-2,99,o,ch.look.c); // above the desk, under the eyes
       if(pose==='sleep')drawZz(wx,ch.x,ht,tp,ch.blinkT||0);
       if(o.mood==='dizzy')drawDizzy(wx,ch.x,ht,tp);
       drawChatBubble(wx,ch,tp);drawRps(wx,ch,tp);

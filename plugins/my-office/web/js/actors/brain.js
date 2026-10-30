@@ -15,7 +15,7 @@ const IDLES={
   float:{w:0,t:[6,9],emo:'star'},catpet:{w:.8,t:[5,8]},tidy:{w:0,t:[60,60]},arcade:{w:0,t:[5,8],emo:'star'},
   chat:{w:3.4,t:[9,15],pair:'chat'},play:{w:2.4,t:[9,14],pair:'play'},rps:{w:2.2,t:[8,12],pair:'chat'},
   planes:{w:2,t:[8,12],pair:'play'},duet:{w:1.4,t:[7,10],pair:'chat',emo:'note'},
-  highfive:{w:0,t:[1.7,1.7]},
+  highfive:{w:0,t:[1.7,1.7]},phone:{w:1.6,t:[15,25]},
 };
 // What each room adds to the pool, with its own weight.
 const THEME_IDLES={japan:{tea:2.6,origami:1.8},paper:{donut:2.6,files:1.6},retro:{dance:1.8,files:1.6},space:{float:2.8},
@@ -160,6 +160,7 @@ function idlePose(ch,tp){
     case 'tinker':case 'arcade':return 'press';
     case 'donut':return 'eat';
     case 'origami':return 'fold';
+    case 'phone':return 'phone';
     case 'float':return 'float';
     case 'catpet':return 'pet';
     case 'tidy':return I.step==='pick'?'pet':'hold';
