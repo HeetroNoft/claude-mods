@@ -60,7 +60,7 @@ defineTheme('space','neon',{name:'Station spatiale',swatch:['#2A3446','#4FC3FF',
     wallPaint:metalWall,floorPaint:grating,
     parts:{
       sill:null,
-      rug(d,T){R(d,163,142,56,24,'#1B2433');for(let x=163;x<219;x+=4){R(d,x,142,2,1,'#E0B04A');R(d,x,165,2,1,'#E0B04A');}
+      rug(d,T){R(d,163,142,56,24,'#1B2433');for(let x=164;x<218;x+=4){R(d,x,142,2,1,'#E0B04A');R(d,x,165,2,1,'#E0B04A');}
         R(d,167,146,48,16,'#2A3446');for(let x=171;x<213;x+=6)R(d,x,147,2,14,'#222B3A');R(d,189,150,4,8,'#4FC3FF');},
       door(d,T){R(d,3,38,25,46,T.doorFrame);R(d,5,40,21,44,T.door);R(d,15,40,1,44,'#1B2433');
         for(let y=40;y<84;y+=6){R(d,5,y,3,Math.min(3,84-y),'#E0B04A');if(y+3<84)R(d,23,y+3,3,Math.min(3,81-y),'#E0B04A');}R(d,9,58,4,4,T.doorPanelHi);R(d,18,58,4,4,T.doorPanelHi);},
@@ -81,6 +81,6 @@ function metalWall(g,T){
 }
 function grating(g,T){
   R(g,0,85,W,H-85,T.floorA);
-  for(let y=85;y<H;y+=10)for(let x=((y-85)/10%2)*10;x<W;x+=20){R(g,x,y,20,1,T.seam);R(g,x,y,1,10,T.seam);
+  for(let y=85;y<H;y+=10)for(let x=((y-85)/10%2)*10-20;x<W;x+=20){R(g,x,y,20,1,T.seam);R(g,x,y,1,10,T.seam);
     for(let k=0;k<3;k++)R(g,x+4+k*5,y+3+(k%2)*3,2,1,T.floorB);}
 }

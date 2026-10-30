@@ -61,8 +61,8 @@ function drawLantern(g,x,tp,i){
 // four corners ever meet. The weave runs along each mat; the dark cloth edge runs down its long sides.
 function tatamiMat(g,x,y,w,h,T){
   R(g,x,y,w,h,T.floorA);
-  if(w>h){for(let j=1;j<h;j+=2)R(g,x,y+j,w,1,T.floorB);R(g,x,y,w,1,T.seam);R(g,x,y+h-1,w,1,T.seam);R(g,x,y,1,h,shade(T.floorA,-.15));}
-  else{for(let i=1;i<w;i+=2)R(g,x+i,y,1,h,T.floorB);R(g,x,y,1,h,T.seam);R(g,x+w-1,y,1,h,T.seam);R(g,x,y,w,1,shade(T.floorA,-.15));}
+  if(w>h){for(let j=1;j<h;j+=2)R(g,x,y+j,w,1,T.floorB);R(g,x,y,w,1,T.seam);R(g,x,y+h-1,w,1,T.seam);R(g,x,y+1,1,h-2,shade(T.floorA,-.15));}
+  else{for(let i=1;i<w;i+=2)R(g,x+i,y,1,h,T.floorB);R(g,x,y,1,h,T.seam);R(g,x+w-1,y,1,h,T.seam);R(g,x+1,y,w-2,1,shade(T.floorA,-.15));}
 }
 function tatami(g,T){
   for(let y=85,row=0;y<H;y+=16,row++)for(let x=-((row%2)*24),k=0;x<W;x+=48,k++){
