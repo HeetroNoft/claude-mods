@@ -1,7 +1,7 @@
 import type { Register } from 'claude-code'
 
 import {
-  activityOf, applyTool, clean, clearPlan, type Desk, eta, finishStep, firstWords, hhmm, lastQuestion, msgKey, newDesk,
+  activityOf, applyTool, baseName, clean, clearPlan, note, toolFlash, type Desk, eta, finishStep, firstWords, hhmm, lastQuestion, msgKey, newDesk,
   finishPlan, parseReceived, pausePlan, peerName, planLines, planSteps, push, rateOf, resumePlan, stopPlan, todoSteps, usageLine, whoLine,
 } from './core'
 import { deskList, installPage, LIVE_MS, carryOver, officeDesks, officeDir, pageInTest, presentDesks, publish, readDesk, readLeft, removeDesk, themeKeys, uselessDesks, writeDesk, writeLeft, writeRoom } from './room'
@@ -85,6 +85,13 @@ async function awaitAnswer($: any, e: any, run: Promise<any>) {
   return result
 }
 
+// The context window's fill, as the status line has it; best effort, like the usage.
+async function readCtx($: any) {
+  const u = await Promise.resolve().then(() => $.session.usage()).catch(() => undefined)
+  const p = u?.context?.percent
+  if (p != null) await save($, d => { d.ctx = Math.round(p) })
+}
+
 function startTicker($: any) {
   ticker?.cancel()
   ticker = $.clock.every(15_000, () => {
@@ -107,9 +114,11 @@ async function doSetup($: any) {
   if (dir && !(await pageInTest($, dir))) await installPage($, `${$.plugin.root}/web`, dir).catch(() => undefined) // the page copy is best effort
   // usage is best effort: an engine without it (or a failing call) must not stop the setup
   const usage = await Promise.resolve().then(() => $.session.usage()).catch(() => undefined)
+  const model = await Promise.resolve().then(() => $.session.model()).catch(() => undefined)
   await save($, (d, now) => {
     const r = rateOf(usage?.rateLimits, now)
     if (r) d.rate = r
+    if (model) d.model = clean(String(model), 24)
     // a session started again after hitting the usage limit is back to normal
     if (d.limited) { d.limited = undefined; d.activity = 'idle'; d.detail = 'Coffee' }
   })
@@ -234,7 +243,7 @@ export const register: Register = on => {
     if (desk && left[desk.id]) { delete left[desk.id]; await writeLeft($, dir, left) }
     // the user answered: no more waiting, the usage limit is behind us, and a paused plan goes on
     await save($, (d, now) => {
-      d.waiting = undefined; d.limited = undefined; resumePlan(d, now)
+      d.waiting = undefined; d.limited = undefined; d.bg = undefined; resumePlan(d, now)
       d.activity = 'think'; d.detail = 'Reading the ask'; d.activityMs = now
     })
     return next({ ...e, context: [...(e.context ?? []), PROMPT_HINT] })
@@ -242,7 +251,7 @@ export const register: Register = on => {
 
   on('turn.start', async ($, e: any, next) => {
     if (e.agentId) return next(e)
-    await save($, (d, now) => { d.turnMs = now; resumePlan(d, now); if (d.activity === 'idle') { d.activity = 'think'; d.detail = 'Thinking'; d.activityMs = now } })
+    await save($, (d, now) => { d.turnMs = now; d.bg = undefined; resumePlan(d, now); if (d.activity === 'idle' || d.activity === 'wait') { d.activity = 'think'; d.detail = 'Thinking'; d.activityMs = now } })
     return next(e)
   })
 
@@ -301,7 +310,15 @@ export const register: Register = on => {
     const background = isHelper && Boolean(e.run_in_background)
     await save($, (d, now) => { Object.assign(d, applyTool(d, e.tool, e, key, now)) })
     const result = await awaitAnswer($, e, next(e))
-    if (isHelper && !background) await save($, d => { d.interns = d.interns.filter(i => i.key !== key) })
+    await save($, (d, now) => {
+      if (isHelper && !background) d.interns = d.interns.filter(i => i.key !== key)
+      const f = toolFlash(d.task?.kind, Boolean(result?.isError || result?.deny), String(result?.text ?? result?.deny ?? ''), now)
+      if (f) { d.flash = f; note(d, f.kind, f.text, now) }
+      d.task = undefined
+      if (e.tool === 'ScheduleWakeup') d.bg = { kind: 'wakeup', since: now, until: now + Number(e.delaySeconds ?? 0) * 1000 }
+      else if (e.run_in_background || e.tool === 'Monitor') d.bg = { kind: 'job', since: now }
+    })
+    await readCtx($)
     return result
   })
 
@@ -316,6 +333,61 @@ export const register: Register = on => {
     return next(e)
   })
 
+  on('classic.PreToolUse', async ($, e: any, next) => {
+    const planning = e.permission_mode === 'plan'
+    if (Boolean(desk?.planMode) !== planning) await save($, d => { d.planMode = planning })
+    return next(e)
+  })
+
+  on('classic.PermissionDenied', async ($, e: any, next) => {
+    await save($, (d, now) => { d.flash = { kind: 'denied', text: 'DENIED', ms: now }; note(d, 'denied', `Refused: ${String(e.tool_name ?? 'a tool')}`, now) })
+    return next(e)
+  })
+
+  // An MCP server asks the user to fill something in: the session waits like for a question.
+  on('classic.Elicitation', async ($, e: any, next) => {
+    await save($, (d, now) => { d.waiting = { kind: 'form', text: firstWords(String(e.message ?? 'A form for you'), 12), since: now } })
+    return next(e)
+  })
+  on('classic.ElicitationResult', async ($, e: any, next) => {
+    await save($, d => { if (d.waiting?.kind === 'form') d.waiting = undefined })
+    return next(e)
+  })
+
+  on('classic.PostModelSwitch', async ($, e: any, next) => {
+    await save($, (d, now) => {
+      d.model = clean(String(e.to_model ?? ''), 24); d.flash = { kind: 'model', text: 'NEW MODEL', ms: now }
+      note(d, 'model', `Model: ${d.model}`, now)
+    })
+    return next(e)
+  })
+
+  on('classic.CwdChanged', async ($, e: any, next) => {
+    await save($, (d, now) => {
+      d.branch = undefined; d.flash = { kind: 'move', text: 'MOVED', ms: now }
+      note(d, 'move', `Moved to ${baseName(e.new_cwd)}`, now)
+    })
+    return next(e)
+  })
+
+  on('classic.TaskCreated', async ($, e: any, next) => {
+    await save($, d => { d.tasks = { done: d.tasks?.done ?? 0, total: (d.tasks?.total ?? 0) + 1 } })
+    return next(e)
+  })
+  on('classic.TaskCompleted', async ($, e: any, next) => {
+    await save($, d => { if (d.tasks) d.tasks = { ...d.tasks, done: Math.min(d.tasks.total, d.tasks.done + 1) } })
+    return next(e)
+  })
+
+  // Compacting: the main conversation's only, a helper's own and the background precompute show nothing.
+  on('session.compact', async ($, e: any, next) => {
+    if (e.agentId || e.trigger === 'precompute') return next(e)
+    await save($, (d, now) => { d.task = { kind: 'compact', ms: now, auto: e.trigger === 'auto' }; d.activity = 'think'; d.detail = 'Compacting'; d.activityMs = now; note(d, 'compact', 'Compacting', now) })
+    const result = await next(e)
+    await save($, d => { d.task = undefined })
+    return result
+  })
+
   // The usage limit stopped the session: it stays at its desk, knocked out, until it is started again.
   on('classic.StopFailure', async ($, e: any, next) => {
     if (e.error === 'rate_limit') {
@@ -324,7 +396,7 @@ export const register: Register = on => {
         d.limited = { since: now, resetsAt: resets }; d.waiting = undefined
         d.activity = 'limit'; d.detail = 'Out of usage'; d.activityMs = now
       })
-    } else await save($, (d, now) => stopPlan(d, 'error', now))
+    } else await save($, (d, now) => { stopPlan(d, 'error', now, String(e.error || 'unknown')); note(d, 'error', `Error: ${String(e.error || 'unknown')}`, now) })
     return next(e)
   })
 
@@ -365,8 +437,10 @@ export const register: Register = on => {
       // a turn that ends on a question waits for the reply, and its plan pauses meanwhile; one the user
       // interrupted keeps its steps, like one an error stopped (see StopFailure); any other finishes its plan
       const q = e.isAborted ? '' : lastQuestion(e.answer)
+      d.task = undefined
       if (q) { d.waiting = { kind: 'reply', text: q, since: now }; d.detail = 'Waiting for you'; pausePlan(d, now) }
       else if (e.isAborted) stopPlan(d, 'interrupted', now)
+      else if (d.bg) { d.activity = 'wait'; d.detail = 'Waiting on a background task'; pausePlan(d, now) }
       else if (!d.stopped) finishPlan(d, now)
       if (!e.isAborted && !d.stopped && d.turnMs && now - d.turnMs >= 15_000) {
         d.doneMs = now
@@ -374,13 +448,14 @@ export const register: Register = on => {
         d.doneLine = `Done in ${Math.round((now - d.turnMs) / 1000)}s${s}`
       }
     })
+    await readCtx($)
     if (!e.isAborted && desk?.doneMs && desk.doneMs >= desk.turnMs && !(await $.store.get('quiet'))) await $.audio.play({ asset: 'sounds/done.wav' }).catch(() => undefined)
     return next(e)
   })
 
   on('session.end', async ($, e, next) => {
     ticker?.cancel()
-    await save($, (d, now) => { d.endedMs = now; d.activity = 'gone'; d.detail = 'Gone home' })
+    await save($, (d, now) => { if ((e as any).reason === 'clear') clearPlan(d); d.endedMs = now; d.activity = 'gone'; d.detail = 'Gone home' })
     return next(e)
   })
 }

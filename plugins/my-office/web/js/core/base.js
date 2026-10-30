@@ -19,7 +19,7 @@ const LOOKS=[
   {c:'#D9534F',style:8},
   {c:'#B5835A',style:9}
 ];
-const STATION={asleep:'desk',read:'cabinet',edit:'desk',think:'desk',send:'desk',bash:'desk',web:'machine',agent:'door',idle:'coffee',gone:'exit',ask:'desk',limit:'desk'};
+const STATION={asleep:'desk',read:'cabinet',edit:'desk',think:'desk',send:'desk',bash:'desk',web:'machine',agent:'door',idle:'coffee',gone:'exit',ask:'desk',limit:'desk',wait:'desk'};
 const CONF=['#D97557','#2A9D8F','#8E6CCF','#E0B04A','#FFFFFF','#5BD08A'];
 const GLYPHS='a{};<>/=+01xk#()$*';
 

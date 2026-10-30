@@ -64,7 +64,7 @@ stage.addEventListener('click',e=>{
 const card=document.getElementById('card');
 const VARIANTS=['Classic','Headphones','Antenna','Beanie','Glasses','Bow','Sprout','Top hat','Cap','Chef'];
 const COLOURS=['Orange','Teal','Purple','Gold','Blue','Pink','Green','Grey','Red','Brown'];
-const ACT_TEXT={think:'Thinking',edit:'Editing files',read:'Reading',bash:'Running commands',web:'On the web',send:'Sending a message',agent:'Briefing a helper',ask:'Waiting for you',limit:'Out of usage',idle:'On a break',asleep:'Not joined yet',gone:'Gone home'};
+const ACT_TEXT={think:'Thinking',edit:'Editing files',read:'Reading',bash:'Running commands',web:'On the web',send:'Sending a message',agent:'Briefing a helper',ask:'Waiting for you',limit:'Out of usage',idle:'On a break',asleep:'Not joined yet',gone:'Gone home',wait:'Waiting on a background task'};
 const IDLE_TEXT={coffee:'having a coffee',window:'looking out the window',plant:'watering the plant',stretch:'stretching',wander:'taking a stroll',juggle:'juggling',chat:'chatting with ',play:'playing catch with ',nap:'napping',read:'reading a book',yoga:'doing yoga',dance:'dancing',game:'playing a game',doze:'dozing off',files:'tidying the files',tinker:'tinkering with the machine',tea:'having tea',origami:'folding a paper crane',donut:'eating a doughnut',float:'floating about',catpet:'petting the cat',arcade:'playing the arcade',rps:'playing rock, paper, scissors with ',planes:'throwing paper planes with ',duet:'dancing with ',highfive:'giving a high five'};
 function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
 function statusOf(ch){
@@ -108,11 +108,13 @@ function renderCard(){
   let eta='';
   if(inf.mode==='ontime')eta=`Done by <b>${hhmm(inf.fin)}</b> · ${about(inf.left)} left`;
   else if(inf.mode==='late')eta=`Now done by ${hhmm(inf.fin)} · <b style="color:#B26A00">${about(inf.late*60000)} behind plan</b>`;
-  else if(inf.mode==='stopped')eta=`<b style="color:${inf.kind==='error'?'#B03A2E':'#B26A00'}">${inf.kind==='error'?'Ended on an error':'Interrupted'} at ${hhmm(inf.at)}</b> · ${inf.done} of ${inf.total} steps`;
+  else if(inf.mode==='stopped')eta=`<b style="color:${inf.kind==='error'?'#B03A2E':'#B26A00'}">${inf.kind==='error'?'Ended':'Interrupted'} at ${hhmm(inf.at)}${inf.kind==='error'&&!inf.label.startsWith('ENDED')?' · '+esc(inf.label):''}</b>${inf.total?` · ${inf.done} of ${inf.total} steps`:''}`;
   else if(inf.mode==='finished')eta=`<b style="color:#2E8A57">Finished at ${hhmm(inf.at)}</b>`;
   else if(!inf.total)eta='No plan yet';
   if(eta)h+=`<div class="eta">${eta}</div>`;
   const nh=(Array.isArray(dk.interns)?dk.interns:[]).length;if(nh)h+=`<div class="eta">${nh} helper${nh>1?'s':''} on it</div>`;
+  const facts=[dk.branch&&'Branch '+str(dk.branch,30),dk.model&&str(dk.model,24),dk.ctx!=null&&'Context '+dk.ctx+'%',dk.tasks&&dk.tasks.total&&`Tasks ${dk.tasks.done} of ${dk.tasks.total}`].filter(Boolean);
+  if(facts.length)h+=`<div class="eta">${esc(facts.join(' · '))}</div>`;
   if(h!==card._h){card.innerHTML=h;card._h=h;}
   placeCard(ch);
 }

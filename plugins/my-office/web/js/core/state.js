@@ -252,7 +252,7 @@ function ingest(d,synthetic){
     // a session out of usage stays knocked out at its desk; one waiting for you calls from its desk
     if(dk.limited)act='limit';else if(dk.waiting&&act!=='gone')act='ask';
     if(ch.act&&ch.act!==act)onActChange(ch,ch.act,act);
-    ch.act=act;
+    ch.act=act;reactToDesk(ch,dk);
     const st=STATION[act]; const n=cnt[st]=(cnt[st]||0); cnt[st]=n+1;
     const t=posFor(st,n,xs[i]); t.st=st;
     // a Claude on a break runs its own little life (the idle brain); everyone else goes where the work is

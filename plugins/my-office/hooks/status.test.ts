@@ -1,7 +1,8 @@
 import { expect, test } from 'claude-code/testing'
 
-import { lastQuestion, pausePlan, rateOf, resumePlan, todoSteps, newDesk } from './core'
+import { bashTask, branchOf, lastQuestion, pausePlan, rateOf, resumePlan, todoSteps, newDesk } from './core'
 import { register } from './register'
+import { toolFlash } from './core'
 
 // A tiny in-memory engine: enough of the engine to run one session's hooks and read its desk file back.
 // The module keeps its desk and its setup across tests (as across a session), so each test sets up
@@ -116,6 +117,50 @@ test('an error keeps the steps left and reads as no success', async () => {
   expect(d.stopped.kind).toBe('error')
   expect(d.steps.some((s: any) => s.doneMs)).toBe(false)
   expect(d.doneLine).toBe(line)
+})
+
+test('a shell command is read as tests, a build, a commit or a push, and how it went', () => {
+  expect(bashTask('bun run test')).toBe('tests')
+  expect(bashTask('npm run build')).toBe('build')
+  expect(bashTask('git add -A && git commit -m x')).toBe('commit')
+  expect(bashTask('npm test && git push')).toBe('push')
+  expect(bashTask('ls')).toBeUndefined()
+  expect(branchOf('git worktree add ../x -b more-states')).toBe('more-states')
+  expect(branchOf('git switch main')).toBe('main')
+  expect(toolFlash('tests', true, 'boom', 1)?.text).toBe('TESTS FAILED')
+  expect(toolFlash('push', false, '', 1)?.kind).toBe('ship')
+  expect(toolFlash(undefined, false, '', 1)).toBeUndefined()
+  expect(toolFlash(undefined, true, 'The user doesn\'t want to proceed', 1)?.kind).toBe('denied')
+})
+
+test('a turn that leaves a background job waits for it instead of finishing the plan', async () => {
+  const o = engine()
+  await o.fire('session.start', {})
+  await o.fire('prompt.submit', {})
+  await o.fire('turn.start', {})
+  await o.fire('tool.call', { tool: 'mcp__my-office__plan', steps: [{ label: 'One', minutes: 5 }] })
+  await o.fire('tool.call', { tool: 'Bash', command: 'sleep 100', run_in_background: true, tool_use_id: 'b1' })
+  await o.fire('turn.complete', { answer: 'Started it.', isAborted: false })
+  expect(o.deskNow().activity).toBe('wait')
+  expect(o.deskNow().bg.kind).toBe('job')
+  expect(o.deskNow().steps[0].doneMs).toBeUndefined()
+  await o.fire('turn.start', {})
+  expect(o.deskNow().bg).toBeUndefined()
+})
+
+test('a named error shows even with no plan, and compacting comes and goes', async () => {
+  const o = engine()
+  await o.fire('session.start', {})
+  await o.fire('prompt.submit', {})
+  await o.fire('turn.start', {})
+  await o.fire('classic.StopFailure', { error: 'overloaded' })
+  await o.fire('turn.complete', { answer: '', isAborted: false })
+  expect(o.deskNow().stopped.error).toBe('overloaded')
+  await o.fire('prompt.submit', {})
+  expect(o.deskNow().stopped).toBeUndefined()
+  await o.fire('session.compact', { trigger: 'auto' })
+  expect(o.deskNow().task).toBeUndefined()
+  expect(o.deskNow().log.some((l: any) => l.kind === 'compact')).toBe(true)
 })
 
 test('the usage limit knocks the session out until its next prompt or restart', async () => {
