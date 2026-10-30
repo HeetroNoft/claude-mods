@@ -3,8 +3,8 @@
 // Pixel sprites: the mascot, icons, and the room furniture.
 // A blocky Claude mascot: wide body, two slit eyes, stubby side arms, four little legs.
 // o: look, pose, frame, blink, dir, small, sq (-2..2: + is taller and thinner, - is squashed),
-//    gaze (-1..1: where the eyes look), mood (happy|love|surprised|dizzy|sleep), wob (accessory sway), glow
-//    held ({kind,...}: a prop in hand, see actors/props.js), lift (raises it), carry (a file's colour, under the arm), breath (0/1)
+//    gaze (-1..1: where the eyes look), mood (happy|love|surprised|dizzy|sleep), sway, pop (px: what it wears trails the head, see trailOf), glow
+//    held ({kind,...}: a prop in hand, see actors/props.js), lift (raises it), raise (0..1: a drink or a bite on its way to the mouth, else frame), carry (a file's colour, under the arm), breath (0/1)
 const EYE='#141413';
 function drawPerson(g,cx,fy,o){
   const sm=!!o.small,pose=o.pose,f=o.frame|0;
@@ -42,6 +42,9 @@ function drawPerson(g,cx,fy,o){
   const twoHands=(x,w,y)=>{reach(-1,x-1,y,true);reach(1,x+w-1,y,true);};
   const thumbs=(x,w,y)=>{R(g,x,y,1,1,c);R(g,x+w-1,y,1,1,c);};
   const lift=o.lift|0;
+  // from the side up to the mouth, in a small arc, the arm crossing the body past halfway
+  const toMouth=my=>{const r=Math.max(0,Math.min(1,o.raise==null?f:o.raise)),hx=L-3+Math.round(r*8),hy=Math.round(ay+1+(my-ay-1)*r-Math.sin(Math.PI*r)*2)-lift;
+    nub(1,0);hand={x:hx,y:hy,side:-1};reach(-1,hx,hy,r>.5);};
   switch(pose){
     case 'walk':if(o.carry&&!sm){nub(-1,f?-1:1);}else{nub(-1,f?-1:1);nub(1,f?1:-1);}break;
     case 'type':nub(-1,f?2:1);nub(1,f?1:2);if(sm)extras.push(()=>R(g,L+1,T+bh-2,bw-2,1,'#C8CDD6'));break;
@@ -53,10 +56,10 @@ function drawPerson(g,cx,fy,o){
     // a drink: held low by its handle, then up to the mouth for a sip, the arm across the body
     case 'sip':if(!o.held)o.held={kind:'mug'};
       if(sm){nub(1,0);nub(-1,f?-2:0);hand={x:L-aw-1,y:ay+(f?-1:1),side:-1};break;}
-      nub(1,0);if(f){hand={x:L+2,y:ey+3-lift,side:-1};reach(-1,hand.x,hand.y,true);}else{hand={x:L-3,y:ay+1-lift,side:-1};reach(-1,hand.x,hand.y);}break;
+      toMouth(ey+3);break;
     // a bite: the same, up to the mouth
     case 'eat':if(sm){nub(1,0);nub(-1,f?-2:-1);break;}
-      nub(1,0);if(f){hand={x:L+2,y:ey+4,side:-1};reach(-1,hand.x,hand.y,true);}else{hand={x:L-3,y:ay+1,side:-1};reach(-1,hand.x,hand.y);}break;
+      toMouth(ey+4);break;
     case 'cheer':case 'stretch':case 'yawn':up(-1);up(1);break;
     case 'catch':up(-1,-1,8);up(1,-1,8);break;
     case 'throw':nub(-1,0);up(1);break;
@@ -81,7 +84,7 @@ function drawPerson(g,cx,fy,o){
     case 'hug':nub(-1,0,3);nub(1,0,3);break;
     case 'highfive':nub(-side,0);up(side,0,6);break;
     case 'slump':nub(-1,2);nub(1,2);break;
-    case 'pet':nub(-side,0);nub(side,2,2);break;
+    case 'pet':nub(-side,0);nub(side,f?1:3,2);break;
     default:{const b=!sm&&(pose==='stand'||pose==='sit')&&o.breath?1:0;nub(-1,b);nub(1,b);} // arms rise and fall with the breath
   }
 
@@ -112,6 +115,7 @@ const ACC_POM=['.ww.','wxww','.ss.'],ACC_BULB=['.aa.','ahaa','aaay','.yy.'];
 const ACC_STEM=['.s.','.s.','ccc'],ACC_STEM_LOW=['..s','.s.','ccc'];
 const ACC_LEAVES=['.....ll.','.ll.lLLl','lLLlsll.','.llls...'],ACC_LEAVES_LOW=['..lsl..','.lLsLl.','lL.s.Ll','l..s..l'];
 const ACC_CHEF=['..WWW..WWW..','.WWWWWWWWWW.','WWWWWWWWWWWs','WWWWsWWWWsWs','.WWWsWWWsWs.','.WWWsWWWsWs.','.gggggggggg.'];
+const HATS=new Set([3,7,8,9]); // what can come off the head
 const ACC_CUPS=['.pp','pPc','pPc','.pp'];
 const ACC_PAL={
   1:{h:'#8C96AC',b:'#4A5266',p:'#FF7A59',P:'#FFB199',c:'#2B2F3A'},
@@ -139,34 +143,34 @@ function drawGlasses(g,ex1,ex2,ey){
   [ex1,ex2].forEach(ex=>{R(g,ex-1,ey-1,3,3,'rgba(190,230,255,.3)');R(g,ex-1,ey-2,3,1,F);R(g,ex-1,ey+2,3,1,U);R(g,ex-2,ey-1,1,3,F);R(g,ex+2,ey-1,1,3,U);R(g,ex+1,ey-1,1,1,'rgba(255,255,255,.75)');});
   if(ex2-ex1>5)R(g,ex1+3,ey-1,ex2-ex1-5,1,F);
 }
-// What the look wears on its head, returns how high it reaches. o.wob sways what hangs loose, a hat
-// jumps off the head on a fright or a cheer, what is soft droops in sleep; a brim or a bow follows
-// the way the Claude faces.
+// What the look wears on its head, returns how high it reaches at rest (a badge above does not bounce
+// with a hat). o.sway swings what hangs loose, o.pop lifts a hat off the head, what is soft droops in
+// sleep; a brim or a bow follows the way the Claude faces.
 function drawAccessory(g,o,b){
-  const {L,T,bw,side,back}=b,st=o.look.style,pal=ACC_PAL[st],w=o.wob|0,flip=side<0;
+  const {L,T,bw,side,back}=b,st=o.look.style,pal=ACC_PAL[st],w=o.sway|0,leaf=Math.max(-1,Math.min(1,w)),flip=side<0;
   const out=o.mood==='dead'||o.mood==='sleep'||o.pose==='sleep',mid=L+(bw>>1);
-  const pop=(st===3||st>=7)?(o.mood==='surprised'?2:o.pose==='cheer'&&o.frame?1:0):0,y=T-pop;
+  const pop=HATS.has(st)?Math.max(0,o.pop|0):0,y=T-pop;
   switch(st){
     case 1:{const n=bw-4;
       drawAcc(g,['...'+'h'.repeat(n)+'...','..h'+'b'.repeat(n)+'b..','.b'+'.'.repeat(n+2)+'b.'],pal,L-1,T-3,b);
       [L-3,L+bw].forEach((x,i)=>drawAcc(g,ACC_CUPS,pal,x,T,b,i>0));return T-3;}
     case 2:{if(out){drawAcc(g,ACC_STEM_LOW,pal,mid-1,T-3,b);drawAcc(g,ACC_BULB,pal,mid,T-7,b);return T-7;}
-      drawAcc(g,ACC_STEM,pal,mid-1,T-3,b);drawAcc(g,ACC_BULB,o.glow?{a:'#FFF3A0',h:'#FFFFFF',y:'#FFD84A'}:pal,mid-1+w,T-7,b);return T-7;}
+      const bend=(w>>1)+2;drawAcc(g,['.....'.slice(0,bend)+'s'+'.....'.slice(bend+1),'..s..','.ccc.'],pal,mid-2,T-3,b);drawAcc(g,ACC_BULB,o.glow?{a:'#FFF3A0',h:'#FFFFFF',y:'#FFD84A'}:pal,mid-1+w,T-7,b);return T-7;}
     case 3:{const rows=[centred('h'+ribs(bw-7),bw),centred('hh'+ribs(bw-6),bw),centred('h'+ribs(bw-3),bw),'cC'.repeat(bw).slice(0,bw),'CD'.repeat(bw).slice(0,bw)];
-      drawAcc(g,ACC_POM,pal,out?mid+3:mid-2+w,out?y-7:y-8,b);
-      drawAcc(g,rows,pal,L,y-4,b);return y-8;}
+      drawAcc(g,ACC_POM,pal,out?mid+3:mid-2+w,(out?y-7:y-8)-(pop?1:0),b);
+      drawAcc(g,rows,pal,L,y-4,b);return T-8;}
     case 5:drawAcc(g,ACC_BOW,pal,flip?L:L+bw-7,T-3,b,flip);return T-3;
     case 6:{if(out){drawAcc(g,ACC_LEAVES_LOW,pal,mid-3,T-4,b);return T-4;}
-      drawAcc(g,['s','s','s'],pal,mid,T-3,b);drawAcc(g,ACC_LEAVES,pal,mid-4+w,T-7,b);
-      if(o.mood==='happy'||o.mood==='love'){R(g,mid+1+w,T-8,2,1,'#FF8FB8');return T-8;}
+      drawAcc(g,['s','s','s'],pal,mid,T-3,b);drawAcc(g,ACC_LEAVES,pal,mid-4+leaf,T-7,b);
+      if(o.mood==='happy'||o.mood==='love'){R(g,mid+1+leaf,T-8,2,1,'#FF8FB8');return T-8;}
       return T-7;}
     case 7:{const c=bw-6,W=bw+2,r='h'+'c'.repeat(c-2)+'d',l=(c-2)>>1;
-      drawAcc(g,[centred('B'.repeat(c+2),W),centred(r,W),centred(r,W),centred(r,W),centred('O'+'o'.repeat(c-1),W),centred('O'+'o'.repeat(l-1)+'gg'+'o'.repeat(c-2-l),W),'BBB'+'b'.repeat(W-5)+'dd'],pal,L-1,y-7,b);return y-7;}
+      drawAcc(g,[centred('B'.repeat(c+2),W),centred(r,W),centred(r,W),centred(r,W),centred('O'+'o'.repeat(c-1),W),centred('O'+'o'.repeat(l-1)+'gg'+'o'.repeat(c-2-l),W),'BBB'+'b'.repeat(W-5)+'dd'],pal,L-1+(w>>1),y-7,b);return T-7;}
     case 8:{const n=bw-2;
-      if(back){drawAcc(g,[centred('hbbbbb',n),centred('h'+'b'.repeat(n-5),n),centred('h'+'b'.repeat(n-3),n),'b'.repeat(n>>1)+'k'+'b'.repeat(n-(n>>1)-1)],pal,L+1,y-4,b);return y-4;}
+      if(back){drawAcc(g,[centred('hbbbbb',n),centred('h'+'b'.repeat(n-5),n),centred('h'+'b'.repeat(n-3),n),'b'.repeat(n>>1)+'k'+'b'.repeat(n-(n>>1)-1)],pal,L+1,y-4,b);return T-4;}
       const rows=[centred('h'+'b'.repeat(n-7),n)+'....',centred('h'+'b'.repeat(n-6)+'wwb',n)+'....','h'+'b'.repeat(n-4)+'wwb'+'....','b'.repeat(n-2)+'tttttd','.'.repeat(n-1)+'ddddd'];
-      drawAcc(g,rows,pal,flip?L-3:L+1,y-4,b,flip);return y-4;}
-    case 9:drawAcc(g,ACC_CHEF,pal,mid-6,y-7,b);return y-7;
+      drawAcc(g,rows,pal,flip?L-3:L+1,y-4,b,flip);return T-4;}
+    case 9:drawAcc(g,ACC_CHEF,pal,mid-6+(w>>1),y-7,b);return T-7;
   }
   return T;
 }

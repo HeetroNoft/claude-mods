@@ -5,7 +5,7 @@ const PROP_SIZE={mug:[4,4],teacup:[3,3],cookie:[4,4],donut:[5,3],ball:[4,4],flow
 const COOKIE_ROWS=['.cc.','cckc','ckcc','.cc.'];
 // Pixels gone after each bite, eaten from the top right.
 const COOKIE_BITES=[[],['3,0','3,1','2,0'],['3,0','3,1','2,0','3,2','2,1','1,0'],['3,0','3,1','2,0','3,2','2,1','1,0','0,1','1,1','2,2','3,3']];
-// o: col (mug or ball colour), fill (0..1 of coffee or tea left), bites (cookie, 0..4), open (gift).
+// drawHeld also takes dx, dy (a shake). o: col (mug or ball colour), fill (0..1 of coffee or tea left), bites (cookie, 0..4), open (gift).
 function drawProp(g,kind,x,y,o){
   o=o||{};x=Math.round(x);y=Math.round(y);
   const full=o.fill==null||o.fill>.01;
@@ -41,7 +41,7 @@ function heldBox(hand,o){
 // rim: a dark edge round the prop, so an orange gift still shows against an orange Claude.
 let heldCv=null;
 function drawHeld(g,hand,o,skin,rim){
-  const b=heldBox(hand,o),dx=o.dx|0;
+  const b=heldBox(hand,o),dx=o.dx|0;b.y+=o.dy|0;
   if(rim){
     if(!heldCv){heldCv=document.createElement('canvas');heldCv.width=heldCv.height=12;}
     const h=heldCv.getContext('2d');h.clearRect(0,0,12,12);h.save();

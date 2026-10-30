@@ -137,15 +137,19 @@ function frame(tp){
     const st=treatNow(ch,tp),I=ch.idle,doing=I&&I.phase==='do'&&!ch.path.length?I.act:null;
     const held=st?st.held:doing==='donut'?{kind:'donut'}:doing==='tea'?{kind:'teacup'}:null;
     const o={look:ch.look,pose,frame:st&&st.frame!=null?st.frame:frameOf(ch,rate),blink:blinking(ch,tp),dir:dirOf(ch),sq:sqOf(ch,tp,pose,jy),gaze:gazeOf(ch,tp),
-      mood:st&&st.mood?st.mood:moodOf(ch,tp,pose),wob:(ch.path.length||jy||ch.held)?Math.round(Math.sin(tp/70)):0,glow:n>.5,air,held,lift:st?st.lift:0,
+      mood:st&&st.mood?st.mood:moodOf(ch,tp,pose),glow:n>.5,air,held,
       carry:ch.errand&&ch.errand.phase==='go'?ch.errand.col:null,breath:((tp/1000+ch.blinkT)%2.8)<1.4?0:1};
+    // a treat says when the arm goes up; a snack on a break is a bite now and then, not a chew a beat
+    const raiseTo=pose!=='sip'&&pose!=='eat'?0:st&&st.raise!=null?st.raise:(st||pose==='sip')?o.frame:((tp/1000+ch.blinkT)%1.6<.5?1:0);
+    const tr=trailOf(ch,ch.x+sway,ch.y+jy+bob-air,pose,o.mood,raiseTo,st&&st.lift||0,tp);
+    o.sway=Math.round(tr.x);o.pop=Math.round(-tr.y);o.raise=tr.raise;o.lift=Math.round(tr.lift);
     items.push({d:ch.held?999:ch.y,f:()=>{
       if(cardId===ch.id)drawRing(wx,ch.x,ch.y,ch.look.c,tp);
       ch.bodyTop=ch.y+jy+bob-air-15;
       ch.headTop=drawPerson(wx,ch.x+sway,ch.y+jy+bob-air,o);
       drawIdleProps(wx,ch,tp);
       if(st)drawTreat(wx,ch,tp,st);
-      if(tp<(ch.flowerUntil||0)&&ch.bodyTop!=null)drawProp(wx,'blossom',Math.round(ch.x+3),Math.round(ch.bodyTop-2));
+      if(tp<(ch.flowerUntil||0)&&ch.bodyTop!=null)drawProp(wx,'blossom',Math.round(ch.x+3+o.sway),HATS.has(ch.look.style)?Math.round(ch.headTop+1-o.pop):Math.round(ch.bodyTop-2)); // tucked in the hat band, or on the head
     }});
     post.push(()=>{
       const ht=ch.headTop; if(ht==null)return;

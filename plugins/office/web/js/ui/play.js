@@ -15,23 +15,24 @@ const TREATS={
   // four bites at the mouth with crumbs, chewing in between, until nothing is left
   cookie:{ms:3800,snd:640,mood:'happy',
     state(ch,u){const k=BITES.filter(b=>u>=b).length,up=BITES.some(b=>u>b-.08&&u<b+.03);
-      return {pose:'eat',frame:up?1:(Math.floor(u*20)%2),held:k<4?{kind:'cookie',bites:k}:null};},
+      return {pose:'eat',frame:Math.floor(u*20)%2,raise:up?1:0,held:k<4?{kind:'cookie',bites:k}:null};},
     events(ch,u,t){const k=BITES.filter(b=>u>=b).length;if(k>(t.k|0)){t.k=k;const y=(ch.bodyTop||ch.y-15)+5;
       for(let i=0;i<4;i++)confetti.push({x:ch.x-9+Math.random()*3,y,vx:(Math.random()-.5)*16,vy:-6-Math.random()*8,c:i%2?'#D49A5A':'#5A3418',life:.7,w:1});blip(300+k*40,.03,'triangle');}},
     end(ch){emote(ch,'note');}},
   // a few dribbles on the floor, then juggling, then a catch over the head
   ball:{ms:4600,snd:760,mood:'happy',
-    state(ch,u){if(u<.36)return {pose:'pet',dribble:true};if(u<.88)return {pose:'juggle',juggle:true};return {pose:'catch',caught:true};},
+    state(ch,u){if(u<.36)return {pose:'pet',frame:Math.abs(Math.sin(u*27))>.5?1:0,dribble:true};if(u<.88)return {pose:'juggle',juggle:true};return {pose:'catch',caught:true};},
     end(ch){emote(ch,'star');}},
   // held in front, lifted for a long sniff (eyes closed, hearts), then tucked on the head for a while
   flower:{ms:3800,snd:880,mood:'love',
-    state(ch,u){const sniff=u>.28&&u<.72;return {pose:'hold',held:{kind:'flower'},lift:sniff?4:0,mood:sniff?'sleep':'love',hearts:sniff};},
+    state(ch,u){const sniff=u>.28&&u<.72;return {pose:'hold',held:{kind:'flower',dx:sniff?Math.round(Math.sin(u*38)*.8):0},lift:sniff?4:0,mood:sniff?'sleep':'love',hearts:sniff};},
     end(ch,tp){ch.flowerUntil=tp+90000;}},
   // a curious shake, the lid pops off with confetti, and a star rises from the open box
   gift:{ms:3800,snd:990,mood:'happy',
-    state(ch,u){if(u<.36)return {pose:'hold',held:{kind:'gift',dx:Math.round(Math.sin(u*90))},mood:'surprised'};
+    state(ch,u){if(u<.36)return {pose:'hold',held:{kind:'gift',dx:Math.round(Math.sin(u*90)*(.6+u*4)),dy:u>.22?-(Math.floor(u*50)%2):0},mood:'surprised'};
       return {pose:u<.7?'cheer':'hold',held:u<.7?null:{kind:'gift',open:true},star:u<.7};},
-    events(ch,u,t){if(u>=.36&&!t.opened){t.opened=true;const x=ch.x,y=(ch.bodyTop||ch.y-15)+4;
+    events(ch,u,t){if(u>=.3&&!t.wind){t.wind=true;ch.sqv-=16;} // it braces, then the lid goes
+      if(u>=.36&&!t.opened){t.opened=true;const x=ch.x,y=(ch.bodyTop||ch.y-15)+4;
       for(let i=0;i<34;i++)confetti.push({x,y,vx:(Math.random()-.5)*60,vy:-25-Math.random()*40,c:CONF[i%CONF.length],life:1.6+Math.random(),w:Math.random()<.4?2:1});
       leaves.push({x:x-2,y:y-2,vx:-18,vy:-30,life:1.2,p:0,w:3,c:'#E58A6A'});chime(.7);}},
     end(ch){emote(ch,'star');}},
@@ -55,7 +56,7 @@ function drawTreat(g,ch,tp,st){
   if(st.steam&&Math.floor(tp/240)%2)R(g,x-11,top+1-Math.floor((tp/140)%4),1,1,'rgba(255,255,255,.75)');
   if(st.dribble){const b=Math.abs(Math.sin((tp-ch.treat.t0)/170));drawProp(g,'ball',x+dir*10-2,Math.round(ch.y-4-b*8),{});}
   if(st.juggle)drawJuggle(g,ch,tp,ch.treat.t0,'#FF6B6B');
-  if(st.caught)drawProp(g,'ball',x-2,top-6,{});
+  if(st.caught)drawProp(g,'ball',x-2,Math.round(ch.headTop-2),{});
   if(st.hearts&&Math.floor(tp/600)!==Math.floor((tp-17)/600))emote(ch,'heart');
   if(st.star){drawStar(g,x,Math.round(top-4-((tp/40)%10)),Math.floor(tp/150)%2?'#FFD84A':'#FFFFFF');}
 }
