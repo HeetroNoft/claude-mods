@@ -1,7 +1,8 @@
 // Test page script: draws every mascot pose in a grid instead of running the office (run.sh gallery),
 // both frames of each; ?set=held draws the props in hand instead (run.sh gallery held), ?set=looks
 // every accessory in each state, on a light and dark checkerboard (run.sh gallery looks); ?set=motion
-// film strips of the springs, left to right, 1 frame every 50 ms (run.sh gallery motion).
+// film strips of the springs, left to right, 1 frame every 50 ms (run.sh gallery motion); ?set=bubbles
+// a chat line and a thought from start to end, on light and dark (run.sh gallery bubbles).
 'use strict';
 startThemes();resize();
 const SET=(location.search.match(/set=(\w+)/)||[])[1]||'poses';
@@ -33,6 +34,16 @@ if(SET==='cat'){gx.fillStyle='#C08A5C';gx.fillRect(0,0,W,H);const tp=performance
     if(o.air){cat.air.t0=tp-(o.z?3000:1000);cat.air.dur=o.z?4000:2000;}
     if(o.state==='swipe')cat.swipe=tp-(i%2?300:50);
     drawCat(gx,t);});});}
+else if(SET==='rps'){gx.fillStyle='#C08A5C';gx.fillRect(0,0,W,H); // both hands up, over the badges, at each moment of a round
+  [1300,1500,2400,2560].forEach((u,i)=>[0,1].forEach(r=>{const x=30+i*76,y=70+r*70,A={id:'r'+i+r,x,y,bodyTop:y-15,look:LOOKS[1+i]},B={id:'s'+i+r,x:x+28,y,bodyTop:y-15,look:LOOKS[4+i]};
+    A.idle={act:'rps',phase:'do',role:0,sync:1000-RPS_ROUND*r,pair:B};B.idle={act:'rps',phase:'do',role:1,pair:A};
+    [A,B].forEach(c=>{c.headTop=drawPerson(gx,c.x,c.y,{look:c.look,pose:'stand',dir:1});drawBadge(gx,'star',c.x,c.headTop,c.look.c,0,c.id);});
+    [A,B].forEach(c=>drawRps(gx,c,1000+u));}));}
+else if(SET==='bubbles'){gx.fillStyle='#E8DCC8';gx.fillRect(0,0,W,H/2);gx.fillStyle='#10131C';gx.fillRect(0,H/2,W,H/2);
+  const AGES=[20,70,130,300,560,1200,1500,1560];
+  [[1,'quest',24],[-1,'heart',66],[1,'star',114],[-1,'cup',156]].forEach(([d,icon,y],j)=>AGES.forEach((age,i)=>{const ch={x:(d>0?12:30)+i*38,y,bodyTop:y-15,look:LOOKS[1+j*2]};
+    drawPerson(gx,ch.x,y,{look:ch.look,pose:'talk',dir:d,frame:1});drawSpeech(gx,ch,d,icon,age,1590-age,1000+i*60);}));
+  [0,100,200,1000].forEach((age,i)=>{[0,1].forEach(k=>{const ch={x:30+i*70,y:k?178:88+0,bodyTop:(k?178:88)-15,look:LOOKS[i*2+1],thoughtAt:1000};drawPerson(gx,ch.x,ch.y,{look:ch.look,pose:'sit',dir:1});drawThought(gx,ch,1000+Math.max(age,1));});});}
 else if(SET==='motion'){gx.fillStyle='#E8DCC8';gx.fillRect(0,0,W,H);
   FILMS.forEach(([style,pose,path,raise,lift,held,mood],j)=>{const ch={},look=LOOKS.find(l=>l.style===style);
     for(let i=0;i<13;i++){const t=i*.05;let tr;for(let k=0;k<5;k++){const q=t+k*.01,[dx,dy]=path(q);tr=trailOf(ch,50+dx,50+dy,pose,mood&&mood(q),q>.1?raise:0,q>.1?lift:0,1000+q*1000);}
