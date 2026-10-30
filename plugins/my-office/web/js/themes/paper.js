@@ -19,7 +19,7 @@ defineTheme('paper','pixel',{name:'Papeterie 2000',swatch:['#D6D0C2','#7C8796','
     view(g,tp,n){
       daySun(g,n,282,38,'#FFF1B8');nightSky(g,tp,n,280,38); // low enough to show under the raised blindsdrawClouds(g,tp,1-n*.85,'#FFFFFF');
       R(g,300,36,16,30,mix('#9AA3AE','#2E3440',n)); for(let y=38;y<56;y+=4)for(let x=302;x<314;x+=4)R(g,x,y,2,2,n>.4&&hash(x+'/'+y)%3?'#FFD27A':mix('#C9DCEB','#3A4250',n));
-      R(g,276,54,40,12,mix('#8A8F96','#3A3E46',n));if(n>.4){g.fillStyle='rgba(255,220,140,.25)';g.fillRect(286,54,9,10);} for(let x=279;x<314;x+=7)R(g,x,58,1,6,'#E8E8E8');
+      snowOn(g,300,36,16,n);R(g,276,54,40,12,mix('#8A8F96','#3A3E46',n));snowOn(g,276,54,40,n);if(n>.4){g.fillStyle='rgba(255,220,140,.25)';g.fillRect(286,54,9,10);} for(let x=279;x<314;x+=7)R(g,x,58,1,6,'#E8E8E8');
       [['#B03A2E',281],['#2B5A9E',295],['#E8E2D0',302]].forEach(([c,x])=>{R(g,x,59,6,3,c);R(g,x+1,58,4,1,shade(c,.2));R(g,x+1,62,1,1,'#1E1E1E');R(g,x+4,62,1,1,'#1E1E1E');});
       R(g,290,44,1,14,'#5C5F66'); R(g,289,44,3,1,'#5C5F66');
     },

@@ -16,7 +16,7 @@ defineTheme('neon',null,{name:'Neon',swatch:['#15112B','#2DE2E6','#FF3DCB','#7B5
     ol:'#4A3A9A',desk:'glass',plantKind:'neon',smallPlant:'cactus',board:'led',boardInk:'#2DE2E6',boardDim:'#6A5FA8',
     sky:n=>skyOf(n,['#8FB8E6','#E3D7EC'],['#0E0826','#3A1A5C'],['#E07AA8','#F5B48C']),
     view(g,tp,n){daySun(g,n,306,31,'#FFE3B0');
-      BLD.forEach(([x,top,w],b)=>{R(g,x,top,w,64-top,mix('#7E7AA8','#1B1440',n));R(g,x,top,w,1,mix('#A9A3CC','#3A2D6E',n));
+      BLD.forEach(([x,top,w],b)=>{R(g,x,top,w,64-top,mix('#7E7AA8','#1B1440',n));R(g,x,top,w,1,mix('#A9A3CC','#3A2D6E',n));snowOn(g,x,top,w,n);
         for(let y=top+2;y<62;y+=3)for(let i=1;i<w-1;i+=2){const h=hash(b+'_'+i+'_'+y);if(h%3)continue;const on=(h%100)/100<n&&Math.sin(tp/1500+h%17)>-.6;R(g,x+i,y,1,1,on?['#2DE2E6','#FF3DCB','#FFD84A'][h%7%3]:mix('#9FB4D0','#2A2050',n));}});
       // the rooftop sign: on the building at x 283 (top 39), on a mast, brighter at night
       R(g,285,35,1,4,mix('#5A5478','#2A2050',n));g.globalAlpha=Math.max(.45,n);R(g,281,31,9,4,'#FF3DCB');R(g,282,32,7,2,'#FF9BE6');g.globalAlpha=1;

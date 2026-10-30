@@ -12,6 +12,11 @@ setTimeout(()=>{
   ok(floorsEl.querySelector('[data-f="1"] i.limit'),'no red light for the out-of-usage desk');
   const r=floorsEl.getBoundingClientRect(),st=stage.getBoundingClientRect();
   ok(Math.abs((r.left+r.right)/2-(st.left+st.width/2))<2,'panel at '+Math.round((r.left-st.left)/st.width*W)+'..'+Math.round((r.right-st.left)/st.width*W)+', not centred');
+  // seasons: the real dates, both hemispheres, and the settings pin one
+  [['2026-03-19','winter'],['2026-03-20','spring'],['2026-06-20','spring'],['2026-06-21','summer'],['2026-09-21','summer'],['2026-09-22','autumn'],['2026-12-20','autumn'],['2026-12-21','winter'],['2026-01-15','winter']].forEach(([d,s])=>ok(seasonOf(new Date(d+'T12:00:00'),false)===s,d+' is not '+s));
+  ok(seasonOf(new Date('2026-01-15T12:00:00'),true)==='summer'&&seasonOf(new Date('2026-07-15T12:00:00'),true)==='winter','the south has the north\'s seasons');
+  setPref('season','winter');ok(seasonNow()==='winter','the setting did not pin the season');setPref('season','auto');ok(seasonNow()===seasonOf(new Date(),false),'Live does not follow the date');
+  setPref('hemi','south');ok(seasonNow()===seasonOf(new Date(),true),'the south setting is ignored');setPref('hemi','north');
   // avatars: the first one in is the plain Claude, the rest are drawn, and a refresh changes nobody
   const lookKey=()=>everyDesk.map(d=>{const l=looksFor(String(d.id));return d.id+'='+l.c+':'+l.style;}).join();
   const lookRules=why=>{const pairs=everyDesk.map(d=>{const l=looksFor(String(d.id));return l.c+':'+l.style;});ok(new Set(pairs).size===pairs.length,why+': two sessions share an avatar');

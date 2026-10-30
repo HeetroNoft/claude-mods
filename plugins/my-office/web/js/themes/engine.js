@@ -33,10 +33,26 @@ function skyOf(n,day,night,dusk){dusk=dusk||['#E9885A','#F7D59C'];
 function nightSky(g,tp,n,mx,my){if(n<=.05)return;g.globalAlpha=n;
   STARS.forEach((s,i)=>{if(Math.sin(tp/700+i*1.7)>-.4)R(g,s[0],s[1],1,1,'#FFFFFF');});
   R(g,mx,my,5,5,'#F4F1DE');R(g,mx-1,my+1,7,3,'#F4F1DE');R(g,mx+2,my-1,4,5,'rgba(11,22,56,.85)');g.globalAlpha=1;}
+// The season outside: the real date (astronomical dates, north unless the settings say south), or the
+// settings' choice, or ?season=winter for tests. windowView sets SEASON once per frame.
+const SEASONS=['spring','summer','autumn','winter'],SEASON_ASKED=(Q.match(/season=(spring|summer|autumn|winter)/)||[])[1]||null;
+let SEASON='summer';
+function seasonOf(d,south){const k=d.getMonth()*100+d.getDate(),i=k<220?3:k<521?0:k<822?1:k<1121?2:3;return SEASONS[south?(i+2)%4:i];}
+function seasonNow(){return SEASON_ASKED||(PREFS.season!=='auto'&&PREFS.season)||seasonOf(new Date(),PREFS.hemi==='south');}
+// The ground in this season, from a theme's [day, night] colours.
+function seasonGround(day,night){
+  if(SEASON==='spring')return [mix(day,'#9CCB6E',.35),night];
+  if(SEASON==='summer')return [mix(day,'#5E9E48',.4),night];
+  if(SEASON==='autumn')return [mix(day,'#C98A3E',.7),mix(night,'#3A2A1E',.5)];
+  return ['#EEF3F7',mix(night,'#7E8FB4',.6)];
+}
+// Snow lying along the top of something, in winter.
+function snowOn(g,x,y,w,n){if(SEASON==='winter')R(g,x,y,w,1,mix('#FFFFFF','#9AA6C4',n));}
 // Rolling hills along the bottom of a window view (x 276..313). hillTop(x) is where the ground is, so
 // anything drawn on the hills (a house, a tree) stands on it instead of floating.
 function hillTop(x,seed){const u=x+(seed||0);return 56+Math.round(1.6*Math.sin(u/6)+.9*Math.sin(u/2.6));}
 function drawHills(g,n,day,night,seed){
+  [day,night]=seasonGround(day,night);
   const c=mix(day,night,n),top=mix(shade(day,.18),shade(night,.12),n),far=mix(shade(day,.12),shade(night,-.1),n);
   for(let x=276;x<314;x++){const t=hillTop(x+11,seed)-3;R(g,x,t,1,66-t,far);}          // a paler ridge behind
   for(let x=276;x<314;x++){const t=hillTop(x,seed);R(g,x,t,1,66-t,c);R(g,x,t,1,1,top);}

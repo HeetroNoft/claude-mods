@@ -18,11 +18,14 @@ defineTheme('japan','pixel',{name:'Japon · ryokan',swatch:['#F3EAD7','#B03A2E',
       // sun and moon at (301..308, 34..38): inside the round window, above Fuji's peak, clear of the branch
       if(n<.9){g.globalAlpha=1-n;R(g,302,34,5,5,'#FFE8A8');R(g,301,35,7,3,'#FFE8A8');g.globalAlpha=1;}
       if(n>.1){g.globalAlpha=n;STARS.forEach((s,i)=>{if(i%2&&Math.sin(tp/700+i)>-.3)R(g,s[0],s[1],1,1,'#FFFFFF');});R(g,302,34,5,5,'#F4F1DE');R(g,304,33,4,4,mix('#26315C','#0B1638',.5));g.globalAlpha=1;}
-      const fuji=mix('#7D8FB0','#2A3354',n);
-      for(let y=40;y<60;y++){const hw=Math.round((y-40)*1.1);R(g,300-hw,y,2*hw+1,1,y<45?mix('#FFFFFF','#9AA6C4',n):fuji);}
-      R(g,276,58,40,8,mix('#7FA070','#1B3038',n));R(g,276,58,40,1,mix('#93B482','#22403A',n));
+      const fuji=mix('#7D8FB0','#2A3354',n),snow={spring:46,summer:42,autumn:44,winter:53}[SEASON],[gd,gn]=seasonGround('#7FA070','#1B3038');
+      for(let y=40;y<60;y++){const hw=Math.round((y-40)*1.1);R(g,300-hw,y,2*hw+1,1,y<snow?mix('#FFFFFF','#9AA6C4',n):fuji);}
+      R(g,276,58,40,8,mix(gd,gn,n));R(g,276,58,40,1,mix(shade(gd,.15),shade(gn,.12),n));
       R(g,276,32,12,1,'#3E2E22'); R(g,283,33,8,1,'#3E2E22'); R(g,289,34,4,1,'#3E2E22');
-      [[278,30],[283,31],[287,33],[280,34],[291,33],[276,33]].forEach(([x,y],i)=>{R(g,x,y,3,2,i%2?'#F7B6C8':'#FFD0DC');R(g,x+1,y-1,1,1,'#FFE4EC');});
+      // the branch: blossom, then leaves, then red maple, then bare with snow on it
+      const twig={spring:['#F7B6C8','#FFD0DC','#FFE4EC'],summer:['#5E9E48','#7DB85E','#A6D67E'],autumn:['#C8492E','#E08A2E','#F2C14E']}[SEASON];
+      if(twig)[[278,30],[283,31],[287,33],[280,34],[291,33],[276,33]].forEach(([x,y],i)=>{R(g,x,y,3,2,twig[i%2]);R(g,x+1,y-1,1,1,twig[2]);});
+      else{snowOn(g,276,31,12,n);snowOn(g,283,32,8,n);snowOn(g,289,33,4,n);}
     },
     wallPaint:shoji,floorPaint:tatami,
     counterThing:X=>[X+27,151,9,7], // the teapot is what the cat knocks off the counter
