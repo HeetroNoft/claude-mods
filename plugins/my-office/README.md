@@ -25,6 +25,8 @@ Four desks fit on a floor. With more sessions the office opens more floors, and 
 
 In the page: **T** changes the room (8 themes, each with day and night following your local time), **L** shows labels, **I** shows or hides the item bar, **M** switches the sound, **G** slides the usage gauge away (its tab stays, turns to an alert, and the gauge comes back by itself on an alarm), and **S** or the gear opens the settings: a legend of what the boards show, a switch per sound, all of that, plus the office's name (the tab's title), the time of day, the cat's name, head icons, hiding the bars, compact buttons and less motion. Drag a Claude to move it, drag a board onto another desk's place to move that desk there, or onto the floor panel to send it to that floor (order and floors last as long as the sessions do), drag an item from the bar onto a Claude to give it, click a board for its plan in detail (estimated and real time per step), click a Claude for its card, with its recent history folded at the bottom, where **‹** and **›** change its accessory and its colour (an accessory that would make it the twin of another Claude shows greyed, and a colour it cannot take is not offered). A chosen accessory stays; if needed, the colour gives way. A chosen colour stays too, unless two chosen ones meet on a floor: then the later arrival draws another.
 
+Everyone goes through the door properly: it opens, the Claude, helper or cat steps through, and it shuts behind them, in every room's own way. It stays open while several go through.
+
 The tab's icon is the head of the room's cat, so it changes with the room.
 
 Every screen a Claude uses lights it softly, stronger at night: the phone, the game, the desk's laptop or monitor, the machine, the selfie phone.

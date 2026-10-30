@@ -61,6 +61,7 @@ const CAT_CROUCH=110,CAT_LAND=170,CAT_ACCEL=110;
 function catJump(x,y,z,dur,h){cat.path=[];cat.air={x0:cat.x,y0:cat.y,z0:cat.z,x1:x,y1:y,z1:z,t0:performance.now()+CAT_CROUCH,dur:dur||420,h:h==null?6:h};
   if(Math.abs(x-cat.x)>.5)cat.face=x>cat.x?1:-1;}
 function stepCat(dt,tp){
+  if(cat.gate){stepGate(cat,dt);return;}
   if(cat.air){const A=cat.air,u=Math.max(0,Math.min(1,(tp-A.t0)/A.dur));
     cat.x=A.x0+(A.x1-A.x0)*u;cat.y=A.y0+(A.y1-A.y0)*u;cat.z=A.z0+(A.z1-A.z0)*u+Math.sin(Math.PI*u)*A.h;
     if(u>=1){cat.air=null;cat.z=A.z1;cat.land=tp+CAT_LAND;}return;}
@@ -81,11 +82,11 @@ const nextTrip=tp=>tp+CAT_TRIP[0]+Math.random()*(CAT_TRIP[1]-CAT_TRIP[0]);
 function otherFloor(){const f=Math.floor(Math.random()*(floorCount-1));return f>=cat.floor?f+1:f;}
 function catGone(){
   if(cat.job&&cat.job.onEnd)cat.job.onEnd(performance.now());
-  cat.job=null;cat.air=null;cat.path=[];cat.z=0;cat.away=true;cat.x=-50;cat.y=150;catBall=null;
+  cat.job=null;cat.air=null;cat.path=[];cat.z=0;cat.away=true;cat.gate=null;cat.hidden=false;cat.x=-50;cat.y=150;catBall=null;
 }
 // In by the door, and off to a place to rest.
 function catEnter(tp){
-  const p=restSpot();Object.assign(cat,{floor:curFloor,away:false,x:DOOR.x,y:DOOR.y,z:0,face:1,nextTrip:nextTrip(tp)});
+  const p=restSpot();Object.assign(cat,{floor:curFloor,away:false,hidden:false,x:DOOR.x,y:DOOR.y,z:0,face:1,nextTrip:nextTrip(tp)});gateIn(cat);
   startJob('arrive',[STEP.go(20,124),STEP.go(p.x,p.y),STEP.wait(400,'sit')]);
   renderFloors();
 }
@@ -101,7 +102,7 @@ function catOnFloor(byDoor){
 // Its turn to go: over to the door and out.
 function catLeaves(tp){
   const f=otherFloor();cat.nextTrip=nextTrip(tp);
-  startJob('trip',[STEP.go(20,124),STEP.go(DOOR.x,DOOR.y),STEP.act(()=>{cat.floor=f;catGone();renderFloors();})]);
+  startJob('trip',[STEP.go(20,124),STEP.go(DOOR.x,DOOR.y),(tp,first)=>{if(first)gateOut(cat);return !cat.gate;},STEP.act(()=>{cat.floor=f;catGone();renderFloors();})]);
 }
 function catElsewhere(tp){
   if(tp<cat.nextTrip||floorCount<2)return;
@@ -130,7 +131,7 @@ function runJob(tp){
   }
 }
 // the job is over (or given up): off any furniture, then back to resting
-function endJob(tp){
+function endJob(tp){cat.gate=null;
   const J=cat.job;cat.job=null;
   if(J&&J.onEnd)J.onEnd(tp);
   if(cat.z>0){const d=J&&J.down||{x:cat.x,y:cat.y};cat.path=[];catJump(d.x,d.y,0,420,5);}
@@ -445,8 +446,9 @@ function drawCat(g,tp){
 }
 // the cat, then a thing it knocked over (falling, on the floor, or carried by a Claude), and the ball
 function catDrawables(items,tp){
-  if(cat&&!cat.away){const L=lookOf(),box=[Math.round(cat.x)-10,Math.round(cat.y-cat.z)-20,21,24],d=cat.z>0?cat.y+2:cat.y; // up on a piece of furniture: in front of it
-    items.push({d,f:()=>L.holo?drawHolo(wx,box,tp):outlinedLive(wx,'cat',box,g=>drawCat(g,tp))});}
+  if(cat&&!cat.away&&!cat.hidden){const L=lookOf(),box=[Math.round(cat.x)-10,Math.round(cat.y-cat.z)-20,21,24],d=cat.z>0?cat.y+2:cat.y; // up on a piece of furniture: in front of it
+    const draw=()=>L.holo?drawHolo(wx,box,tp):outlinedLive(wx,'cat',box,g=>drawCat(g,tp));
+    if(inDoorway(cat))doorway.push(draw);else items.push({d,f:draw});}
   const F=fallen;
   if(F&&F.state!=='carried'){const u=F.state==='falling'?Math.min(1,(tp-F.t0)/450):1;
     items.push({d:F.fy+.4,f:()=>drawFallen(wx,F,u)});}
