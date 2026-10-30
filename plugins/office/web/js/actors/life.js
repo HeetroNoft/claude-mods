@@ -21,6 +21,24 @@ function animChar(ch,tp,dt,now){
   // back to work (or play) a moment after being put down somewhere
   if(ch.resumeAt&&tp>ch.resumeAt){ch.resumeAt=0;if(ch.act!=='idle'&&ch.want){ch.tgt=null;setTarget(ch,ch.want);}else if(!ch.idle)ch.idle={phase:'pick',t:tp+300};}
 }
+// Follow-through, one set of springs per Claude. What it wears trails behind the head (x, y: px off
+// its rest place; y<0 is off the head, and it can never sink in), a fright or a greeting kicks a hat
+// up, and the arm with a treat (raise, 0..1) and a lifted prop (lift, px) ease to where they go.
+const POP_POSES={cheer:45,wave:40,highfive:40,catch:55};
+function trailOf(ch,x,y,pose,mood,raiseTo,liftTo,tp){
+  const a=ch.trail||(ch.trail={x:0,y:0,vx:0,vy:0,hx:x,hy:y,t:tp,pose,mood,raise:raiseTo,rv:0,lift:liftTo,lv:0});
+  const dt=Math.min(.033,(tp-a.t)/1000),dx=x-a.hx,dy=y-a.hy;a.t=tp;a.hx=x;a.hy=y;
+  if(Math.abs(dx)+Math.abs(dy)>14){a.x=a.y=a.vx=a.vy=0;}else{a.x-=dx;a.y-=dy;} // a long jump is a teleport: no trail
+  if(pose!==a.pose&&POP_POSES[pose])a.vy-=POP_POSES[pose];
+  if(mood==='surprised'&&a.mood!=='surprised')a.vy-=80;
+  a.pose=pose;a.mood=mood;
+  a.vx+=(-a.x*150-a.vx*8)*dt;a.x=Math.max(-3,Math.min(3,a.x+a.vx*dt));
+  a.vy+=(-a.y*150-a.vy*8)*dt;a.y=Math.max(-4,a.y+a.vy*dt);
+  if(a.y>0){a.y=0;if(a.vy>0)a.vy*=-.3;}
+  a.rv+=((raiseTo-a.raise)*130-a.rv*17)*dt;a.raise+=a.rv*dt;
+  a.lv+=((liftTo-a.lift)*130-a.lv*14)*dt;a.lift+=a.lv*dt;
+  return a;
+}
 function blinking(ch,tp){const t=tp-(ch.blinkAt||-1e9);return t<110||(ch.dbl&&t>230&&t<330);}
 function setMood(ch,m,ms){ch.mood=m;ch.moodUntil=performance.now()+ms;}
 function moodOf(ch,tp,pose){if(ch.act==='limit')return 'dead';if(tp<ch.moodUntil)return ch.mood;if(pose==='catch')return 'happy';return null;}
