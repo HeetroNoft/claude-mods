@@ -1,5 +1,6 @@
 // Test page script: draws every mascot pose in a grid instead of running the office (run.sh gallery),
-// both frames of each; ?set=held draws the props in hand instead (run.sh gallery held).
+// both frames of each; ?set=held draws the props in hand instead (run.sh gallery held), ?set=looks
+// every accessory in each state, on a light and dark checkerboard (run.sh gallery looks).
 'use strict';
 startThemes();resize();
 const SET=(location.search.match(/set=(\w+)/)||[])[1]||'poses';
@@ -15,6 +16,10 @@ const cell=(i,label,o)=>{const x=14+(i%10)*31,y=42+Math.floor(i/10)*56;
   const air=(o.pose==='dangle'||o.pose==='float')?7:0;
   drawPerson(gx,x,y-air,Object.assign({look:LOOKS[i%LOOKS.length],dir:1,air},o));
   pixText(gx,label.slice(0,7),x-13,y+4,'#00132F');};
-if(SET==='held')HELD.forEach(([label,pose,frame,held,extra],i)=>cell(i,label,Object.assign({pose,frame,held:held?{...held}:null},extra||{})));
+const STATES=[{},{dir:-1},{pose:'look'},{mood:'surprised'},{pose:'sleep'},{mood:'happy'},{mood:'dead'}];
+if(SET==='looks')STATES.forEach((st,j)=>LOOKS.forEach((look,i)=>{
+  gx.fillStyle=(i+j)%2?'#10131C':'#E8DCC8';gx.fillRect(i*32,j*25,32,25);
+  drawPerson(gx,16+i*32,23+j*25,Object.assign({look,pose:'stand',dir:1,frame:1},st));}));
+else if(SET==='held')HELD.forEach(([label,pose,frame,held,extra],i)=>cell(i,label,Object.assign({pose,frame,held:held?{...held}:null},extra||{})));
 else POSES.forEach((p,i)=>cell(i,p,{pose:p,frame:1,mood:p==='dance'?'happy':null}));
 console.log('GALLERY OK');

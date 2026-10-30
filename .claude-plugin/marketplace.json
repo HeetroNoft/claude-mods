@@ -13,7 +13,7 @@
       "name": "office",
       "source": "./plugins/office",
       "description": "Bureau pixel-art local avec des variantes de la mascotte Claude (d'après l'office de charlie-free-mods)",
-      "version": "1.9.4"
+      "version": "1.9.5"
     },
     {
       "name": "mission-control",

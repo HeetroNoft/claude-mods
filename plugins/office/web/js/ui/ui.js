@@ -62,7 +62,7 @@ stage.addEventListener('click',e=>{
 
 /* ---------- session card ---------- */
 const card=document.getElementById('card');
-const VARIANTS=['Classic','Headphones','Antenna','Beanie','Shades','Bow','Sprout','Top hat','Cap','Chef'];
+const VARIANTS=['Classic','Headphones','Antenna','Beanie','Glasses','Bow','Sprout','Top hat','Cap','Chef'];
 const ACT_TEXT={think:'Thinking',edit:'Editing files',read:'Reading',bash:'Running commands',web:'On the web',send:'Sending a message',agent:'Briefing a helper',ask:'Waiting for you',limit:'Out of usage',idle:'On a break',asleep:'Not joined yet',gone:'Gone home'};
 const IDLE_TEXT={coffee:'having a coffee',window:'looking out the window',plant:'watering the plant',stretch:'stretching',wander:'taking a stroll',juggle:'juggling',chat:'chatting with ',play:'playing catch with ',nap:'napping',read:'reading a book',yoga:'doing yoga',dance:'dancing',game:'playing a game',doze:'dozing off',files:'tidying the files',tinker:'tinkering with the machine',tea:'having tea',origami:'folding a paper crane',donut:'eating a doughnut',float:'floating about',catpet:'petting the cat',arcade:'playing the arcade',rps:'playing rock, paper, scissors with ',planes:'throwing paper planes with ',duet:'dancing with ',highfive:'giving a high five'};
 function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}

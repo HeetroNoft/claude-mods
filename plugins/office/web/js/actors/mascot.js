@@ -102,21 +102,70 @@ function drawPerson(g,cx,fy,o){
   if(o.carry&&!sm){drawFolder(g,L+bw-4,ay-3,o.carry,true);R(g,L+bw-3,ay,4,4,ol);R(g,L+bw-2,ay+1,2,2,c);R(g,L+bw-2,ay+1,1,1,hi);} // a file under the arm
   drawArms(frontArms);
   if(hand&&o.held&&!sm)drawHeld(g,hand,o.held,c,ol);
-  // variant accessories
-  let top=T;
-  if(!sm){
-    const st=lk.style,w=o.wob|0;
-    if(st===1){R(g,L+1,T-2,bw-2,1,'#2B2F3A');R(g,L,T-1,1,1,'#2B2F3A');R(g,L+bw-1,T-1,1,1,'#2B2F3A');R(g,L-1,T,1,4,'#2B2F3A');R(g,L+bw,T,1,4,'#2B2F3A');R(g,L-1,T+1,1,2,'#E8ECF2');R(g,L+bw,T+1,1,2,'#E8ECF2');top=T-2;}
-    else if(st===2){const ax=L+(bw>>1);R(g,ax,T-3,1,3,dk);R(g,ax-1+w,T-5,3,2,o.glow?'#FFF3A0':'#FFD84A');top=T-5;}
-    else if(st===3){R(g,L+1,T-2,bw-2,3,dk);R(g,L+1,T,bw-2,1,shade(dk,.25));R(g,L+(bw>>1)-1+w,T-4,2,2,'#FFFFFF');top=T-4;}
-    else if(st===4&&!back&&o.mood!=='dead'){const F='#1E2230';[ex1,ex2].forEach(ex=>{R(g,ex-1,ey-1,3,1,F);R(g,ex-1,ey+2,3,1,F);R(g,ex-1,ey,1,2,F);R(g,ex+1,ey,1,2,F);});R(g,ex1+2,ey,ex2-ex1-3,1,F);}
-    else if(st===5){const B='#C2185B';R(g,L+bw-6,T-2,2,3,B);R(g,L+bw-3,T-2,2,3,B);R(g,L+bw-4,T-1,1,1,shade(B,-.3));top=T-2;}
-    else if(st===6){const sx=L+(bw>>1);R(g,sx,T-3,1,3,'#3E7A2E');R(g,sx-2+w,T-4,2,1,'#8BD46A');R(g,sx+1+w,T-5,2,1,'#8BD46A');top=T-5;}
-    else if(st===7){const H='#1E2230';R(g,L+1,T-1,bw-2,1,H);R(g,L+3,T-6,bw-6,5,H);R(g,L+3,T-2,bw-6,1,ORANGE);top=T-6;}
-    else if(st===8){const C='#2C3E8C';R(g,L+1,T-2,bw-3,2,C);R(g,L+bw-3,T-1,4,1,shade(C,-.25));R(g,L+(bw>>1)-1,T-3,2,1,C);top=T-3;}
-    else if(st===9){R(g,L+3,T-5,bw-6,4,'#FFFFFF');R(g,L+2,T-4,bw-4,2,'#FFFFFF');R(g,L+3,T-1,bw-6,1,'#D5DAE2');top=T-5;}
+  if(sm)return T-2;
+  if(lk.style===4&&!back)drawGlasses(g,ex1,ex2,ey);
+  return drawAccessory(g,o,{L,T,bw,ol,side,back})-2;
+}
+// Accessory sprites: rows of palette letters, '.' for nothing.
+const ACC_BOW=['bb...bb','bhbkbhb','bbbkbbb','bd...db'],ACC_POM=['.w.','whw','.w.'],ACC_POM_LOW=['ww.','whw'];
+const ACC_BULB=['.a.','hay','.y.'],ACC_LEAVES=['...ll','ll.lL','lL...'],ACC_LEAVES_LOW=['.l.l.','l...l'];
+const ACC_CHEF=['..WW..WW..','.WWWWWWWW.','WWWWWWWWWW','.WsWWsWWs.','.WWWWWWWW.','.gggggggg.'];
+const ACC_PAL={
+  1:{h:'#6B7488',b:'#3A4052',p:'#FF7A59',P:'#FFB199'},
+  2:{a:'#FFD84A',h:'#FFF8D0',y:'#E8A92E',s:'#8A8FA0'},
+  3:{r:'#C8485A',h:'#E5707E',c:'#EFE7D6',C:'#CFC6B2',w:'#FFFFFF',h2:'#E6E0D0'},
+  5:{b:'#E0266E',h:'#FF7FAE',d:'#A81650',k:'#7E0F3B'},
+  6:{s:'#3E7A2E',l:'#8BD46A',L:'#5FAE4E'},
+  7:{c:'#2E3347',h:'#565F80',d:'#20243A',o:ORANGE,O:'#F0A080',b:'#3A4058',B:'#6A7490'},
+  8:{b:'#3558C8',h:'#5C80E8',d:'#263F96',w:'#FFFFFF',k:'#1E2230'},
+  9:{W:'#FFFFFF',s:'#C9CFDA',g:'#AEB6C4'}
+};
+const centred=(s,n)=>{const p=(n-s.length)>>1;return '.'.repeat(p)+s+'.'.repeat(n-s.length-p);};
+// A sprite with a dark rim round it, except where it sits on the body (a hat's edge stays clean).
+function drawAcc(g,rows,pal,x,y,b,flip){
+  const w=rows[0].length,px=[];
+  rows.forEach((r,j)=>{for(let i=0;i<w;i++)if(r[i]!=='.')px.push([x+(flip?w-1-i:i),y+j,pal[r[i]]]);});
+  const on=new Set(px.map(p=>p[0]+','+p[1]));
+  px.forEach(([i,j])=>[[1,0],[-1,0],[0,1],[0,-1]].forEach(([a,c])=>{const u=i+a,v=j+c;if(!on.has(u+','+v)&&!(u>=b.L&&u<b.L+b.bw&&v>=b.T))R(g,u,v,1,1,b.ol);}));
+  px.forEach(([i,j,c])=>R(g,i,j,1,1,c));
+}
+// Round frames around the eyes, over the face: every mood still reads through the lenses.
+function drawGlasses(g,ex1,ex2,ey){
+  const F='#1E2230';
+  [ex1,ex2].forEach(ex=>{R(g,ex-1,ey-1,3,3,'rgba(190,230,255,.3)');R(g,ex-1,ey-2,3,1,F);R(g,ex-1,ey+2,3,1,F);R(g,ex-2,ey-1,1,3,F);R(g,ex+2,ey-1,1,3,F);R(g,ex+1,ey-1,1,1,'rgba(255,255,255,.75)');});
+  if(ex2-ex1>5)R(g,ex1+3,ey-1,ex2-ex1-5,1,F);
+}
+// What the look wears on its head, returns how high it reaches. o.wob sways what hangs loose, a hat
+// jumps off the head on a fright or a cheer, what is soft droops in sleep; a brim or a bow follows
+// the way the Claude faces.
+function drawAccessory(g,o,b){
+  const {L,T,bw,side,back}=b,st=o.look.style,pal=ACC_PAL[st],w=o.wob|0,flip=side<0;
+  const out=o.mood==='dead'||o.mood==='sleep'||o.pose==='sleep',mid=L+(bw>>1);
+  const pop=(st===3||st>=7)?(o.mood==='surprised'?2:o.pose==='cheer'&&o.frame?1:0):0,y=T-pop;
+  switch(st){
+    case 1:{const n=bw-4;
+      drawAcc(g,['..'+'h'.repeat(n)+'..','.b'+'.'.repeat(n)+'b.','b.'+'.'.repeat(n)+'.b'],pal,L,T-2,b);
+      [L-2,L+bw].forEach((x,i)=>drawAcc(g,i?['bp','bP','bP','bp']:['pb','Pb','Pb','pb'],pal,x,T,b));return T-2;}
+    case 2:{if(out){R(g,mid,T-2,1,2,pal.s);R(g,mid+1,T-3,1,1,pal.s);drawAcc(g,ACC_BULB,pal,mid+1,T-5,b);return T-5;}
+      R(g,mid,T-3,1,3,pal.s);R(g,mid+w,T-3,1,1,pal.s);drawAcc(g,ACC_BULB,o.glow?{a:'#FFF3A0',h:'#FFFFFF',y:'#FFD84A'}:pal,mid-1+w,T-6,b);return T-6;}
+    case 3:{const rows=[centred('h'+'r'.repeat(bw-7),bw),centred('hh'+'r'.repeat(bw-6),bw),centred('h'+'r'.repeat(bw-3),bw),'cC'.repeat(bw).slice(0,bw)];
+      if(out)drawAcc(g,ACC_POM_LOW,{w:'#FFFFFF',h:pal.h2},mid+3,y-4,b);else drawAcc(g,ACC_POM,{w:'#FFFFFF',h:pal.h2},mid-1+w,y-5,b);
+      drawAcc(g,rows,pal,L,y-3,b);return y-5;}
+    case 5:drawAcc(g,ACC_BOW,pal,flip?L:L+bw-7,T-3,b,flip);return T-3;
+    case 6:{const px=mid-2;
+      if(out){drawAcc(g,ACC_LEAVES_LOW,pal,px,T-3,b);R(g,mid,T-3,1,3,pal.s);return T-3;}
+      drawAcc(g,ACC_LEAVES,pal,px+w,T-5,b);R(g,mid,T-3,1,3,pal.s);
+      if(o.mood==='happy'||o.mood==='love'){R(g,mid+w,T-6,1,1,'#FF8FB8');return T-6;}
+      return T-5;}
+    case 7:{const c=bw-6,r='h'+'c'.repeat(c-2)+'d';
+      drawAcc(g,[centred(r,bw),centred(r,bw),centred(r,bw),centred(r,bw),centred('O'+'o'.repeat(c-1),bw),'.'+'B'.repeat(3)+'b'.repeat(bw-5)+'.'],pal,L,y-6,b);return y-6;}
+    case 8:{const n=bw-2;
+      if(back){drawAcc(g,[centred('bbbb',n),centred('h'+'b'.repeat(n-3),n),'b'.repeat(n>>1)+'k'+'b'.repeat(n-(n>>1)-1)],pal,L+1,y-3,b);return y-3;}
+      const rows=[centred('bbbb',n)+'...',centred('h'+'b'.repeat(n-5)+'ww',n)+'...','b'.repeat(n-2)+'ddddd'];
+      drawAcc(g,rows,pal,flip?L-2:L+1,y-3,b,flip);return y-3;}
+    case 9:drawAcc(g,ACC_CHEF,pal,mid-5,y-6,b);return y-6;
   }
-  return top-2;
+  return T;
 }
 function drawFace(g,o,sm,ex1,ex2,ey,mx,dk){
   const m=o.mood,pose=o.pose,both=fn=>{fn(ex1);fn(ex2);};
