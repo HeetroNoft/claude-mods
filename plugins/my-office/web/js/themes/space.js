@@ -1,6 +1,43 @@
 // Theme "space": registered with defineTheme, painted by themes/engine.js.
 'use strict';
-defineTheme('space','neon',{name:'Station spatiale',swatch:['#2A3446','#4FC3FF','#C7D0DB','#FF8A3D'],dark:.45,beam:0,dust:'space',neon:false,
+// The planet out of the porthole is another world each season. A disc is painted pixel by pixel, with
+// the night side down and to the left: the light comes from high on the right, as everywhere.
+function planetDisc(g,cx,cy,r,paint){
+  for(let y=-r;y<=r;y++)for(let x=-r;x<=r;x++){
+    if(x*x+y*y>r*r+r*.6)continue;
+    const c=paint(x,y);R(g,cx+x,cy+y,1,1,x-y<-r*.7?shade(c,-.4):c);
+  }
+}
+const orbit=(g,cx,cy,a,rx,ry,s,c)=>R(g,cx+Math.cos(a)*rx,cy+Math.sin(a)*ry,s,s,c);
+const CRATERS=[[-3,-2,2.2],[3,2,2.4],[2,-4,1.3],[-2,4,1.4],[5,-1,1]];
+const PLANETS={
+  // spring: a living world, seas and turning continents under clouds, with a small moon
+  spring(g,cx,cy,t){
+    planetDisc(g,cx,cy,7,(x,y)=>{const u=Math.floor(x+t*.8);
+      if(Math.sin((x+t*1.5)/3+y*1.7)>.88)return '#F2F8FA';
+      return Math.sin(u/2.6+Math.sin(y/2)*1.4)+Math.sin(u/5.3+y/3)>.3?'#5FAE4E':'#3F7FC4';});
+    orbit(g,cx,cy,t*.5,11,3,2,'#C9D3DE');
+  },
+  // summer: a banded giant inside a tilted ring, which passes behind it and then in front
+  summer(g,cx,cy,t){
+    const ring=front=>{for(let i=0;i<72;i++){const a=i/72*Math.PI*2,x=Math.cos(a)*13,y=Math.sin(a)*3+x*.2;if(Math.sin(a)>0===front)R(g,cx+x,cy+y,1,1,i%9<7?'#F2D2A8':'#B98A5E');}};
+    ring(false);
+    planetDisc(g,cx,cy,7,(x,y)=>['#E58A4A','#F2B872','#C8703A'][Math.floor((y+x*.2+20+Math.sin((x+t)/4)*.6)/2.5)%3]);
+    ring(true);
+  },
+  // autumn: a dead rust world, pitted with craters, and two little moons
+  autumn(g,cx,cy,t){
+    planetDisc(g,cx,cy,7,(x,y)=>{for(const [a,b,r] of CRATERS){const d=Math.hypot(x-a,y-b);if(d<=r-.6)return '#7E3A2A';if(d<=r+.5)return '#D98A5A';}return '#B8603A';});
+    orbit(g,cx,cy,t*.7,10,6,1,'#D9C2A8');orbit(g,cx,cy,-t*.35+2,12,4,2,'#8A6A58');
+  },
+  // winter: an ice world, cracked, with white poles, a glint and shards drifting round it
+  winter(g,cx,cy,t){
+    planetDisc(g,cx,cy,7,(x,y)=>{if(Math.abs(y)>4)return '#FFFFFF';return Math.abs(Math.sin(x/1.9+y/1.2))<.14||Math.abs(Math.sin(x/3.1-y/1.5))<.1?'#5FA8D6':'#CFEDF8';});
+    if(Math.sin(t*2)>.5){R(g,cx+2,cy-5,3,1,'#FFFFFF');R(g,cx+3,cy-6,1,3,'#FFFFFF');}
+    for(let i=0;i<4;i++)orbit(g,cx,cy,t*.3+i*1.6,11-i,4+i%2,1,'#BFE6F5');
+  }
+};
+defineTheme('space','neon',{name:'Station spatiale',swatch:['#2A3446','#4FC3FF','#C7D0DB','#FF8A3D'],dark:.45,beam:0,dust:'space',neon:false,noWeather:true,
     moteCols:['200,220,255','120,200,255','255,255,255'],window:'porthole',sillPot:false,desk:'console',plantKind:'hydro',board:'holo',
     wall:'#2A3446',stripe:'#36425A',wallTop:'#1B2433',wainHi:'#4A5872',wain:'#222B3A',wainEdge:'#1B2433',panel:'#4A5872',panelEdge:'#1E2633',base:'#141A24',
     floorA:'#3A4558',floorB:'#46526A',seam:'#2A3344',grainA:'#3A4558',grainB:'#46526A',
@@ -17,7 +54,7 @@ defineTheme('space','neon',{name:'Station spatiale',swatch:['#2A3446','#4FC3FF',
     sky:()=>['#02040C','#0A1430'],
     view(g,tp){
       for(let i=0;i<26;i++){const h=hash('s'+i);if(Math.sin(tp/600+i*1.3)>-.5)R(g,276+h%40,28+(h>>>8)%38,1,1,i%5?'#FFFFFF':'#9FE6FF');}
-      const px=286+Math.sin(tp/9000)*3;R(g,px,44,9,9,'#E58A4A');R(g,px+1,43,7,11,'#E58A4A');R(g,px,46,9,2,'#C8703A');R(g,px-4,48,17,1,'#F2D2A8');
+      PLANETS[SEASON](g,Math.round(295+Math.sin(tp/9000)*2),47,tp/1000);
       const sx=(tp/1000*14)%120;if(sx<60)R(g,320-sx,36,4,1,'#C7D0DB'),R(g,323-sx,36,2,1,'#FF8A3D');
     },
     wallPaint:metalWall,floorPaint:grating,

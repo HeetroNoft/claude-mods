@@ -1,6 +1,6 @@
 // The settings panel (the gear, or S): what the page lets you choose, remembered in this browser.
 'use strict';
-const PREFS_DEFAULT={time:'auto',badges:true,gauge:true,autohide:false,compact:false,calm:false};
+const PREFS_DEFAULT={time:'auto',season:'auto',hemi:'north',badges:true,gauge:true,autohide:false,compact:false,calm:false};
 const PREFS={...PREFS_DEFAULT};
 const prefsEl=document.getElementById('prefs'),setBtn=document.getElementById('set');
 try{Object.assign(PREFS,JSON.parse(localStorage.getItem('office.prefs')||'{}'));}catch(e){}
@@ -23,7 +23,7 @@ function prefsHtml(){
   const keys=[['T','Next room'],['L','Labels'],['I','Item bar'],['G','Usage gauge'],['M','Sound'],['S','Settings'],['1-9','Go to a floor'],['Esc','Close']];
   return `<header><h2>Settings</h2><button type="button" class="x" aria-label="Close">×</button></header>
 <section><h3>Room</h3><div class="rooms">${THEME_KEYS.map(k=>{const t=THEMES[k];return `<button type="button" class="${k===themeKey?'on':''}" aria-pressed="${k===themeKey}" data-room="${k}"><span class="sw">${t.swatch.map(c=>`<i style="background:${c}"></i>`).join('')}</span><span class="nm">${esc(t.name)}</span></button>`;}).join('')}</div>
-${seg('time','Time of day',[['auto','Live'],['day','Day'],['night','Night']])}<div class="row"><label for="pcat">Cat's name</label><input id="pcat" type="text" maxlength="${CAT_NAME_MAX}" placeholder="No name yet" spellcheck="false" autocomplete="off" value="${esc(catName)}"></div></section>
+${seg('time','Time of day',[['auto','Live'],['day','Day'],['night','Night']])}${seg('season','Season',[['auto','Live'],['spring','Spring'],['summer','Summer'],['autumn','Autumn'],['winter','Winter']])}${seg('hemi','Hemisphere',[['north','North'],['south','South']])}<div class="row"><label for="pcat">Cat's name</label><input id="pcat" type="text" maxlength="${CAT_NAME_MAX}" placeholder="No name yet" spellcheck="false" autocomplete="off" value="${esc(catName)}"></div></section>
 <section><h3>Display</h3>${sw('labels','Labels',LABELS,'Names and plans in words')}${sw('badges','Head icons',PREFS.badges,'The role above each Claude')}${sw('gauge','Usage gauge',PREFS.gauge,'Slides away; its tab stays')}${sw('items','Item bar',barOn)}${sw('autohide','Hide the bars',PREFS.autohide,'They come back near the bottom')}${sw('compact','Compact buttons',PREFS.compact)}${sw('calm','Less motion',PREFS.calm,'No slides, no bounces')}</section>
 <section><h3>Sound</h3>${sw('sound','Sound',soundOn)}<div class="row"><span>Volume</span><input id="pvol" type="range" min="0" max="100" step="5" aria-label="Volume" value="${volume}"><output id="pvolv">${volume}%</output></div></section>
 <section><h3>Shortcuts</h3><dl>${keys.map(([k,t])=>`<div><dt>${k}</dt><dd>${t}</dd></div>`).join('')}</dl></section>

@@ -16,8 +16,9 @@ defineTheme('cosy',null,{name:'Cosy lo-fi',swatch:['#3B2D4F','#6A4C55','#E0B04A'
     ol:'#1C110B',desk:'cottage',plantKind:'fern',smallPlant:'cactus',board:'chalk',boardInk:'#F1EBDD',boardDim:'#9FB0A3',
     sky:n=>skyOf(n,['#8A96B0','#C2C8D6'],['#141530','#3B2D4F'],['#6A6E8C','#A895A8']),
     view(g,tp,n){if(n>.3){g.globalAlpha=Math.min(1,(n-.3)*1.5);R(g,304,33,5,5,'#F1E6C8');R(g,303,34,7,3,'#F1E6C8');g.globalAlpha=1;}
-      R(g,276,57,38,7,mix('#5E6478','#232541',n));R(g,276,54,12,3,mix('#525870','#1E2038',n));R(g,298,53,10,4,mix('#525870','#1E2038',n));
+      R(g,276,57,38,7,mix('#5E6478','#232541',n));R(g,276,54,12,3,mix('#525870','#1E2038',n));R(g,298,53,10,4,mix('#525870','#1E2038',n));snowOn(g,276,57,38,n);snowOn(g,276,54,12,n);snowOn(g,298,53,10,n);
       if(n>.25)[[280,58],[284,59],[301,55],[305,56],[309,59]].forEach(([x,y],i)=>{if(Math.sin(tp/1900+i*2.3)>-.7)R(g,x,y,1,1,'#FFC970');});
+      if(SEASON==='winter')return; // it snows instead (windowWeather)
       for(let i=0;i<16;i++){const x=276+((i*7.3+tp/1000*9)%38),y=30+((i*13.7+tp/1000*55)%34);R(g,x,y,1,2,'rgba(160,185,235,.55)');}
       for(let i=0;i<3;i++){const y=30+((tp/1000*(5+i*2)+i*11)%34);R(g,281+i*11,y,1,2,'rgba(200,215,245,.5)');}},
     extras(g){R(g,278,72,32,10,'#8A7466');R(g,278,72,32,1,'#A28C7E');for(let x=280;x<309;x+=3)R(g,x,73,1,9,'#6E5A4E');R(g,278,82,32,1,'rgba(0,0,0,.25)');}});

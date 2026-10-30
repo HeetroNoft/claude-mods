@@ -3,7 +3,7 @@
 # browser and prints what matters (JS errors, layout checks, activity states); screenshots go to $OUT.
 #
 #   tools/my-office/run.sh check              every theme: layout checks + break activities + a screenshot
-#   tools/my-office/run.sh shot <theme> [h]   one screenshot (h = hour of day, 0-24; default 12)
+#   tools/my-office/run.sh shot <theme> [h] [season]   one screenshot (h = hour of day, 0-24; default 12)
 #   tools/my-office/run.sh scenario <theme> <a|b|t>
 #   tools/my-office/run.sh gallery [held|looks|motion|bubbles|front]   every mascot pose in a grid, the props in hand, the accessories, film strips of the springs, or the speech bubbles
 #   tools/my-office/run.sh preview [off]      copy the page to ~/.claude/my-office and keep it there: sessions starting no longer replace it
@@ -35,7 +35,7 @@ case "${1:-check}" in
   check) build "check.js scenario.js"
     for t in pixel claude cosy neon japan paper retro space; do echo "== $t"; open "theme=$t&hour=12&scn=t&desks=6" "check_$t"; done
     echo "== floors"; N=11 build "floors.js"; open "theme=pixel&hour=12" "check_floors" ;;
-  shot) build ""; open "theme=${2:-pixel}&hour=${3:-12}&desks=6" "shot_${2:-pixel}_${3:-12}" ;;
+  shot) build ""; open "theme=${2:-pixel}&hour=${3:-12}&desks=6${4:+&season=$4}" "shot_${2:-pixel}_${3:-12}${4:+_$4}" ;;
   scenario) build "scenario.js"; open "theme=${2:-pixel}&hour=12&desks=6&scn=${3:-a}" "scn_${2:-pixel}_${3:-a}" ;;
   preview) D="$HOME/.claude/my-office"; if [ "${2:-}" = off ]; then rm -f "$D/.dev"; echo "the next session to start puts the installed page back"; else mkdir -p "$D" && cp -r "$WEB"/. "$D"/ && touch "$D/.dev" && echo "page copied: reload it (run.sh preview off to stop)"; fi ;;
   gallery) build "gallery.js"; open "theme=pixel&set=${2:-poses}" "gallery${2:+_$2}" ;;
