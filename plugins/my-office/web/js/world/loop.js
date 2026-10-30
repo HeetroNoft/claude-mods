@@ -169,10 +169,12 @@ function frame(tp){
     const raiseTo=pose!=='sip'&&pose!=='eat'?0:st&&st.raise!=null?st.raise:(st||pose==='sip')?o.frame:((tp/1000+ch.blinkT)%1.6<.5?1:0);
     const tr=trailOf(ch,ch.x+sway,ch.y+jy+bob-air,pose,o.mood,raiseTo,st&&st.lift||0,tp);
     o.sway=Math.round(tr.x);o.pop=Math.round(-tr.y);o.raise=tr.raise;o.lift=Math.round(tr.lift);
+    ch.screen=ch.fly?null:screenOf(ch,pose,o);
     const body=()=>{
       if(cardId===ch.id)drawRing(wx,ch.x,ch.y,ch.look.c,tp);
       ch.bodyTop=ch.y+jy+bob-air-15;
       ch.headTop=ch.fly?drawFlying(wx,ch,o,ch.x+sway,ch.y+jy+bob-air):drawPerson(wx,ch.x+sway,ch.y+jy+bob-air,o);
+      if(ch.screen)drawScreenLight(wx,ch.screen,ch.x+sway,ch.y+jy+bob-air,o,n);
       drawIdleProps(wx,ch,tp);
       if(st)drawTreat(wx,ch,tp,st);
       if(tp<(ch.flowerUntil||0)&&ch.bodyTop!=null)drawProp(wx,'blossom',Math.round(ch.x+3+o.sway),HATS.has(ch.look.style)?Math.round(ch.headTop+1-o.pop):Math.round(ch.bodyTop-2)); // tucked in the hat band, or on the head

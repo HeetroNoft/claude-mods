@@ -101,7 +101,7 @@ function selfiePose(ch,tp){const L=leadOf(ch);if(L&&L.shot&&tp>L.shot)return 'ch
 function selfieProps(g,ch,tp,I){
   if(I.role!==0||!I.sync||ch.path.length)return;
   const s=dirOf(ch),x=Math.round(ch.x+s*11),y=Math.round(ch.y-26);
-  if(!I.shot||tp-I.shot<400){R(g,x-1,y,4,6,'#1F1E1D');R(g,x,y+1,2,3,'#7FD0E8');if(!I.shot&&Math.floor(tp/300)%2)R(g,x,y-1,1,1,'#FF5D5D');}
+  if(!I.shot||tp-I.shot<400){R(g,x-1,y,4,6,'#2B2F3A');R(g,x-1,y,4,1,'#4A5163');R(g,x,y+1,1,1,'#14131C');if(!I.shot&&Math.floor(tp/300)%2)R(g,x,y-1,1,1,'#FF5D5D');}
   const a=I.shot?1-(tp-I.shot)/240:0;
   if(a>0){g.fillStyle=`rgba(255,255,255,${.85*a})`;g.fillRect(Math.round(Math.min(ch.x,I.pair.x)-12),Math.round(ch.y-24),Math.round(Math.abs(ch.x-I.pair.x))+24,26);
     [[-5,0],[5,0],[0,-5],[0,5],[-3,-3],[3,3],[3,-3],[-3,3]].forEach(([dx,dy])=>R(g,x+dx,y+dy,1,1,'#FFFFFF'));}

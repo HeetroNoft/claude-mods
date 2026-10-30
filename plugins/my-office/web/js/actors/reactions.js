@@ -88,6 +88,29 @@ function reactToDesk(ch,dk){
   else if(f.kind==='ship'){setMood(ch,'happy',1800);ch.jumpUntil=tp+800;ch.starT=tp;emote(ch,'heart');if(soundFor('ship'))chime(.5);}
   else{ch.sqv+=18;emote(ch,'note');}
 }
+// The screen a Claude is using, as a light on it: where it stands, how far it reaches, its colour.
+// A desk's laptop or monitor faces its Claude, as the machine does the one using it; a phone's light is its feed.
+const FEED_SCREEN=[1,5,9,13].map(i=>hexRgb(shade(FEED[i],.3)).join(','));
+function screenOf(ch,pose,o){
+  const glow=TH.screenGlow||'160,215,255',I=ch.idle,doing=I&&I.phase==='do'?I.act:null;
+  if(pose==='phone')return ch.seated?{x:ch.x,y:103,r:15,c:FEED_SCREEN[Math.floor((o.scroll|0)/4)%4]}:{x:ch.x,y:ch.y-7,r:15,c:FEED_SCREEN[Math.floor((o.scroll|0)/4)%4]};
+  if(pose==='game')return {x:ch.x,y:ch.y-6,r:14,c:'127,232,255'};
+  if(I&&I.act==='selfie'&&I.role===0&&I.sync&&!I.shot){const s=dirOf(ch);return {x:ch.x+s*11,y:ch.y-23,r:16,c:'127,208,232'};}
+  if(ch.path.length)return null;
+  if(ch.seated)return ch.act==='idle'||ch.act==='limit'||pose==='sleep'?null:{x:['cubicle','pod'].includes(TH.desk)?ch.x-deskHalf(desks.length)+6:ch.x,y:100,r:16,c:glow};
+  if(ch.act==='web'||doing==='arcade'||doing==='tinker')return {x:ch.x+Math.sign(105-ch.x)*10,y:ch.y-12,r:15,c:glow};
+  return null;
+}
+// The light lands on the Claude alone: its own pixels, drawn apart, take a soft gradient that fades to
+// nothing and is added over it, stronger at night. Nothing here reaches the outlines' alpha (.6).
+const litC=document.createElement('canvas');litC.width=44;litC.height=48;const litX=litC.getContext('2d');
+function drawScreenLight(g,L,x,y,o,n){
+  const ox=Math.round(x)-22,oy=Math.round(y)-38,a=.2+.08*n,gr=litX.createRadialGradient(L.x-ox,L.y-oy,0,L.x-ox,L.y-oy,L.r);
+  gr.addColorStop(0,`rgba(${L.c},${a})`);gr.addColorStop(.5,`rgba(${L.c},${a*.55})`);gr.addColorStop(1,`rgba(${L.c},0)`);
+  litX.globalCompositeOperation='source-over';litX.clearRect(0,0,44,48);drawPerson(litX,x-ox,y-oy,o);
+  litX.globalCompositeOperation='source-in';litX.fillStyle=gr;litX.fillRect(0,0,44,48);
+  g.globalCompositeOperation='lighter';g.drawImage(litC,ox,oy);g.globalCompositeOperation='source-over';
+}
 function emote(ch,icon){emotes.push({ch,icon,t0:performance.now()});}
 function emoteAt(x,y,icon){emotes.push({x,y,icon,t0:performance.now()});}
 function drawEmotes(g,tp){
