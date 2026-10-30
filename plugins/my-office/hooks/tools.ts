@@ -34,13 +34,13 @@ export const TOOLS = [
 ]
 
 export const COMMANDS = [
-  { name: 'office-desk', description: 'Name your desk in the office, for example /office-desk Writer', argumentHint: '[name]' },
-  { name: 'office', description: 'Show where the office page is', immediate: true },
-  { name: 'office-leave', description: 'Send a session home to free its desk: /office-leave for this one, /office-leave <name or id> for another, /office-leave others for all but this one', argumentHint: '[name, id or others]' },
-  { name: 'office-who', description: 'Who is in the office, what each one does, and the usage left; /office-who <name> shows a plan', argumentHint: '[name]', immediate: true },
-  { name: 'office-board', description: 'Show your plan; /office-board clear takes it off your board', argumentHint: '[clear]', immediate: true },
-  { name: 'office-quiet', description: 'Turn the sound at the end of a turn on or off, for every session', argumentHint: '[on|off]' },
-  { name: 'office-theme', description: 'Change the room on the office page, or list the rooms', argumentHint: '[room]', immediate: true },
+  { name: 'my-office-desk', description: 'Name your desk in the office, for example /my-office-desk Writer', argumentHint: '[name]' },
+  { name: 'my-office', description: 'Show where the office page is', immediate: true },
+  { name: 'my-office-leave', description: 'Send a session home to free its desk: /my-office-leave for this one, /my-office-leave <name or id> for another, /my-office-leave others for all but this one', argumentHint: '[name, id or others]' },
+  { name: 'my-office-who', description: 'Who is in the office, what each one does, and the usage left; /my-office-who <name> shows a plan', argumentHint: '[name]', immediate: true },
+  { name: 'my-office-board', description: 'Show your plan; /my-office-board clear takes it off your board', argumentHint: '[clear]', immediate: true },
+  { name: 'my-office-quiet', description: 'Turn the sound at the end of a turn on or off, for every session', argumentHint: '[on|off]' },
+  { name: 'my-office-theme', description: 'Change the room on the office page, or list the rooms', argumentHint: '[room]', immediate: true },
 ]
 
-export const PROMPT_HINT = 'OFFICE (office mod): your desk shows a live "Done by" clock. For a task of 2+ steps, call mcp__office__plan with each step and your honest minutes estimate, then mcp__office__step_done as each step finishes.'
+export const PROMPT_HINT = 'OFFICE (my-office mod): your desk shows a live "Done by" clock. For a task of 2+ steps, call mcp__my-office__plan with each step and your honest minutes estimate, then mcp__my-office__step_done as each step finishes.'

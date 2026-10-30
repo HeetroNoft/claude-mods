@@ -1,12 +1,12 @@
 import { expect, test } from 'claude-code/testing'
 
-import { installPage, officeDir } from './room'
+import { carryOver, installPage, officeDir } from './room'
 
 const envOf = (vars: Record<string, string>) => ({ env: { get: async (k: string) => vars[k] } })
 
 test('the office folder falls back to USERPROFILE when HOME is unset (Windows)', async () => {
-  expect(await officeDir(envOf({ HOME: '/home/sam' }))).toBe('/home/sam/.claude/office')
-  expect(await officeDir(envOf({ HOME: '', USERPROFILE: 'C:\\Users\\sam' }))).toBe('C:/Users/sam/.claude/office')
+  expect(await officeDir(envOf({ HOME: '/home/sam' }))).toBe('/home/sam/.claude/my-office')
+  expect(await officeDir(envOf({ HOME: '', USERPROFILE: 'C:\\Users\\sam' }))).toBe('C:/Users/sam/.claude/my-office')
   expect(await officeDir(envOf({}))).toBe('')
 })
 
@@ -26,4 +26,15 @@ test('the whole web folder is copied next to data.js, sub-folders included', asy
   await installPage($, '/p/web', '/o')
   expect([...out.keys()].sort()).toEqual(['/o/index.html', '/o/js/main.js', '/o/office.css'])
   expect(out.get('/o/js/main.js')).toBe('go()')
+})
+
+test('the theme and who was sent home come over once from the old folder, and never overwrite', async () => {
+  const files = new Map([['/h/.claude/office/room.json', 'old room'], ['/h/.claude/office/left.json', 'old left'], ['/h/.claude/my-office/left.json', 'new left']])
+  const $: any = { fs: {
+    read: async (p: string) => { if (!files.has(p)) throw new Error('no file'); return files.get(p) },
+    write: async (p: string, s: string) => { files.set(p, s) },
+  } }
+  await carryOver($, '/h/.claude/my-office')
+  expect(files.get('/h/.claude/my-office/room.json')).toBe('old room')
+  expect(files.get('/h/.claude/my-office/left.json')).toBe('new left')
 })

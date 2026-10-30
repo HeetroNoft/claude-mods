@@ -102,7 +102,7 @@ function placeCard(ch){
 card.addEventListener('click',e=>{if(e.target.closest('.x'))closeCard();});
 
 /* ---------- the room ---------- */
-// A /office-theme from a session: the page follows each one once, then T goes on working as usual.
+// A /my-office-theme from a session: the page follows each one once, then T goes on working as usual.
 let roomSeen=null;
 function followRoom(r){if(!r||!r.theme||!r.ms)return;if(roomSeen===null)try{roomSeen=+localStorage.getItem('office.roomMs')||0;}catch(e){roomSeen=0;}
   if(r.ms<=roomSeen)return;roomSeen=r.ms;try{localStorage.setItem('office.roomMs',String(r.ms));}catch(e){}setTheme(r.theme);}

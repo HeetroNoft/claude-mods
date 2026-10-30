@@ -11,7 +11,7 @@ test('each tool sends the character to the right place, with file names only', a
   expect(activityOf('Bash', { description: 'count the words' })?.detail).toBe('Count the words')
   expect(activityOf('Agent', { description: 'x' })?.activity).toBe('agent')
   expect(activityOf('SendMessage', {})?.activity).toBe('send')
-  expect(activityOf('mcp__office__plan', {})).toBeNull()
+  expect(activityOf('mcp__my-office__plan', {})).toBeNull()
 })
 
 test('bubbles never show a path or a session id', async () => {

@@ -67,7 +67,7 @@ export const plainFile = (name: string) => {
 
 // Where the character goes for each tool. null = draw nothing new (the office's own tools).
 export function activityOf(tool: string, input: any): { activity: string; detail: string; file?: FileMark['kind'] } | null {
-  if (tool.startsWith('mcp__office__')) return null
+  if (tool.startsWith('mcp__my-office__')) return null
   const f = plainFile(baseName(input?.file_path ?? input?.notebook_path))
   switch (tool) {
     case 'Read': return { activity: 'read', detail: f ? `Reading ${f}` : 'Reading', file: 'read' }
@@ -190,11 +190,11 @@ export function applyTool(d: Desk, tool: string, input: any, key: string, now: n
   return out
 }
 
-// room: what the whole office shares, here the theme a /office-theme asked for (the page follows it once).
+// room: what the whole office shares, here the theme a /my-office-theme asked for (the page follows it once).
 export const dataJs = (now: number, desks: Desk[], room?: Room) =>
   `window.__office && window.__office(${JSON.stringify({ now, desks, room })})\n`
 
-// One line of /office-who: who it is, what it does now, how far its plan is.
+// One line of /my-office-who: who it is, what it does now, how far its plan is.
 export function whoLine(d: Desk, mine: boolean) {
   const bits = [d.limited ? 'out of usage' : d.waiting ? `waiting for you: ${d.waiting.text}` : d.detail]
   if (d.steps.length) bits.push(`plan ${d.steps.filter(s => s.doneMs).length}/${d.steps.length}`)
