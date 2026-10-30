@@ -10,7 +10,7 @@ const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1)
 // Server names people recognise. Anything else is shown as "Une app connectée".
 const APPS: Record<string, string> = {
   notion: 'Notion', claude_ai_Notion: 'Notion', claude_ai_Gmail: 'Gmail', claude_ai_Google_Drive: 'Google Drive',
-  claude_ai_Google_Calendar: 'Google Calendar', figma: 'Figma', 'claude-in-chrome': 'Chrome', office: 'Office',
+  claude_ai_Google_Calendar: 'Google Calendar', figma: 'Figma', 'claude-in-chrome': 'Chrome', 'my-office': 'Office',
 }
 
 // One tool call in, one line anyone can read out. null = not worth showing.

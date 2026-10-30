@@ -31,7 +31,7 @@ function engine(files = new Map<string, string>()) {
     const run = (i: number, x: any): any => (i < hs.length ? hs[i].fn($, x, (y: any) => run(i + 1, y)) : inner(x))
     return run(0, e)
   }
-  const deskNow = () => JSON.parse(files.get('/home/.claude/office/desks/s1.json') ?? '{}')
+  const deskNow = () => JSON.parse(files.get('/home/.claude/my-office/desks/s1.json') ?? '{}')
   return { fire, deskNow }
 }
 
@@ -63,7 +63,7 @@ test('a turn that ends on a question waits for the reply, and the plan pauses me
   await o.fire('session.start', {})
   await o.fire('prompt.submit', {})
   await o.fire('turn.start', {})
-  await o.fire('tool.call', { tool: 'mcp__office__plan', steps: [{ label: 'One', minutes: 5 }, { label: 'Two', minutes: 5 }] })
+  await o.fire('tool.call', { tool: 'mcp__my-office__plan', steps: [{ label: 'One', minutes: 5 }, { label: 'Two', minutes: 5 }] })
   await o.fire('turn.complete', { answer: 'Step one is done. Shall I go on with step two?', isAborted: false })
   const d = o.deskNow()
   expect(d.waiting.kind).toBe('reply')
@@ -105,7 +105,7 @@ test('without an office plan the board follows Claude Code\'s task list, and the
   let d = o.deskNow()
   expect(d.planSource).toBe('todos')
   expect(d.steps.map((s: any) => Boolean(s.doneMs))).toEqual([true, false, false])
-  await o.fire('tool.call', { tool: 'mcp__office__plan', steps: [{ label: 'A', minutes: 3 }, { label: 'B', minutes: 3 }] })
+  await o.fire('tool.call', { tool: 'mcp__my-office__plan', steps: [{ label: 'A', minutes: 3 }, { label: 'B', minutes: 3 }] })
   await o.fire('tool.call', { tool: 'mcp__mission-control__set_plan', steps: ['A', 'B'] })
   await o.fire('tool.call', { tool: 'TodoWrite', todos: [{ content: 'Other', status: 'pending' }] })
   d = o.deskNow()

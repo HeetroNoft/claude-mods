@@ -4,10 +4,10 @@ Heet's Claude Code mods, published as the `heet-mods` marketplace (`.claude-plug
 
 | Plugin | Folder | What it is |
 | --- | --- | --- |
-| office | `plugins/office` | A pixel-art office page where every Claude session is a mascot at its own desk, with a live plan board |
+| my-office | `plugins/my-office` | A pixel-art office page where every Claude session is a mascot at its own desk, with a live plan board |
 | mission-control | `plugins/mission-control` | A live panel of the current turn: plan bar, plain-language activity, ticked asks |
 
-`~/.claude/office/` is **output**, not source: desk files, `data.js` and a copy of the page that the office mod writes at session start. Never edit it by hand; edit `plugins/office/web/` and copy it over to preview (see Testing).
+`~/.claude/my-office/` is **output**, not source: desk files, `data.js` and a copy of the page that the office mod writes at session start. Never edit it by hand; edit `plugins/my-office/web/` and copy it over to preview (see Testing).
 
 **Never infer: ask.** When the request, the code or the checks leave something open, ask Heet instead of assuming the answer.
 
@@ -15,16 +15,16 @@ Heet's Claude Code mods, published as the `heet-mods` marketplace (`.claude-plug
 
 Several sessions may be editing this repository at the same time. To stay out of each other's way:
 
-1. **Claim one area per session**, the narrower the better (one theme file, one hooks module), and name your desk after it: `/office-desk Themes` or the `mcp__office__name_desk` tool. The office page then shows who works on what.
+1. **Claim one area per session**, the narrower the better (one theme file, one hooks module), and name your desk after it: `/my-office-desk Themes` or the `mcp__my-office__name_desk` tool. The office page then shows who works on what.
 2. **Only edit files inside your area.** The areas are listed below; each file starts with a one-line comment saying what it owns.
-3. **Shared files** are edited by several areas: the `<script>` list in `plugins/office/web/index.html`, `plugins/office/web/office.css`, both `plugin.json` files and `.claude-plugin/marketplace.json`. Re-read one right before you change it, change only your lines with a targeted edit, and never rewrite it whole.
+3. **Shared files** are edited by several areas: the `<script>` list in `plugins/my-office/web/index.html`, `plugins/my-office/web/office.css`, both `plugin.json` files and `.claude-plugin/marketplace.json`. Re-read one right before you change it, change only your lines with a targeted edit, and never rewrite it whole.
 4. **Version bumps**: bump a plugin's version in its `plugin.json` **and** in `marketplace.json` once, when your work is finished and checked, not per edit.
 5. **Git** (when the repository is a git repository): give each session its own worktree and branch, `git worktree add ../claude-mods-<task> -b <task>`.
-6. **Test on a copy**: when its checks pass, every branch asks Heet for a test before committing. Copy the branch's `plugins/office/web/.` and `~/.claude/office/data.js` to a separate folder, `~/.claude/office-test-<task>/`, never over `~/.claude/office/`, and give Heet the `file://` address. If the branch changes nothing on the page, ask Heet how to test it. Commit once Heet confirms the test, then delete the copy.
-7. **Merge**: the Manager merges everything. There is a Manager when a desk named Manager is present and not `gone` in `~/.claude/office/desks/`. With no Manager, the session merges its own branch into `main`.
+6. **Test on a copy**: when its checks pass, every branch asks Heet for a test before committing. Copy the branch's `plugins/my-office/web/.` and `~/.claude/my-office/data.js` to a separate folder, `~/.claude/my-office-test-<task>/`, never over `~/.claude/my-office/`, and give Heet the `file://` address. If the branch changes nothing on the page, ask Heet how to test it. Commit once Heet confirms the test, then delete the copy.
+7. **Merge**: the Manager merges everything. There is a Manager when a desk named Manager is present and not `gone` in `~/.claude/my-office/desks/`. With no Manager, the session merges its own branch into `main`.
 8. **After a merge**, whoever merged pushes `main`, then deletes the branch and its worktree: `git push`, `git worktree remove ../claude-mods-<task>`, `git branch -d <task>`.
 
-### office: areas and files (`plugins/office/`)
+### office: areas and files (`plugins/my-office/`)
 
 | Area | Files | Owns |
 | --- | --- | --- |
@@ -44,27 +44,27 @@ Scripts are plain browser scripts sharing one global scope (the page runs from `
 1. Create `web/js/themes/<key>.js` with `defineTheme('<key>', '<base theme or null>', {...})`; copy a close theme as a start. Each key is documented where `themes/engine.js` or the furniture reads it.
 2. Add its `<script>` line to `index.html` after the other themes.
 3. Optional: break activities only this room offers, in `THEME_IDLES` (`actors/brain.js`).
-4. Run `tools/office/run.sh check`.
+4. Run `tools/my-office/run.sh check`.
 
 ## Rules the office page keeps
 
-- **Eyes stay visible**: nothing on a desk covers x−5..x+4, y 95..98 around a seated Claude (`tools/office/check.js` enforces it).
+- **Eyes stay visible**: nothing on a desk covers x−5..x+4, y 95..98 around a seated Claude (`tools/my-office/check.js` enforces it).
 - **No overlaps**: desks and boards share the lane x 34..264, at most 4 desks per floor (`MAX_DESKS`); boards keep 3 px apart, desks 2 px.
 - **Outlines** trace pixels with alpha ≥ .6; keep shadows and glows below that so they get no rim.
 - **Light comes from the window** (high, right): every shadow falls down and to the left.
-- **Everything shows and nothing overlaps**, in every theme: `tools/office/check.js` checks that each room element stands out from the wall or floor it sits on (contrast ≥ 1.8, by its colour or its rim) and that room elements, the item bar and the buttons never overlap. The buttons and the item bar scale with the room (`--u` in `office.css`), so they always cover the same corner of it; keep the bottom-right corner (x ≥ 306, y ≥ 169) and the strip under the rug free.
+- **Everything shows and nothing overlaps**, in every theme: `tools/my-office/check.js` checks that each room element stands out from the wall or floor it sits on (contrast ≥ 1.8, by its colour or its rim) and that room elements, the item bar and the buttons never overlap. The buttons and the item bar scale with the room (`--u` in `office.css`), so they always cover the same corner of it; keep the bottom-right corner (x ≥ 306, y ≥ 169) and the strip under the rug free.
 - **Hooks**: a function imported across files that receives `$` must be a `function` declaration (the validator refuses arrows). `HOME` can be unset on Windows: use `officeDir` in `hooks/room.ts`.
 
 ## Testing
 
 ```bash
-claude plugin validate plugins/office      # manifest and hooks module
-claude plugin test plugins/office          # hooks unit tests (*.test.ts)
-tools/office/run.sh check                  # page: layout checks, break activities, a screenshot per theme
-tools/office/run.sh shot japan 22          # one screenshot (theme, hour of day)
-tools/office/run.sh gallery                # every mascot pose
-tools/office/run.sh preview                # preview the page live (reload it in the browser); sessions starting leave it alone
-tools/office/run.sh preview off            # back to the installed page at the next session start
+claude plugin validate plugins/my-office      # manifest and hooks module
+claude plugin test plugins/my-office          # hooks unit tests (*.test.ts)
+tools/my-office/run.sh check                  # page: layout checks, break activities, a screenshot per theme
+tools/my-office/run.sh shot japan 22          # one screenshot (theme, hour of day)
+tools/my-office/run.sh gallery                # every mascot pose
+tools/my-office/run.sh preview                # preview the page live (reload it in the browser); sessions starting leave it alone
+tools/my-office/run.sh preview off            # back to the installed page at the next session start
 ```
 
-The fake data (`tools/office/mkdata.js`) covers every board state: on time, late, finished, no plan, waiting for the user, knocked out by the usage limit, and a usage reading for the gauge. `run.sh` exits non-zero on any JS error or failed layout check; screenshots land in `$OUT` (default `$TMPDIR/office-shots`). Run `/reload-plugins` in a session to load changed hooks.
+The fake data (`tools/my-office/mkdata.js`) covers every board state: on time, late, finished, no plan, waiting for the user, knocked out by the usage limit, and a usage reading for the gauge. `run.sh` exits non-zero on any JS error or failed layout check; screenshots land in `$OUT` (default `$TMPDIR/office-shots`). Run `/reload-plugins` in a session to load changed hooks.

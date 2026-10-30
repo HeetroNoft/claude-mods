@@ -37,64 +37,64 @@ function engine(id: string, files: Map<string, string>) {
 }
 
 const other = (id: string, name: string) => JSON.stringify({ ...newDesk(id, name, 1), detail: 'Editing a doc' })
-const data = (files: Map<string, string>) => { const js = files.get('/home/.claude/office/data.js') ?? ''; return JSON.parse(js.slice(js.indexOf('(') + 1, js.lastIndexOf(')'))) }
+const data = (files: Map<string, string>) => { const js = files.get('/home/.claude/my-office/data.js') ?? ''; return JSON.parse(js.slice(js.indexOf('(') + 1, js.lastIndexOf(')'))) }
 
-test('/office-who lists the office and /office-who <name> a plan; /office-board shows and clears yours', async () => {
+test('/my-office-who lists the office and /my-office-who <name> a plan; /my-office-board shows and clears yours', async () => {
   const files = new Map<string, string>()
-  files.set('/home/.claude/office/desks/bbbb2222.json', JSON.stringify({ ...newDesk('bbbb2222', 'Writer', 1), detail: 'Editing a doc', steps: [{ label: 'Draft', estMin: 3, doneMs: 5 }, { label: 'Polish', estMin: 2 }] }))
+  files.set('/home/.claude/my-office/desks/bbbb2222.json', JSON.stringify({ ...newDesk('bbbb2222', 'Writer', 1), detail: 'Editing a doc', steps: [{ label: 'Draft', estMin: 3, doneMs: 5 }, { label: 'Polish', estMin: 2 }] }))
   const a = engine('aaaa1111', files)
   await a.fire('session.start', {})
 
-  const all = await a.fire('command.run', { command: 'office-who', args: '' })
+  const all = await a.fire('command.run', { command: 'my-office-who', args: '' })
   expect(all.text).toContain('Claude (you): ')
   expect(all.text).toContain('Writer: Editing a doc · plan 1/2')
-  const one = await a.fire('command.run', { command: 'office-who', args: 'writer' })
+  const one = await a.fire('command.run', { command: 'my-office-who', args: 'writer' })
   expect(one.text).toContain('[x] 1. Draft (3 min)')
   expect(one.text).toContain('[ ] 2. Polish (2 min)')
-  expect((await a.fire('command.run', { command: 'office-who', args: 'nobody' })).text).toContain('No desk called')
+  expect((await a.fire('command.run', { command: 'my-office-who', args: 'nobody' })).text).toContain('No desk called')
 
-  await a.fire('tool.call', { tool: 'mcp__office__plan', steps: [{ label: 'One', minutes: 5 }] })
-  expect((await a.fire('command.run', { command: 'office-board', args: '' })).text).toContain('[ ] 1. One (5 min)')
-  await a.fire('command.run', { command: 'office-board', args: 'clear' })
-  expect((await a.fire('command.run', { command: 'office-board', args: '' })).text).toBe('No plan on your board.')
+  await a.fire('tool.call', { tool: 'mcp__my-office__plan', steps: [{ label: 'One', minutes: 5 }] })
+  expect((await a.fire('command.run', { command: 'my-office-board', args: '' })).text).toContain('[ ] 1. One (5 min)')
+  await a.fire('command.run', { command: 'my-office-board', args: 'clear' })
+  expect((await a.fire('command.run', { command: 'my-office-board', args: '' })).text).toBe('No plan on your board.')
   expect(data(files).desks.find((d: Desk) => d.id === 'aaaa1111').steps).toEqual([])
 })
 
-test('/office-leave others sends everyone else home', async () => {
+test('/my-office-leave others sends everyone else home', async () => {
   const files = new Map<string, string>()
-  files.set('/home/.claude/office/desks/bbbb2222.json', other('bbbb2222', 'Writer'))
-  files.set('/home/.claude/office/desks/cccc3333.json', other('cccc3333', 'Writer'))
+  files.set('/home/.claude/my-office/desks/bbbb2222.json', other('bbbb2222', 'Writer'))
+  files.set('/home/.claude/my-office/desks/cccc3333.json', other('cccc3333', 'Writer'))
   const a = engine('eeee5555', files)
   await a.fire('session.start', {})
-  expect((await a.fire('command.run', { command: 'office-leave', args: 'others' })).text).toContain('went home')
+  expect((await a.fire('command.run', { command: 'my-office-leave', args: 'others' })).text).toContain('went home')
   expect(data(files).desks.map((d: Desk) => d.id)).toEqual(['eeee5555'])
-  expect((await a.fire('command.run', { command: 'office-leave', args: 'others' })).text).toBe('Nobody else is in the office.')
+  expect((await a.fire('command.run', { command: 'my-office-leave', args: 'others' })).text).toBe('Nobody else is in the office.')
 })
 
-test('/office-quiet silences the end of a turn', async () => {
+test('/my-office-quiet silences the end of a turn', async () => {
   const a = engine('ffff6666', new Map())
   await a.fire('session.start', {})
   const turn = async () => { await a.fire('turn.start', {}); await a.fire('turn.complete', {}) }
   await turn()
   expect(a.played.length).toBe(1)
-  expect((await a.fire('command.run', { command: 'office-quiet', args: '' })).text).toContain('No more sound')
+  expect((await a.fire('command.run', { command: 'my-office-quiet', args: '' })).text).toContain('No more sound')
   await turn()
   expect(a.played.length).toBe(1)
-  expect((await a.fire('command.run', { command: 'office-quiet', args: 'loud' })).text).toContain('Use /office-quiet')
-  await a.fire('command.run', { command: 'office-quiet', args: 'off' })
+  expect((await a.fire('command.run', { command: 'my-office-quiet', args: 'loud' })).text).toContain('Use /my-office-quiet')
+  await a.fire('command.run', { command: 'my-office-quiet', args: 'off' })
   await turn()
   expect(a.played.length).toBe(2)
 })
 
-test('/office-theme lists the rooms and tells the page', async () => {
+test('/my-office-theme lists the rooms and tells the page', async () => {
   const files = new Map<string, string>()
   for (const f of ['engine', 'neon', 'cosy']) files.set(`/plugin/web/js/themes/${f}.js`, '')
   const a = engine('abab7777', files)
   await a.fire('session.start', {})
-  expect((await a.fire('command.run', { command: 'office-theme', args: '' })).text).toContain('Rooms: cosy, neon.')
-  expect((await a.fire('command.run', { command: 'office-theme', args: 'moon' })).text).toContain('No room called')
+  expect((await a.fire('command.run', { command: 'my-office-theme', args: '' })).text).toContain('Rooms: cosy, neon.')
+  expect((await a.fire('command.run', { command: 'my-office-theme', args: 'moon' })).text).toContain('No room called')
   expect(data(files).room).toBeUndefined()
-  await a.fire('command.run', { command: 'office-theme', args: 'Neon' })
+  await a.fire('command.run', { command: 'my-office-theme', args: 'Neon' })
   expect(data(files).room.theme).toBe('neon')
 })
 

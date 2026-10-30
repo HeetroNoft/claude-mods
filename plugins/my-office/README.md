@@ -1,15 +1,15 @@
 # office
 
-A pixel-art office in a local web page. Every Claude Code session running this mod gets a Claude mascot at its own desk, with a board above it showing the session's plan, the step in progress and a live "done by" time. Nothing leaves the machine: each session writes its own desk file under `~/.claude/office/desks/`, and the page reads them back every second.
+A pixel-art office in a local web page. Every Claude Code session running this mod gets a Claude mascot at its own desk, with a board above it showing the session's plan, the step in progress and a live "done by" time. Nothing leaves the machine: each session writes its own desk file under `~/.claude/my-office/desks/`, and the page reads them back every second.
 
 ## Use
 
-- `/office` prints the page's address (`file:///…/.claude/office/index.html`); open it in a browser.
-- `/office-desk Writer` names your desk; `/office-leave` sends a session home and frees its desk, `/office-leave <name or id>` another one, `/office-leave others` everyone but you (for desks left behind by a crashed session).
-- `/office-who` lists who is in the office, what each one does and the usage left; `/office-who <name>` shows that desk's plan.
-- `/office-board` shows your plan; `/office-board clear` takes it off your board.
-- `/office-theme neon` changes the room on the page from the terminal; `/office-theme` lists the rooms.
-- `/office-quiet` switches the sound at the end of a turn off or on (`/office-quiet on`, `/office-quiet off`), for every session.
+- `/my-office` prints the page's address (`file:///…/.claude/my-office/index.html`); open it in a browser.
+- `/my-office-desk Writer` names your desk; `/my-office-leave` sends a session home and frees its desk, `/my-office-leave <name or id>` another one, `/my-office-leave others` everyone but you (for desks left behind by a crashed session).
+- `/my-office-who` lists who is in the office, what each one does and the usage left; `/my-office-who <name>` shows that desk's plan.
+- `/my-office-board` shows your plan; `/my-office-board clear` takes it off your board.
+- `/my-office-theme neon` changes the room on the page from the terminal; `/my-office-theme` lists the rooms.
+- `/my-office-quiet` switches the sound at the end of a turn off or on (`/my-office-quiet on`, `/my-office-quiet off`), for every session.
 - Claude keeps the board up to date with the `plan` and `step_done` tools, and the mod also follows the session's own task list.
 
 The board follows what the session really does: the `plan` tool when Claude gives one (it has estimates), otherwise mission-control's plan or Claude Code's own task list. While a session waits for you (a question, a permission, a turn that ends on a question) its plan pauses, so waiting never shows as running late, and its Claude stays at its desk hopping and waving, a **?** over its head and its lamp blinking. A session stopped by the usage limit sits knocked out (crossed eyes, a skull instead of its icon, a red bar) until its next prompt or restart. The gauge top left shows the usage left in the 5-hour and weekly windows and, in turn, when each resets; hover it for both in words. It turns amber at 20% left and blinks red at 5%; an empty window shows a skull and dims the room. Each threshold shakes the gauge and, with the sound on, plays a short alarm.
@@ -22,4 +22,4 @@ In the page: **T** changes the room (8 themes, each with day and night following
 
 ## Layout
 
-`hooks/` is the engine side (TypeScript, runs inside each session); `web/` is the page (plain browser scripts, copied to `~/.claude/office/` at session start). See `CLAUDE.md` at the repository root for the file map, the rules the page keeps and how to test.
+`hooks/` is the engine side (TypeScript, runs inside each session); `web/` is the page (plain browser scripts, copied to `~/.claude/my-office/` at session start). See `CLAUDE.md` at the repository root for the file map, the rules the page keeps and how to test.

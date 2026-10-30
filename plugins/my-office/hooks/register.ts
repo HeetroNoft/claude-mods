@@ -4,7 +4,7 @@ import {
   activityOf, applyTool, clean, clearPlan, type Desk, eta, finishStep, firstWords, hhmm, lastQuestion, msgKey, newDesk,
   parseReceived, pausePlan, peerName, planLines, planSteps, push, rateOf, resumePlan, todoSteps, usageLine, whoLine,
 } from './core'
-import { deskList, installPage, LIVE_MS, officeDir, pageInTest, presentDesks, publish, readDesk, readLeft, themeKeys, writeDesk, writeLeft, writeRoom } from './room'
+import { deskList, installPage, LIVE_MS, carryOver, officeDir, pageInTest, presentDesks, publish, readDesk, readLeft, themeKeys, writeDesk, writeLeft, writeRoom } from './room'
 import { COMMANDS, PROMPT_HINT, TOOLS } from './tools'
 
 // The office: every session that runs this mod gets a desk in one shared pixel-art room.
@@ -20,6 +20,7 @@ let ticker: { cancel: () => void } | undefined
 async function ensure($: any) {
   if (desk && dir) return
   dir = await officeDir($)
+  await carryOver($, dir)
   const id = await $.session.id()
   const now = await $.clock.now()
   const saved = await readDesk($, dir, id)
@@ -115,7 +116,7 @@ async function doSetup($: any) {
   if (desk?.eta && !desk.eta.allDone) startTicker($)
 }
 
-// A session that starts again (VS Code reopened, a resumed conversation, after /office-leave) walks back
+// A session that starts again (VS Code reopened, a resumed conversation, after /my-office-leave) walks back
 // to its desk. The desk is read again: the module may outlive a session (after /clear the id changes).
 async function comeBack($: any) {
   await chain
@@ -134,14 +135,14 @@ export const register: Register = on => {
     return next(e)
   })
 
-  on('command.run', { command: 'office-desk' }, async ($, e: any) => {
+  on('command.run', { command: 'my-office-desk' }, async ($, e: any) => {
     const name = clean(String(e.args ?? e.text ?? '').trim(), 14)
-    if (!name) return { text: `Your desk is called ${desk?.name ?? 'Claude'}. Rename it with /office-desk <name>.` }
+    if (!name) return { text: `Your desk is called ${desk?.name ?? 'Claude'}. Rename it with /my-office-desk <name>.` }
     await rename($, name)
     return { text: `Your desk is now called ${name}.` }
   })
 
-  on('command.run', { command: 'office-leave' }, async ($, e: any) => {
+  on('command.run', { command: 'my-office-leave' }, async ($, e: any) => {
     await setup($)
     await ensure($)
     const arg = String(e.args ?? e.text ?? '').trim().toLowerCase()
@@ -151,7 +152,7 @@ export const register: Register = on => {
     const hits = others ? here.filter(d => d.id !== desk?.id) : arg ? here.filter(d => d.name.toLowerCase() === arg || d.id.startsWith(arg)) : here.filter(d => d.id === desk?.id)
     if (others && !hits.length) return { text: 'Nobody else is in the office.' }
     if (!hits.length) return { text: arg ? `No desk called "${arg}". In the office: ${deskList(here)}.` : 'This session is not in the office.' }
-    if (!others && hits.length > 1) return { text: `Several desks match "${arg}": ${deskList(hits)}. Use /office-leave <start of the id>.` }
+    if (!others && hits.length > 1) return { text: `Several desks match "${arg}": ${deskList(hits)}. Use /my-office-leave <start of the id>.` }
     // who left long ago is off the board anyway: the list only keeps who could still show
     const left = Object.fromEntries(Object.entries(await readLeft($, dir)).filter(([, ms]) => now - ms < LIVE_MS))
     await writeLeft($, dir, { ...left, ...Object.fromEntries(hits.map(d => [d.id, now])) })
@@ -162,12 +163,12 @@ export const register: Register = on => {
     return { text: `${gone.name} went home and freed a desk.${mine ? ' This session comes back on its next prompt or when it is opened again.' : ' It comes back when that session gets a new prompt or is opened again.'}` }
   })
 
-  on('command.run', { command: 'office' }, async $ => {
+  on('command.run', { command: 'my-office' }, async $ => {
     await ensure($)
-    return { text: `Open this page in your browser: file:///${dir.replace(/^\//, '')}/index.html\nEvery session with the office mod gets a desk there. Rename yours with /office-desk <name>.` }
+    return { text: `Open this page in your browser: file:///${dir.replace(/^\//, '')}/index.html\nEvery session with the my-office mod gets a desk there. Rename yours with /my-office-desk <name>.` }
   })
 
-  on('command.run', { command: 'office-who' }, async ($, e: any) => {
+  on('command.run', { command: 'my-office-who' }, async ($, e: any) => {
     await ensure($)
     const now = await $.clock.now()
     const here = await presentDesks($, dir, now)
@@ -181,7 +182,7 @@ export const register: Register = on => {
     return { text: [...here.map(d => whoLine(d, d.id === desk?.id)), usageLine(here)].filter(Boolean).join('\n') }
   })
 
-  on('command.run', { command: 'office-board' }, async ($, e: any) => {
+  on('command.run', { command: 'my-office-board' }, async ($, e: any) => {
     await ensure($)
     if (String(e.args ?? '').trim().toLowerCase() === 'clear') {
       await save($, clearPlan)
@@ -190,19 +191,19 @@ export const register: Register = on => {
     return { text: desk?.steps.length ? [...planLines(desk), desk.eta && !desk.eta.allDone ? `Due ${hhmm(desk.eta.finishMs)}.` : ''].filter(Boolean).join('\n') : 'No plan on your board.' }
   })
 
-  on('command.run', { command: 'office-quiet' }, async ($, e: any) => {
+  on('command.run', { command: 'my-office-quiet' }, async ($, e: any) => {
     const arg = String(e.args ?? '').trim().toLowerCase()
-    if (arg && arg !== 'on' && arg !== 'off') return { text: 'Use /office-quiet on, /office-quiet off, or /office-quiet to switch.' }
+    if (arg && arg !== 'on' && arg !== 'off') return { text: 'Use /my-office-quiet on, /my-office-quiet off, or /my-office-quiet to switch.' }
     const quiet = arg ? arg === 'on' : !(await $.store.get('quiet'))
     await $.store.set('quiet', quiet)
     return { text: quiet ? 'No more sound at the end of a turn.' : 'The sound at the end of a turn is back.' }
   })
 
-  on('command.run', { command: 'office-theme' }, async ($, e: any) => {
+  on('command.run', { command: 'my-office-theme' }, async ($, e: any) => {
     await ensure($)
     const keys = await themeKeys($, `${$.plugin.root}/web`)
     const arg = String(e.args ?? '').trim().toLowerCase()
-    if (!arg || !keys.includes(arg)) return { text: `${arg ? `No room called "${arg}". ` : ''}Rooms: ${keys.join(', ')}. Use /office-theme <room>.` }
+    if (!arg || !keys.includes(arg)) return { text: `${arg ? `No room called "${arg}". ` : ''}Rooms: ${keys.join(', ')}. Use /my-office-theme <room>.` }
     await writeRoom($, dir, { theme: arg, ms: await $.clock.now() })
     await save($, () => undefined)
     return { text: `The office is now the ${arg} room.` }
@@ -226,7 +227,7 @@ export const register: Register = on => {
     return next(e)
   })
 
-  on('tool.call', { tool: 'mcp__office__plan' }, async ($, e: any) => {
+  on('tool.call', { tool: 'mcp__my-office__plan' }, async ($, e: any) => {
     let n = 0
     await save($, (d, now) => {
       d.steps = planSteps(e.steps, now); d.planMs = now; d.doneMs = 0; n = d.steps.length
@@ -237,7 +238,7 @@ export const register: Register = on => {
     return { result: `Plan on your desk board: ${n} steps.${due}` }
   })
 
-  on('tool.call', { tool: 'mcp__office__name_desk' }, async ($, e: any) => {
+  on('tool.call', { tool: 'mcp__my-office__name_desk' }, async ($, e: any) => {
     const name = clean(String(e.name ?? '').trim(), 14)
     if (!name) return { result: 'Not renamed: the name was empty.' }
     await ensure($)
@@ -245,7 +246,7 @@ export const register: Register = on => {
     return { result: `Your desk is now called ${name}.` }
   })
 
-  on('tool.call', { tool: 'mcp__office__name_peer' }, async ($, e: any) => {
+  on('tool.call', { tool: 'mcp__my-office__name_peer' }, async ($, e: any) => {
     const who = String(e.who ?? '').trim()
     const name = clean(String(e.name ?? '').trim(), 14)
     if (!who || !name) return { result: 'Not saved: who and name are both needed.' }
@@ -258,7 +259,7 @@ export const register: Register = on => {
     return { result: `${who} shows as ${name} on your board.` }
   })
 
-  on('tool.call', { tool: 'mcp__office__step_done' }, async ($, e: any) => {
+  on('tool.call', { tool: 'mcp__my-office__step_done' }, async ($, e: any) => {
     const n = Number(e.step)
     if (!desk?.steps[n - 1]) return { result: `No step ${n}.` }
     await save($, (d, now) => { d.steps = finishStep(d.steps, n, now) })
