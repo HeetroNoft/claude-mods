@@ -102,7 +102,8 @@ function boardPixels(g,x,dk,now,tp){
   // row 1: role icon and the desk's name
   const nameCol=readable(col,bg,3.5);
   const ic=drawIcon(g,iconFor(dk),L,31+Math.floor((5-ICONS[iconFor(dk)].length)/2),nameCol);
-  pixMarquee(g,dk.name||'Claude',L+ic.w+3,31,CW-ic.w-3,nameCol,tp,seed);
+  pixMarquee(g,dk.branch&&Math.floor((tp+seed)/7000)%3===2?dk.branch:dk.name||'Claude',L+ic.w+3,31,CW-ic.w-3,nameCol,tp,seed); // now and then, the branch it works on
+  if(dk.ctx>=70&&dk.activity!=='gone')R(g,L,37,Math.max(1,Math.round(CW*Math.min(100,dk.ctx)/100)),1,dk.ctx>=85?'#E5484D':AMBER); // the context filling up
   if(dk.activity==='gone'){pixText(g,'AWAY',centre(pixWidth('AWAY')),47,dimInk);return;}
   // row 2: one pip per step, together as wide as the face: green done, blinking desk colour now, dark to come
   const n=inf.total;
@@ -117,10 +118,12 @@ function boardPixels(g,x,dk,now,tp){
   }else{const k=Math.floor(tp/400)%4,x0=centre(13);for(let i=0;i<3;i++)R(g,x0+i*5,40,3,2,i<k?col:off);}
   // row 3: what is being done now
   // what is happening now: the step in progress, and every few seconds what the session is really doing
-  const w=dk.waiting,warn=readable(AMBER,bg,3.5),red=readable('#E5484D',bg,3.5),live=dk.detail&&!['idle','gone','asleep'].includes(dk.activity)&&Math.floor((tp+seed)/5000)%3===2;
+  const beat=deskBeat(dk,now),w=dk.waiting,warn=readable(AMBER,bg,3.5),red=readable('#E5484D',bg,3.5),live=dk.detail&&!['idle','gone','asleep'].includes(dk.activity)&&Math.floor((tp+seed)/5000)%3===2;
   if(dk.limited)pixMarquee(g,'OUT OF USAGE',L,47,CW,red,tp,seed);
-  else if(w)pixMarquee(g,Math.floor(tp/2600)%2?w.text:(w.kind==='permission'?'NEEDS YOUR OK':w.kind==='question'?'QUESTION FOR YOU':'YOUR TURN'),L,47,CW,Math.floor(tp/500)%2?warn:ink,tp,seed);
-  else if(inf.mode==='stopped')pixMarquee(g,inf.kind==='error'?`ENDED ${inf.done} OF ${n}`:'INTERRUPTED',L,47,CW,inf.kind==='error'?red:warn,tp,seed);
+  else if(w)pixMarquee(g,Math.floor(tp/2600)%2?w.text:(w.kind==='permission'?'NEEDS YOUR OK':w.kind==='question'?'QUESTION FOR YOU':w.kind==='form'?'FORM FOR YOU':'YOUR TURN'),L,47,CW,Math.floor(tp/500)%2?warn:ink,tp,seed);
+  else if(inf.mode==='stopped')pixMarquee(g,inf.label,L,47,CW,inf.kind==='error'?red:warn,tp,seed);
+  else if(beat)pixMarquee(g,beat.text,L,47,CW,beat.tone==='bad'?red:beat.tone==='warn'?warn:beat.tone==='good'?readable(GREEN,bg,3.5):ink,tp,seed);
+  else if(!n&&dk.tasks&&dk.tasks.total)pixMarquee(g,`TASKS ${dk.tasks.done} OF ${dk.tasks.total}`,L,47,CW,ink,tp,seed);
   else pixMarquee(g,live?dk.detail:n?(inf.cur?inf.cur.label:'ALL STEPS DONE'):'NO PLAN YET',L,47,CW,live?soft:n&&inf.cur?ink:dimInk,tp,seed);
   // row 4: a draining bar and the finish time; a narrow board shows the time alone, centred
   const T5=19,wide=CW>=T5+20,barW=CW-T5-4,tx=wide?L+CW-T5:centre(T5);

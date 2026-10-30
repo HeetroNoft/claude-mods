@@ -75,6 +75,19 @@ const EMO={
 // What two Claudes say to each other: a line, then its answer.
 const CHAT_TALKS=[['quest','bulb'],['quest','excl'],['cup','heart'],['zap','star'],['note','smile'],['spark','star'],['bulb','zap'],['heart','smile']];
 function drawEmo(g,icon,x,y,col){const E=EMO[icon];if(E)pattern(g,E.p,x,y,col||E.c);}
+// What a desk's latest news does to its Claude, once; and what stays on it, a sweat when the context is nearly full.
+function reactToDesk(ch,dk){
+  const f=dk.flash,tp=performance.now();
+  if(dk.ctx>=85&&!ch.hidden&&ch.headTop!=null&&Math.random()<.4)leaves.push({x:ch.x+5,y:ch.headTop+3,vx:7,vy:-10,life:.7,p:0,w:1,c:'#9FE6FF'});
+  if(!ch.hidden&&ch.act!=='idle'&&deskBeat(dk,Date.now())?.text==='STUCK?'&&tp>(ch.nextEmote||0)){ch.nextEmote=tp+6000;emote(ch,'excl');}
+  if(!f||f.ms===ch.flashSeen)return;
+  const first=ch.flashSeen==null;ch.flashSeen=f.ms;if(first||Date.now()-f.ms>FLASH_MS)return;
+  if(f.kind==='fail'){setMood(ch,'surprised',1200);emote(ch,'excl');ch.sqv-=20;blip(240,.12,'triangle');}
+  else if(f.kind==='denied'){setMood(ch,'dizzy',1500);emote(ch,'excl');blip(200,.14,'triangle');}
+  else if(f.kind==='pass'){setMood(ch,'happy',1200);emote(ch,'note');blip(880,.05);}
+  else if(f.kind==='ship'){setMood(ch,'happy',1800);ch.jumpUntil=tp+800;ch.starT=tp;emote(ch,'heart');chime(.5);}
+  else{ch.sqv+=18;emote(ch,'note');}
+}
 function emote(ch,icon){emotes.push({ch,icon,t0:performance.now()});}
 function emoteAt(x,y,icon){emotes.push({x,y,icon,t0:performance.now()});}
 function drawEmotes(g,tp){
