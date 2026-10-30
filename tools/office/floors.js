@@ -11,7 +11,7 @@ setTimeout(()=>{
   ok(floorsEl.querySelector('i.wait'),'no blinking light for the waiting desk');
   ok(floorsEl.querySelector('[data-f="1"] i.limit'),'no red light for the out-of-usage desk');
   const r=floorsEl.getBoundingClientRect(),st=stage.getBoundingClientRect();
-  ok(r.right<st.left+st.width*239/W&&r.left>=st.left+st.width*180/W-1,'panel at '+Math.round((r.left-st.left)/st.width*W)+'..'+Math.round((r.right-st.left)/st.width*W));
+  ok(Math.abs((r.left+r.right)/2-(st.left+st.width/2))<2,'panel at '+Math.round((r.left-st.left)/st.width*W)+'..'+Math.round((r.right-st.left)/st.width*W)+', not centred');
   // avatars: the first one in is the plain Claude, the rest are drawn, and a refresh changes nobody
   const lookKey=()=>everyDesk.map(d=>{const l=looksFor(String(d.id));return d.id+'='+l.c+':'+l.style;}).join();
   const lookRules=why=>{const pairs=everyDesk.map(d=>{const l=looksFor(String(d.id));return l.c+':'+l.style;});ok(new Set(pairs).size===pairs.length,why+': two sessions share an avatar');

@@ -3,7 +3,6 @@
 startThemes();
 resize();
 buildBg();
-renderMenu();
 poll(); setInterval(poll,1000);
 setInterval(renderCard,500);
 requestAnimationFrame(frame);

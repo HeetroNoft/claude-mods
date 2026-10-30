@@ -327,14 +327,11 @@ function checkPending(){
 }
 
 /* ---------- done ---------- */
-const lbtn=document.getElementById('lbl'); lbtn.classList.toggle('on',LABELS);
-lbtn.addEventListener('click',()=>{LABELS=!LABELS;lbtn.classList.toggle('on',LABELS);});
-window.addEventListener('keydown',e=>{if(e.key==='l'||e.key==='L')lbtn.click();});
-
-// Sound: the button mutes and unmutes (M), the slider that shows on hovering it sets the volume.
+function setLabels(on){LABELS=on;try{localStorage.setItem('office.labels',on?'1':'0');}catch(e){}}
+window.addEventListener('keydown',e=>{if(e.key==='l'||e.key==='L')setLabels(!LABELS);});
+// Sound: M mutes and unmutes; the settings panel has the switch and the volume.
 // Every sound goes through one master gain; the volume and the mute are remembered (localStorage).
 let actx=null,master=null,soundOn=false,volume=70;
-const btn=document.getElementById('snd'),volBox=document.getElementById('vol'),volR=document.getElementById('volr'),volV=document.getElementById('volv');
 try{const v=+localStorage.getItem('office.volume');if(localStorage.getItem('office.volume')!==null&&v>=0&&v<=100)volume=v;soundOn=localStorage.getItem('office.sound')==='on'&&volume>0;}catch(e){}
 const gainOf=v=>1.8*(v/100)*(v/100); // heard loudness grows roughly with the square
 function soundOut(){return master||actx.destination;}
@@ -344,10 +341,6 @@ function wakeAudio(){
     master.gain.value=gainOf(volume);actx.resume();}catch(e){}
 }
 function showSound(){
-  const level=!soundOn||!volume?0:volume<50?1:2;
-  btn.dataset.level=level;btn.classList.toggle('on',soundOn);btn.setAttribute('aria-pressed',String(soundOn));
-  volR.value=volume;volR.setAttribute('aria-valuetext',soundOn?volume+'%':'muted');
-  volV.textContent=soundOn?volume+'%':'off';volBox.classList.toggle('muted',!soundOn);
   if(master&&actx)master.gain.setTargetAtTime(soundOn?gainOf(volume):0,actx.currentTime,.02);
   try{localStorage.setItem('office.volume',String(volume));localStorage.setItem('office.sound',soundOn?'on':'off');}catch(e){}
 }
@@ -355,10 +348,8 @@ function setSound(on){
   soundOn=on;if(on&&!volume)volume=50; // unmuting at 0 would stay silent
   if(on)wakeAudio();showSound();if(on)chime(.6);
 }
-btn.addEventListener('click',()=>setSound(!soundOn));
-volR.addEventListener('input',()=>{volume=+volR.value;if(!volume)soundOn=false;else if(!soundOn){soundOn=true;wakeAudio();}else wakeAudio();showSound();});
-volR.addEventListener('change',()=>{if(soundOn)blip(660,.04,'triangle');}); // a tick at the chosen level
-window.addEventListener('keydown',e=>{if((e.key==='m'||e.key==='M')&&!e.ctrlKey&&!e.metaKey&&e.target!==volR)setSound(!soundOn);});
+function setVolume(v){volume=v;if(!volume)soundOn=false;else if(!soundOn){soundOn=true;wakeAudio();}else wakeAudio();showSound();}
+window.addEventListener('keydown',e=>{if((e.key==='m'||e.key==='M')&&!e.ctrlKey&&!e.metaKey)setSound(!soundOn);});
 ['pointerdown','keydown'].forEach(ev=>window.addEventListener(ev,()=>{if(soundOn&&!actx)wakeAudio();},{once:true,capture:true}));
 showSound();
 function chime(vol){

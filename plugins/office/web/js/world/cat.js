@@ -354,7 +354,20 @@ function resetCatWorld(){
   if(!cat||cat.away)return;if(cat.job&&cat.job.onEnd)cat.job.onEnd(performance.now());
   cat.job=null;cat.air=null;cat.path=[];cat.z=0;const p={x:clampX(cat.x),y:Math.max(121,clampY(cat.y))};outOfFurniture(p);cat.x=p.x;cat.y=p.y;cat.state='sit';
 }
-function catMeow(tp){cat.hop=tp+420;cat.hopH=4;if(cat.state==='sleep'&&!cat.job){cat.state='sit';cat.until=tp+6000;}emoteAt(cat.x+3,cat.y-cat.z-9,Math.random()<.5?'heart':'note');meowSound();}
+// Its name, from the settings: letters and digits the room's pixel font can draw, without accents.
+const CAT_NAME_MAX=10;
+let catName='',catTagUntil=0;
+try{catName=localStorage.getItem('office.catName')||'';}catch(e){}
+function setCatName(s){catName=String(s||'').normalize('NFD').replace(/[^A-Za-z0-9 -]/g,'').trim().slice(0,CAT_NAME_MAX);try{localStorage.setItem('office.catName',catName);}catch(e){}}
+// A small tag over the cat: while the pointer is on it, for a moment after a click, always with labels.
+function drawCatTag(g,tp){
+  if(!cat||!catName||cat.away)return;
+  const top=cat.y-cat.z,near=ptr.in&&Math.abs(ptr.x-cat.x)<=6&&ptr.y>=top-10&&ptr.y<=top+1;
+  if(!near&&!LABELS&&tp>catTagUntil)return;
+  const t=catName.toUpperCase(),w=pixWidth(t)+4,x=Math.max(2,Math.min(W-w-2,Math.round(cat.x-w/2))),y=Math.round(top-15);
+  R(g,x-1,y+8,w,1,'rgba(0,0,0,.25)');R(g,x+1,y,w-2,8,NAVY);R(g,x,y+1,w,6,NAVY);pixText(g,t,x+2,y+1,'#FFFFFF');
+}
+function catMeow(tp){catTagUntil=tp+2200;cat.hop=tp+420;cat.hopH=4;if(cat.state==='sleep'&&!cat.job){cat.state='sit';cat.until=tp+6000;}emoteAt(cat.x+3,cat.y-cat.z-9,Math.random()<.5?'heart':'note');meowSound();}
 
 /* ---------- drawing ---------- */
 function drawCat(g,tp){

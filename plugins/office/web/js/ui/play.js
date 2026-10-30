@@ -126,16 +126,19 @@ function itemCanvas(kind){
   A.rows.forEach((r,j)=>{for(let i=0;i<8;i++){const col=A.pal[r[i]];if(col){g.fillStyle=col;g.fillRect(i,j,1,1);}}});
   return c;
 }
-const bar=document.getElementById('items'),ibtn=document.getElementById('itm'),ghost=document.getElementById('ghost');
+const bar=document.getElementById('items'),ghost=document.getElementById('ghost');
 Object.keys(ITEM_ART).forEach(k=>{
-  const b=document.createElement('button');b.type='button';b.dataset.k=k;b.title=ITEM_NAMES[k]+' — drag it onto a Claude';b.setAttribute('aria-label',ITEM_NAMES[k]);
+  const b=document.createElement('button');b.type='button';b.dataset.k=k;b.dataset.tip=ITEM_NAMES[k];b.style.setProperty('--i',bar.children.length);b.setAttribute('aria-label',ITEM_NAMES[k]);
   b.appendChild(itemCanvas(k));bar.appendChild(b);
 });
-function showBar(on){bar.classList.toggle('hide',!on);ibtn.classList.toggle('on',on);try{localStorage.setItem('office.items',on?'1':'0');}catch(err){}}
+// The bars share the bottom of the room, centred: the floors at the edge with the items above them,
+// or whichever is alone at the edge. The floors come and go (a drag shows them), so this follows both.
+function layoutBars(){stage.classList.toggle('two',document.getElementById('floors').classList.contains('show')&&!bar.classList.contains('hide'));}
+function showBar(on){bar.classList.toggle('hide',!on);layoutBars();try{localStorage.setItem('office.items',on?'1':'0');}catch(err){}}
 let barOn=true;try{barOn=localStorage.getItem('office.items')!=='0';}catch(err){}
 showBar(barOn);
-ibtn.addEventListener('click',()=>{barOn=!barOn;showBar(barOn);});
-window.addEventListener('keydown',e=>{if((e.key==='i'||e.key==='I')&&!e.ctrlKey&&!e.metaKey){barOn=!barOn;showBar(barOn);}});
+const setBar=on=>{barOn=on;showBar(on);};
+window.addEventListener('keydown',e=>{if((e.key==='i'||e.key==='I')&&!e.ctrlKey&&!e.metaKey)setBar(!barOn);});
 
 // Dragging an item: a ghost follows the pointer; the Claude under it lights up; letting go gives it.
 let carry=null;
@@ -153,10 +156,10 @@ bar.addEventListener('pointermove',e=>{
   if(!carry.moved)return;
   ghost.style.left=e.clientX+'px';ghost.style.top=e.clientY+'px';
   const p=toWorld(e),c=overStage(e)?claudeNear(p):null;
-  if(c!==hoverCh&&c)c.sqv+=8;hoverCh=c;ptr.x=p.x;ptr.y=p.y;ptr.in=overStage(e);
+  if(c!==hoverCh&&c)c.sqv+=8;hoverCh=c;ghost.classList.toggle('hot',!!c);ptr.x=p.x;ptr.y=p.y;ptr.in=overStage(e);
 });
 const dropItem=e=>{
-  if(!carry)return;const k=carry.kind,moved=carry.moved;carry=null;ghost.classList.remove('on');
+  if(!carry)return;const k=carry.kind,moved=carry.moved;carry=null;ghost.classList.remove('on','hot');
   if(!moved){
     // a plain click gives the item to the Claude whose card is open, or shows how to use it
     const c=cardId&&chars.get(cardId);if(c&&!c.hidden){giveItem(c,k);return;}
@@ -164,8 +167,8 @@ const dropItem=e=>{
   }
   if(!overStage(e))return;
   const p=toWorld(e),c=claudeNear(p);
-  if(c)giveItem(c,k);else if(k==='ball'&&p.y>86)dropBallForCat(p.x,p.y); // a ball on the floor is the cat's
+  if(c){giveItem(c,k);const b=bar.querySelector(`button[data-k="${k}"]`);b.classList.remove('sent');void b.offsetWidth;b.classList.add('sent');}else if(k==='ball'&&p.y>86)dropBallForCat(p.x,p.y); // a ball on the floor is the cat's
   else{emoteAt(Math.round(p.x)-1,Math.round(p.y)-6,'quest');blip(260,.05,'triangle');}
 };
 bar.addEventListener('pointerup',dropItem);
-bar.addEventListener('pointercancel',()=>{carry=null;ghost.classList.remove('on');});
+bar.addEventListener('pointercancel',()=>{carry=null;ghost.classList.remove('on','hot');});

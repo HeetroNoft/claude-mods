@@ -18,7 +18,8 @@ function pattern(g,rows,x,y,col){rows.forEach((r,j)=>{for(let i=0;i<r.length;i++
 const STARS=[[279,33],[285,40],[289,32],[298,37],[311,33],[308,42],[281,45],[300,31],[313,47],[290,49]];
 const CLOUDS=[{x:4,y:36,v:1.6},{x:30,y:43,v:1.1},{x:46,y:33,v:2}];
 const BLD=[[276,44,6],[283,39,5],[289,48,6],[296,36,7],[304,45,5],[310,40,5]];
-const HOUR=(()=>{const m=Q.match(/hour=(\d+(?:\.\d+)?)/);return m?+m[1]:null;})();
+const HOUR_ASKED=(()=>{const m=Q.match(/hour=(\d+(?:\.\d+)?)/);return m?+m[1]:null;})();
+let HOUR=HOUR_ASKED; // null follows the clock; ui/settings.js can hold it at day or night
 // 0 is full day, 1 full night. ?hour=22 pins the hour, for tests.
 function nightness(now){
   let h; if(HOUR!=null)h=HOUR; else{const d=new Date(now);h=d.getHours()+d.getMinutes()/60;}

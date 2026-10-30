@@ -183,7 +183,7 @@ function frame(tp){
     });
     (ch.held?lifted:post).push(()=>{
       if(ch.headTop==null)return;const ht=ch.headTop-Math.round(ch.badgeUp);
-      if(!LABELS){const dk=ch.desk||{};const badge=ch.act==='limit'?['skull','#B03A2E']:ch.act==='ask'?['quest',Math.floor(tp/300)%2?AMBER:ch.look.c]:[iconFor(dk),ch.look.c];
+      if(!LABELS&&(PREFS.badges||ch.act==='limit'||ch.act==='ask')){const dk=ch.desk||{};const badge=ch.act==='limit'?['skull','#B03A2E']:ch.act==='ask'?['quest',Math.floor(tp/300)%2?AMBER:ch.look.c]:[iconFor(dk),ch.look.c];
         drawBadge(wx,badge[0],ch.x,ht,badge[1],tp,ch.id);
         if(tp<ch.jumpUntil+2500&&ch.starT&&tp-ch.starT<4000)drawStar(wx,Math.round(ch.x),Math.round(ht-21+Math.sin(tp/150)),Math.floor(tp/200)%2?'#FFD84A':'#FFFFFF');}
     });
@@ -206,15 +206,15 @@ function frame(tp){
   // changing floors with reduced motion: the room comes up out of a quick dark
   const fade=(floorFade-performance.now())/FLOOR_FADE; // on the wall clock: a late frame never leaves it dark
   if(fade>0){wx.fillStyle=`rgba(0,0,0,${Math.min(1,fade)})`;wx.fillRect(0,0,W,H);}
-  // a usage window run dry dims the room; the gauge, drawn after, stays lit
+  // a usage window run dry dims the room; the gauge, on its own canvas, stays lit
   if(gaugeEmpty()){wx.fillStyle='rgba(18,4,6,.42)';wx.fillRect(0,0,W,H);}
-  drawGauge(wx,now,tp);
+  drawGauge(gcx,now,tp);
   if(TH.live)TH.live(wx,tp);
   const oneBoard=(dk,x)=>{const c=looksFor(String(dk.id)).c;outlined(wx,'board'+x+'/'+desks.length,g=>drawBoard(g,x,c,dk.activity==='gone',tp),g=>drawBoard(g,x,c,false,0));if(!LABELS)boardPixels(wx,x,dk,now,tp);};
   desks.forEach((dk,i)=>{if(!boardShift(dk))oneBoard(dk,xs[i]);});
   drawBoardDrag(wx,xs,oneBoard); // the board being dragged, over the others (ui/boards.js)
   if(TH.neon)drawNeon(wx,tp);
-  post.forEach(f=>f());over.forEach(f=>f());lifted.forEach(f=>f());
+  post.forEach(f=>f());over.forEach(f=>f());drawCatTag(wx,tp);lifted.forEach(f=>f());
   drawEmotes(wx,tp);
   leaves=leaves.filter(l=>{l.life-=dt;l.vy+=8*dt;l.x+=(l.vx+Math.sin(tp/250+l.p)*6)*dt;l.y+=l.vy*dt;if(l.life<=0||l.y>178)return false;wx.globalAlpha=Math.min(1,l.life);R(wx,l.x,l.y,l.w,1,l.c);wx.globalAlpha=1;return true;});
   // decorative send planes
