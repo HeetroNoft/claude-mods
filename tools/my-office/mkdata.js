@@ -12,6 +12,8 @@ const N=+(process.env.N||4);const all=[
 for(let i=4;i<N;i++)all.push(desk("e"+i,["Writer","CEO","Dev"][i%3],"read",[st("Step",5,now-M)],{finishMs:now+9*M,plannedMs:now+9*M,lateMin:0,allDone:false}));
 // the account's usage, as the gauge reads it, and a fifth desk knocked out by the usage limit
 all[0].rate={fiveHour:62,sevenDay:35,fiveResets:new Date(now+2*60*M).toISOString(),sevenResets:new Date(now+3*24*60*M).toISOString(),ms:now};
+// what the office costs this session in tokens, as the card reads it
+all[0].tokens={hint:82,calls:1460,cmds:315,defs:610,defsLoaded:false};
 if(all[4])Object.assign(all[4],{activity:'limit',limited:{since:now-M,resetsAt:new Date(now+95*M).toISOString()}});
 [[5,'interrupted'],[6,'error']].forEach(([i,kind])=>{if(all[i])Object.assign(all[i],{activity:'idle',stopped:{kind,ms:now-2*M},pausedMs:now-2*M});});
 // the other states, on desks 8 and up (N=16)

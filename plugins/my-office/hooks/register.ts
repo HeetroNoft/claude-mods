@@ -2,8 +2,8 @@ import type { Register } from 'claude-code'
 
 import {
   freshRate, limitOver, limitReset, passed, rateStale,
-  activityOf, applyTool, baseName, clean, clearPlan, note, toolFlash, type Desk, eta, finishStep, firstWords, hhmm, lastQuestion, msgKey, newDesk,
-  finishPlan, parseReceived, pausePlan, peerName, planLines, planSteps, push, rateOf, resumePlan, stopPlan, todoSteps, usageLine, whoLine,
+  activityOf, addTokens, applyTool, baseName, clean, clearPlan, note, toolFlash, type Desk, eta, finishStep, firstWords, hhmm, lastQuestion, msgKey, newDesk,
+  finishPlan, officeDefs, parseReceived, pausePlan, peerName, planLines, planSteps, push, rateOf, resumePlan, stopPlan, todoSteps, usageLine, whoLine,
 } from './core'
 import { deskList, installPage, LIVE_MS, carryOver, officeDesks, officeDir, pageInTest, presentDesks, publish, readDesk, readLeft, removeDesk, themeKeys, uselessDesks, writeDesk, writeLeft, writeRoom } from './room'
 import { COMMANDS, PROMPT_HINT, TOOLS } from './tools'
@@ -123,6 +123,30 @@ export async function resetCheck($: any) {
   if (resume) await Promise.resolve().then(() => $.prompt.submit({ text: RESUME_TEXT })).catch(() => undefined)
 }
 
+// What the model wrote to call an office tool: its arguments, as the schema names them.
+function toolInput(name: string, e: any) {
+  const keys = Object.keys(TOOLS.find(t => t.name === name)?.inputSchema.properties ?? {})
+  return JSON.stringify(Object.fromEntries(keys.filter(k => e[k] !== undefined).map(k => [k, e[k]])))
+}
+
+// The office tools' schemas, counted once a session by the token-count API (as /context counts them).
+// Best effort and in the background: it sends one count request per tool and memory file of the session.
+async function measureDefs($: any) {
+  const u = await Promise.resolve().then(() => $.session.usage({ breakdown: 'full' })).catch(() => undefined)
+  const m = officeDefs(u?.context?.breakdown)
+  if (m) await save($, d => { d.tokens = { hint: 0, calls: 0, cmds: 0, ...d.tokens, defs: m.tokens, defsLoaded: m.loaded } })
+}
+
+// An office command's output and an office tool's answer go into the conversation: both count (Tokens).
+async function said($: any, text: string) {
+  await save($, d => addTokens(d, 'cmds', text))
+  return { text }
+}
+async function answered($: any, e: any, name: string, result: string) {
+  await save($, d => addTokens(d, 'calls', `mcp__my-office__${name}${toolInput(name, e)}${result}`))
+  return { result }
+}
+
 // Setup runs once: at session start or, after /reload-plugins (which does not fire
 // session.start), on the first prompt or tool call.
 let ready: Promise<void> | undefined
@@ -146,6 +170,7 @@ async function doSetup($: any) {
     if (d.limited) { d.limited = undefined; d.activity = 'idle'; d.detail = 'Coffee' }
   })
   if (desk?.eta && !desk.eta.allDone) startTicker($)
+  if (desk && desk.tokens?.defs == null) void measureDefs($)
   resetWatch?.cancel()
   resetWatch = $.clock.every(30_000, () => { void resetCheck($) })
 }
@@ -171,9 +196,9 @@ export const register: Register = on => {
 
   on('command.run', { command: 'my-office-desk' }, async ($, e: any) => {
     const name = clean(String(e.args ?? e.text ?? '').trim(), 14)
-    if (!name) return { text: `Your desk is called ${desk?.name ?? 'Claude'}. Rename it with /my-office-desk <name>.` }
+    if (!name) return said($, `Your desk is called ${desk?.name ?? 'Claude'}. Rename it with /my-office-desk <name>.`)
     await rename($, name)
-    return { text: `Your desk is now called ${name}.` }
+    return said($, `Your desk is now called ${name}.`)
   })
 
   on('command.run', { command: 'my-office-leave' }, async ($, e: any) => {
@@ -184,17 +209,17 @@ export const register: Register = on => {
     const here = await presentDesks($, dir, now)
     const others = arg === 'others'
     const hits = others ? here.filter(d => d.id !== desk?.id) : arg ? here.filter(d => d.name.toLowerCase() === arg || d.id.startsWith(arg)) : here.filter(d => d.id === desk?.id)
-    if (others && !hits.length) return { text: 'Nobody else is in the office.' }
-    if (!hits.length) return { text: arg ? `No desk called "${arg}". In the office: ${deskList(here)}.` : 'This session is not in the office.' }
-    if (!others && hits.length > 1) return { text: `Several desks match "${arg}": ${deskList(hits)}. Use /my-office-leave <start of the id>.` }
+    if (others && !hits.length) return said($, 'Nobody else is in the office.')
+    if (!hits.length) return said($, arg ? `No desk called "${arg}". In the office: ${deskList(here)}.` : 'This session is not in the office.')
+    if (!others && hits.length > 1) return said($, `Several desks match "${arg}": ${deskList(hits)}. Use /my-office-leave <start of the id>.`)
     // who left long ago is off the board anyway: the list only keeps who could still show
     const left = Object.fromEntries(Object.entries(await readLeft($, dir)).filter(([, ms]) => now - ms < LIVE_MS))
     await writeLeft($, dir, { ...left, ...Object.fromEntries(hits.map(d => [d.id, now])) })
     await save($, () => undefined)
-    if (others) return { text: `${deskList(hits)} went home. Each comes back with a new prompt or when its session is opened again.` }
+    if (others) return said($, `${deskList(hits)} went home. Each comes back with a new prompt or when its session is opened again.`)
     const gone = hits[0]
     const mine = gone.id === desk?.id
-    return { text: `${gone.name} went home and freed a desk.${mine ? ' This session comes back on its next prompt or when it is opened again.' : ' It comes back when that session gets a new prompt or is opened again.'}` }
+    return said($, `${gone.name} went home and freed a desk.${mine ? ' This session comes back on its next prompt or when it is opened again.' : ' It comes back when that session gets a new prompt or is opened again.'}`)
   })
 
   on('command.run', { command: 'my-office-clear' }, async $ => {
@@ -202,7 +227,7 @@ export const register: Register = on => {
     await ensure($)
     const now = await $.clock.now()
     const useless = await uselessDesks($, dir, now, desk?.id)
-    if (!useless.length) return { text: 'Nothing to clear.' }
+    if (!useless.length) return said($, 'Nothing to clear.')
     const done = new Map<string, boolean>()
     for (const d of useless) done.set(d.id, await removeDesk($, dir, d.id))
     const cleared = useless.filter(d => done.get(d.id))
@@ -210,15 +235,15 @@ export const register: Register = on => {
     // who left long ago is off the board anyway, and a cleared desk needs no entry
     await writeLeft($, dir, Object.fromEntries(Object.entries(await readLeft($, dir)).filter(([id, ms]) => now - ms < LIVE_MS && !done.get(id))))
     await save($, () => undefined)
-    return { text: [
+    return said($, [
       cleared.length ? `Cleared ${deskList(cleared)}. A session that is still open comes back at its next activity.` : '',
       stuck.length ? `Could not delete ${deskList(stuck)}.` : '',
-    ].filter(Boolean).join('\n') }
+    ].filter(Boolean).join('\n'))
   })
 
   on('command.run', { command: 'my-office' }, async $ => {
     await ensure($)
-    return { text: `Open this page in your browser: file:///${dir.replace(/^\//, '')}/index.html\nEvery session with the my-office mod gets a desk there. Rename yours with /my-office-desk <name>.` }
+    return said($, `Open this page in your browser: file:///${dir.replace(/^\//, '')}/index.html\nEvery session with the my-office mod gets a desk there. Rename yours with /my-office-desk <name>.`)
   })
 
   on('command.run', { command: 'my-office-who' }, async ($, e: any) => {
@@ -228,38 +253,38 @@ export const register: Register = on => {
     const arg = String(e.args ?? '').trim().toLowerCase()
     if (arg) {
       const d = here.find(x => x.name.toLowerCase() === arg || x.id.startsWith(arg))
-      if (!d) return { text: `No desk called "${arg}". In the office: ${deskList(here)}.` }
-      return { text: [whoLine(d, d.id === desk?.id), ...planLines(d)].join('\n') }
+      if (!d) return said($, `No desk called "${arg}". In the office: ${deskList(here)}.`)
+      return said($, [whoLine(d, d.id === desk?.id), ...planLines(d)].join('\n'))
     }
-    if (!here.length) return { text: 'Nobody is in the office.' }
-    return { text: [...here.map(d => whoLine(d, d.id === desk?.id)), usageLine(here)].filter(Boolean).join('\n') }
+    if (!here.length) return said($, 'Nobody is in the office.')
+    return said($, [...here.map(d => whoLine(d, d.id === desk?.id)), usageLine(here)].filter(Boolean).join('\n'))
   })
 
   on('command.run', { command: 'my-office-board' }, async ($, e: any) => {
     await ensure($)
     if (String(e.args ?? '').trim().toLowerCase() === 'clear') {
       await save($, clearPlan)
-      return { text: 'Your board is clear.' }
+      return said($, 'Your board is clear.')
     }
-    return { text: desk?.steps.length ? [...planLines(desk), desk.eta && !desk.eta.allDone ? `Due ${hhmm(desk.eta.finishMs)}.` : ''].filter(Boolean).join('\n') : 'No plan on your board.' }
+    return said($, desk?.steps.length ? [...planLines(desk), desk.eta && !desk.eta.allDone ? `Due ${hhmm(desk.eta.finishMs)}.` : ''].filter(Boolean).join('\n') : 'No plan on your board.')
   })
 
   on('command.run', { command: 'my-office-quiet' }, async ($, e: any) => {
     const arg = String(e.args ?? '').trim().toLowerCase()
-    if (arg && arg !== 'on' && arg !== 'off') return { text: 'Use /my-office-quiet on, /my-office-quiet off, or /my-office-quiet to switch.' }
+    if (arg && arg !== 'on' && arg !== 'off') return said($, 'Use /my-office-quiet on, /my-office-quiet off, or /my-office-quiet to switch.')
     const quiet = arg ? arg === 'on' : !(await $.store.get('quiet'))
     await $.store.set('quiet', quiet)
-    return { text: quiet ? 'No more sound at the end of a turn.' : 'The sound at the end of a turn is back.' }
+    return said($, quiet ? 'No more sound at the end of a turn.' : 'The sound at the end of a turn is back.')
   })
 
   on('command.run', { command: 'my-office-theme' }, async ($, e: any) => {
     await ensure($)
     const keys = await themeKeys($, `${$.plugin.root}/web`)
     const arg = String(e.args ?? '').trim().toLowerCase()
-    if (!arg || !keys.includes(arg)) return { text: `${arg ? `No room called "${arg}". ` : ''}Rooms: ${keys.join(', ')}. Use /my-office-theme <room>.` }
+    if (!arg || !keys.includes(arg)) return said($, `${arg ? `No room called "${arg}". ` : ''}Rooms: ${keys.join(', ')}. Use /my-office-theme <room>.`)
     await writeRoom($, dir, { theme: arg, ms: await $.clock.now() })
     await save($, () => undefined)
-    return { text: `The office is now the ${arg} room.` }
+    return said($, `The office is now the ${arg} room.`)
   })
 
   on('prompt.submit', async ($, e, next) => {
@@ -271,6 +296,7 @@ export const register: Register = on => {
     await save($, (d, now) => {
       d.waiting = undefined; d.limited = undefined; d.bg = undefined; resumePlan(d, now)
       hint = !d.hinted; d.hinted = true
+      if (hint) addTokens(d, 'hint', PROMPT_HINT)
       d.activity = 'think'; d.detail = 'Reading the ask'; d.activityMs = now
     })
     return next(hint ? { ...e, context: [...(e.context ?? []), PROMPT_HINT] } : e)
@@ -290,36 +316,36 @@ export const register: Register = on => {
     })
     startTicker($)
     const due = desk?.eta ? ` Done by ${hhmm(desk.eta.finishMs)}.` : ''
-    return { result: `Plan on your desk board: ${n} steps.${due}` }
+    return answered($, e, 'plan', `Plan on your desk board: ${n} steps.${due}`)
   })
 
   on('tool.call', { tool: 'mcp__my-office__name_desk' }, async ($, e: any) => {
     const name = clean(String(e.name ?? '').trim(), 14)
-    if (!name) return { result: 'Not renamed: the name was empty.' }
+    if (!name) return answered($, e, 'name_desk', 'Not renamed: the name was empty.')
     await ensure($)
     await rename($, name)
-    return { result: `Your desk is now called ${name}.` }
+    return answered($, e, 'name_desk', `Your desk is now called ${name}.`)
   })
 
   on('tool.call', { tool: 'mcp__my-office__name_peer' }, async ($, e: any) => {
     const who = String(e.who ?? '').trim()
     const name = clean(String(e.name ?? '').trim(), 14)
-    if (!who || !name) return { result: 'Not saved: who and name are both needed.' }
+    if (!who || !name) return answered($, e, 'name_peer', 'Not saved: who and name are both needed.')
     await save($, d => {
       d.peers = { ...(d.peers ?? {}), [who]: name }
       const relabel = (x: string) => (x && peerName({ peers: { [who]: name }, seen: d.seen }, x) === name ? name : x)
       d.got = d.got.map(g => ({ ...g, from: relabel(g.from) }))
       d.sent = d.sent.map(s => ({ ...s, to: relabel(s.to) }))
     })
-    return { result: `${who} shows as ${name} on your board.` }
+    return answered($, e, 'name_peer', `${who} shows as ${name} on your board.`)
   })
 
   on('tool.call', { tool: 'mcp__my-office__step_done' }, async ($, e: any) => {
     const n = Number(e.step)
-    if (!desk?.steps[n - 1]) return { result: `No step ${n}.` }
+    if (!desk?.steps[n - 1]) return answered($, e, 'step_done', `No step ${n}.`)
     await save($, (d, now) => { d.steps = finishStep(d.steps, n, now) })
     const t = desk?.eta
-    return { result: t ? `Step ${n} done. Now due ${hhmm(t.finishMs)}${t.lateMin ? `, ${t.lateMin} min late` : ''}.` : `Step ${n} done.` }
+    return answered($, e, 'step_done', t ? `Step ${n} done. Now due ${hhmm(t.finishMs)}${t.lateMin ? `, ${t.lateMin} min late` : ''}.` : `Step ${n} done.`)
   })
 
   on('tool.call', async ($, e: any, next) => {

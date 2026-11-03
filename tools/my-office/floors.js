@@ -98,6 +98,9 @@ setTimeout(()=>{
   card.querySelector('[data-pick="acc"][data-step="-1"]').click();card.querySelector('[data-pick="acc"][data-step="1"]').click();
   ok(looksFor(d1).style===nx&&lookMem.get(d1).pin&&!card.querySelector('.acc .off'),'the card did not wear a free accessory');
   closeCard();settleLooks(everyDesk);lookRules('after the card');
+  // the card shows what the office costs in tokens: the estimated total, its parts, the schemas apart
+  {const dt=everyDesk.find(d=>d.tokens);ok(dt,'no fake desk has a token count');if(dt){openCard(String(dt.id));const tk=card.querySelector('.tok');
+  ok(tk&&/Office tokens ~1.9k/.test(tk.textContent)&&/hint ~82 · tool calls ~1\.5k · commands ~315/.test(tk.textContent)&&/Tool schemas 610 \(exact, apart, loaded on demand\)/.test(tk.textContent),'the card token count reads wrong: '+(tk&&tk.textContent));closeCard();}}
   // the arrows stay under the pointer through every accessory, a hat of any height and a greyed name
   openCard(d1);const arrow=()=>card.querySelector('[data-pick="acc"][data-step="1"]'),arrowAt=Math.round(arrow().getBoundingClientRect().top),chD1=chars.get(d1),head=chD1.headTop;
   for(let i=0;i<VARIANTS.length;i++){arrow().click();chD1.headTop=head-i;renderCard();ok(Math.round(arrow().getBoundingClientRect().top)===arrowAt,'the card moved on accessory step '+i);}

@@ -114,6 +114,16 @@ function historyHtml(dk){
   const list=cardHist?'<ul class="hist">'+log.slice().reverse().map(l=>`<li class="${BAD_NEWS.has(l.kind)?'bad':''}"><span>${hhmm(l.ms)}</span><span>${esc(str(l.text,60))}</span></li>`).join('')+'</ul>':'';
   return `<button type="button" class="histbtn" aria-expanded="${cardHist}" data-hist>${cardHist?'▾':'▸'} History (${log.length})</button>`+list;
 }
+// What the office itself costs this session in tokens: the estimated total and its parts (~), then the
+// office tools' schemas, counted exactly once a session and kept apart (they ride along with every request).
+const kTok=n=>n<1000?String(n):(n/1000).toFixed(n<10000?1:0)+'k';
+function tokensHtml(dk){
+  const t=dk.tokens;if(!t||typeof t!=='object')return '';
+  const n=k=>Math.max(0,Math.round(+t[k]||0)),sum=n('hint')+n('calls')+n('cmds');
+  let h=`<div class="tok">Office tokens ~${kTok(sum)}<small>hint ~${kTok(n('hint'))} · tool calls ~${kTok(n('calls'))} · commands ~${kTok(n('cmds'))}</small>`;
+  if(t.defs!=null)h+=`<small>Tool schemas ${kTok(n('defs'))} (exact, apart${t.defsLoaded===false?', loaded on demand':''})</small>`;
+  return h+'</div>';
+}
 function renderCard(){
   if(!cardId)return;const ch=chars.get(cardId);if(!ch||ch.removed){closeCard();return;}
   const dk=ch.desk||{},inf=etaInfo(dk,Date.now());
@@ -128,6 +138,7 @@ function renderCard(){
   h+=historyHtml(dk);
   const facts=[dk.branch&&'Branch '+str(dk.branch,30),dk.model&&str(dk.model,24),dk.ctx!=null&&'Context '+dk.ctx+'%',dk.tasks&&dk.tasks.total&&`Tasks ${dk.tasks.done} of ${dk.tasks.total}`].filter(Boolean);
   if(facts.length)h+=`<div class="eta">${esc(facts.join(' · '))}</div>`;
+  h+=tokensHtml(dk);
   if(h!==card._h){card.innerHTML=h;card._h=h;}
   placeCard(ch);
 }
