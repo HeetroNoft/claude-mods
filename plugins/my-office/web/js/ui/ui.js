@@ -152,10 +152,10 @@ function cardColours(ch){
 }
 function renderCard(){
   if(!cardId)return;const ch=chars.get(cardId);if(!ch||ch.removed){closeCard();return;}
-  const dk=ch.desk||{},inf=etaInfo(dk,Date.now()),nlog=(Array.isArray(dk.log)?dk.log:[]).filter(Boolean).length;
+  const dk=ch.desk||{},inf=etaInfo(dk,Date.now());
   cardColours(ch);
   let h=`<button class="x" type="button" aria-label="Close">×</button><h3><i></i>${esc(str(dk.name||'Claude',24))}</h3><div class="sub">${esc(statusOf(ch))}</div>`;
-  h+='<div class="tabs" role="tablist">'+CARD_TABS.map(([k,l])=>`<button type="button" role="tab" id="ct-${k}" aria-selected="${cardTab===k}" tabindex="${cardTab===k?0:-1}" data-tab="${k}">${l}${k==='hist'&&nlog?` <em>${nlog}</em>`:''}</button>`).join('')+'</div>';
+  h+='<div class="tabs" role="tablist">'+CARD_TABS.map(([k,l])=>`<button type="button" role="tab" id="ct-${k}" aria-selected="${cardTab===k}" tabindex="${cardTab===k?0:-1}" data-tab="${k}">${l}</button>`).join('')+'</div>';
   h+=`<div class="pane" role="tabpanel" aria-labelledby="ct-${cardTab}">`+(cardTab==='session'?sessionHtml(dk):cardTab==='look'?pickRow('acc')+pickRow('col'):cardTab==='hist'?historyHtml(dk):workHtml(ch,dk,inf))+'</div>';
   if(h!==card._h){const f=document.activeElement&&card.contains(document.activeElement)&&document.activeElement.dataset.tab;card.innerHTML=h;card._h=h;if(f){const b=card.querySelector(`[data-tab="${f}"]`);if(b)b.focus();}}
   placeCard(ch);

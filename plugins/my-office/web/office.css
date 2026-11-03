@@ -32,7 +32,6 @@ body.clean #set,body.clean #prefs,body.clean #items{display:none}
 #card .tabs button:hover{color:var(--ink,#1F1E1D);background:var(--well,#F3EEE4)}
 #card .tabs button:focus-visible{outline:2px solid var(--ca,#D97557);outline-offset:-2px}
 #card .tabs button[aria-selected=true]{color:var(--ink,#1F1E1D);border-bottom-color:var(--ca,#D97557)}
-#card .tabs em{font-style:normal;font-size:.85em;padding:0 .3em;border-radius:3px;background:var(--well,#F3EEE4)}
 #card .pane{min-height:6.5em}
 #card .none{margin:.3em 0;color:var(--dim,#5A554C)}
 #card .now{background:var(--well,#F3EEE4);border-left:3px solid var(--ca,#D97557);padding:.4em .55em;margin-bottom:.55em;overflow-wrap:anywhere}
