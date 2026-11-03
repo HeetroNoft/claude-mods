@@ -89,7 +89,7 @@ setTimeout(()=>{
   Object.assign(lookMem.get(far),{c:lookMem.get(d3).c,s:(lookMem.get(d3).s+1)%10});
   ok(accessoryTaken(far,lookMem.get(d3).s),'an accessory that makes a twin was offered');settleLooks(everyDesk);lookRules('twin refused');
   // the card's arrows: a free accessory is worn at once, a taken one greys and changes nothing
-  openCard(d1);const was=looksFor(d1).style,nx=(was+1)%VARIANTS.length,other=everyDesk.find(d=>String(d.id)!==d1&&lookMem.get(String(d.id)).c===lookMem.get(d1).c);
+  openCard(d1);cardTab='look';renderCard();const was=looksFor(d1).style,nx=(was+1)%VARIANTS.length,other=everyDesk.find(d=>String(d.id)!==d1&&lookMem.get(String(d.id)).c===lookMem.get(d1).c);
   if(other)lookMem.get(String(other.id)).s=-1;
   const twin=lookMem.get(d2),keep={c:twin.c,s:twin.s};Object.assign(twin,{c:lookMem.get(d1).c,s:nx});
   card.querySelector('[data-pick="acc"][data-step="1"]').click();
@@ -98,16 +98,24 @@ setTimeout(()=>{
   card.querySelector('[data-pick="acc"][data-step="-1"]').click();card.querySelector('[data-pick="acc"][data-step="1"]').click();
   ok(looksFor(d1).style===nx&&lookMem.get(d1).pin&&!card.querySelector('.acc .off'),'the card did not wear a free accessory');
   closeCard();settleLooks(everyDesk);lookRules('after the card');
+  // the card: four tabs, Work first; a Claude whose card is open is on hold where it stands, and let go when it closes
+  {const id=d1,ch=chars.get(id);openCard(id);const tabs=[...card.querySelectorAll('[role=tab]')].map(b=>b.dataset.tab);
+  ok(tabs.join()==='work,session,look,hist'&&card.querySelector('[aria-selected=true]').dataset.tab==='work','card tabs: '+tabs.join());
+  ok(ch.spot&&poseFor(ch,performance.now()+1)!=='walk','a Claude with its card open is not on hold');
+  ch.path=[{x:ch.x+40,y:ch.y}];const x0=ch.x;stepEntity(ch,.1);ok(ch.x===x0&&ch.path.length===1,'a Claude with its card open walked on');
+  showTab('hist');ok(card.querySelector('[aria-selected=true]').dataset.tab==='hist','the History tab did not open');
+  closeCard();ok(!ch.spot,'a closed card left its Claude on hold');ch.path=[];
+  openCard(id);ok(card.querySelector('[aria-selected=true]').dataset.tab==='work','a card does not open on Work');closeCard();}
   // the card shows what the office costs in tokens: the estimated total, its parts, the schemas apart
-  {const dt=everyDesk.find(d=>d.tokens);ok(dt,'no fake desk has a token count');if(dt){openCard(String(dt.id));const tk=card.querySelector('.tok');
-  ok(tk&&/Office tokens ~1.9k/.test(tk.textContent)&&/hint ~82 · tool calls ~1\.5k · commands ~315/.test(tk.textContent)&&/Tool schemas 610 \(exact, apart, loaded on demand\)/.test(tk.textContent),'the card token count reads wrong: '+(tk&&tk.textContent));closeCard();}}
+  {const dt=everyDesk.find(d=>d.tokens);ok(dt,'no fake desk has a token count');if(dt){openCard(String(dt.id));showTab('session');const tk=card.querySelector('.tok');
+  ok(tk&&/Office tokens\s*~1\.9k/.test(tk.textContent)&&/hint ~82 · tool calls ~1\.5k · commands ~315/.test(tk.textContent)&&/Tool schemas 610 \(exact, apart, loaded on demand\)/.test(tk.textContent),'the card token count reads wrong: '+(tk&&tk.textContent));closeCard();}}
   // the arrows stay under the pointer through every accessory, a hat of any height and a greyed name
-  openCard(d1);const arrow=()=>card.querySelector('[data-pick="acc"][data-step="1"]'),arrowAt=Math.round(arrow().getBoundingClientRect().top),chD1=chars.get(d1),head=chD1.headTop;
+  openCard(d1);cardTab='look';renderCard();const arrow=()=>card.querySelector('[data-pick="acc"][data-step="1"]'),arrowAt=Math.round(arrow().getBoundingClientRect().top),chD1=chars.get(d1),head=chD1.headTop;
   for(let i=0;i<VARIANTS.length;i++){arrow().click();chD1.headTop=head-i;renderCard();ok(Math.round(arrow().getBoundingClientRect().top)===arrowAt,'the card moved on accessory step '+i);}
   chD1.headTop=head;closeCard();settleLooks(everyDesk);lookRules('after going round the accessories');
   // the colour: one on the floor is skipped, the next free one is worn and stays
   const c0=lookMem.get(d1).c,c2=lookMem.get(d2).c,nextC=()=>card.querySelector('[data-pick="col"][data-step="1"]').click();
-  lookMem.get(d2).c=(c0+1)%LOOKS.length;openCard(d1);nextC();
+  lookMem.get(d2).c=(c0+1)%LOOKS.length;openCard(d1);cardTab='look';renderCard();nextC();
   const freeC=lookMem.get(d1).c;
   ok(freeC!==c0&&freeC!==(c0+1)%LOOKS.length&&looksFor(d1).c===LOOKS[freeC].c&&lookMem.get(d1).pinC&&!card.querySelector('.acc .off'),'the card did not skip a taken colour for the next free one');
   lookMem.get(d2).c=c2;closeCard();settleLooks(everyDesk);saveLooks();

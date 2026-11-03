@@ -20,6 +20,7 @@ function stepEntity(e,dt){
   // a Claude held by the pointer hangs under it, a little behind, like on a string
   if(e.held){const k=Math.min(1,dt*16);e.x+=(e.held.x-e.x)*k;e.y+=(e.held.y+16-e.y)*k;return false;}
   if(e.gate&&!e.hidden){stepGate(e,dt);return true;}
+  if(e.spot){e.v=0;return false;} // its card is open: it stays where it is, its way kept for later (actors/spotlight.js)
   if(e.hidden||!e.path.length){e.v=0;return false;}
   let left=0,from=e;e.path.forEach(p=>{left+=Math.hypot(p.x-from.x,p.y-from.y);from=p;});
   if(!e.small)dodge(e,left,dt);
@@ -45,6 +46,7 @@ function stepEntity(e,dt){
 function poseFor(ch,tp){
   if(ch.held||ch.fly)return 'dangle';
   if(ch.gate)return ch.gate.step==='walk'?'walk':ch.gate.step==='shut'?'look':'stand';
+  if(ch.spot)return spotPose(ch,tp);
   if(ch.path.length)return 'walk';
   if(tp<(ch.getUpUntil||0))return 'slump';
   if(tp<(ch.lampReach||0))return 'press';
