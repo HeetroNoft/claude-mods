@@ -76,15 +76,16 @@ function statusOf(ch){
   if(ch.act==='idle'&&I&&I.act)return 'On a break · '+IDLE_TEXT[I.act].replace('the cat',catName||'the cat')+(I.pair?str((I.pair.desk||{}).name||'Claude',14):'');
   return ACT_TEXT[ch.act]||'Working';
 }
-function openCard(id){closePlan();cardId=id;cardPick={};cardHist=false;card.classList.remove('open');void card.offsetWidth;card._h='';card.classList.add('open');renderCard();}
-function closeCard(){closePlan();cardId=null;cardPick={};card.classList.remove('open');}
+// Opening a card puts its Claude on hold where it stands, closing it lets it go (actors/spotlight.js).
+function openCard(id){closePlan();if(cardId&&cardId!==id)letGo(chars.get(cardId));cardId=id;cardPick={};cardTab='work';holdStill(chars.get(id));card.classList.remove('open');void card.offsetWidth;card._h='';card.classList.add('open');renderCard();}
+function closeCard(){closePlan();if(cardId)letGo(chars.get(cardId));cardId=null;cardPick={};card.classList.remove('open');}
 // The card's pickers: a free accessory or colour is worn at once. A taken accessory shows greyed and the Claude
 // keeps what it wears; a taken colour is never offered (skip).
 const PICKERS={
   acc:{label:'accessory',names:VARIANTS,cur:id=>lookMem.get(id).s,taken:accessoryTaken,set:setAccessory},
   col:{label:'colour',names:COLOURS,cur:id=>lookMem.get(id).c,taken:colourTaken,set:setColour,skip:true}
 };
-let cardPick={},cardHist=false;
+let cardPick={},cardTab='work';
 function stepPick(k,d){
   const ch=chars.get(cardId);if(!ch)return;
   const pk=PICKERS[k],cur=pk.cur(cardId),n=pk.names.length;
@@ -97,22 +98,21 @@ function stepPick(k,d){
 }
 function pickRow(k){
   const pk=PICKERS[k],p=cardPick[k],off=p!=null;
-  return `<div class="acc"><button type="button" data-pick="${k}" data-step="-1" aria-label="Previous ${pk.label}">‹</button><span class="${off?'off':''}">${esc(pk.names[off?p:pk.cur(cardId)]||'')}${off?' · taken':''}</span><button type="button" data-pick="${k}" data-step="1" aria-label="Next ${pk.label}">›</button></div>`;
+  return `<div class="lbl">${k==='acc'?'Accessory':'Colour'}</div><div class="acc"><button type="button" data-pick="${k}" data-step="-1" aria-label="Previous ${pk.label}">‹</button><span class="${off?'off':''}">${esc(pk.names[off?p:pk.cur(cardId)]||'')}${off?' · taken':''}</span><button type="button" data-pick="${k}" data-step="1" aria-label="Next ${pk.label}">›</button></div>`;
 }
 // The plan's state in a line, for the card and the board's panel.
 function etaLine(inf){
   if(inf.mode==='ontime')return `Done by <b>${hhmm(inf.fin)}</b> · ${about(inf.left)} left`;
-  if(inf.mode==='late')return `Now done by ${hhmm(inf.fin)} · <b style="color:#B26A00">${about(inf.late*60000)} behind plan</b>`;
-  if(inf.mode==='stopped')return `<b style="color:${inf.kind==='error'?'#B03A2E':'#B26A00'}">${inf.kind==='error'?'Ended':'Interrupted'} at ${hhmm(inf.at)}${inf.kind==='error'&&!inf.label.startsWith('ENDED')?' · '+esc(inf.label):''}</b>${inf.total?` · ${inf.done} of ${inf.total} steps`:''}`;
-  if(inf.mode==='finished')return `<b style="color:#2E8A57">Finished at ${hhmm(inf.at)}</b>`;
+  if(inf.mode==='late')return `Now done by ${hhmm(inf.fin)} · <b style="color:var(--warn,#B26A00)">${about(inf.late*60000)} behind plan</b>`;
+  if(inf.mode==='stopped')return `<b style="color:${inf.kind==='error'?'var(--bad,#B03A2E)':'var(--warn,#B26A00)'}">${inf.kind==='error'?'Ended':'Interrupted'} at ${hhmm(inf.at)}${inf.kind==='error'&&!inf.label.startsWith('ENDED')?' · '+esc(inf.label):''}</b>${inf.total?` · ${inf.done} of ${inf.total} steps`:''}`;
+  if(inf.mode==='finished')return `<b style="color:var(--good,#2E8A57)">Finished at ${hhmm(inf.at)}</b>`;
   return inf.total?'':'No plan yet';
 }
-// The session's latest news, newest first, folded until asked for.
+// The session's latest news, newest first.
 const BAD_NEWS=new Set(['fail','denied','error']);
 function historyHtml(dk){
-  const log=(Array.isArray(dk.log)?dk.log:[]).filter(Boolean);if(!log.length)return '';
-  const list=cardHist?'<ul class="hist">'+log.slice().reverse().map(l=>`<li class="${BAD_NEWS.has(l.kind)?'bad':''}"><span>${hhmm(l.ms)}</span><span>${esc(str(l.text,60))}</span></li>`).join('')+'</ul>':'';
-  return `<button type="button" class="histbtn" aria-expanded="${cardHist}" data-hist>${cardHist?'▾':'▸'} History (${log.length})</button>`+list;
+  const log=(Array.isArray(dk.log)?dk.log:[]).filter(Boolean);if(!log.length)return '<p class="none">Nothing yet</p>';
+  return '<ul class="hist">'+log.slice().reverse().map(l=>`<li class="${BAD_NEWS.has(l.kind)?'bad':''}"><span>${hhmm(l.ms)}</span><span>${esc(str(l.text,60))}</span></li>`).join('')+'</ul>';
 }
 // What the office itself costs this session in tokens: the estimated total and its parts (~), then the
 // office tools' schemas, counted exactly once a session and kept apart (they ride along with every request).
@@ -120,26 +120,44 @@ const kTok=n=>n<1000?String(n):(n/1000).toFixed(n<10000?1:0)+'k';
 function tokensHtml(dk){
   const t=dk.tokens;if(!t||typeof t!=='object')return '';
   const n=k=>Math.max(0,Math.round(+t[k]||0)),sum=n('hint')+n('calls')+n('cmds');
-  let h=`<div class="tok">Office tokens ~${kTok(sum)}<small>hint ~${kTok(n('hint'))} · tool calls ~${kTok(n('calls'))} · commands ~${kTok(n('cmds'))}</small>`;
+  let h=`<div class="tok"><div class="row"><span>Office tokens</span><b>~${kTok(sum)}</b></div><small>hint ~${kTok(n('hint'))} · tool calls ~${kTok(n('calls'))} · commands ~${kTok(n('cmds'))}</small>`;
   if(t.defs!=null)h+=`<small>Tool schemas ${kTok(n('defs'))} (exact, apart${t.defsLoaded===false?', loaded on demand':''})</small>`;
   return h+'</div>';
 }
+// The card's tabs: the work in hand, the session's figures, the Claude's look, and its history.
+const CARD_TABS=[['work','Work'],['session','Session'],['look','Look'],['hist','History']];
+function workHtml(ch,dk,inf){
+  let h='';const det=str(dk.detail,140);if(det&&ch.act!=='idle')h+=`<div class="now">${esc(det)}</div>`;
+  if(inf.total)h+='<ol>'+inf.steps.map(s=>{const cur=s===inf.cur;return `<li class="${s.doneMs?'done':cur?'cur':''}"><span>${s.doneMs?'✓':cur?'▸':'·'}</span><span>${esc(str(s.label,70))}</span></li>`;}).join('')+'</ol>';
+  const eta=etaLine(inf);if(eta)h+=`<div class="eta">${eta}</div>`;
+  const nh=(Array.isArray(dk.interns)?dk.interns:[]).length;if(nh)h+=`<div class="eta">${nh} helper${nh>1?'s':''} on it</div>`;
+  return h||'<p class="none">Nothing in hand</p>';
+}
+function sessionHtml(dk){
+  const row=(k,v)=>`<div class="row"><span>${k}</span><b>${esc(v)}</b></div>`;
+  let h='';
+  if(dk.ctx!=null)h+=row('Context',dk.ctx+'%')+`<div class="bar"><i style="width:${Math.max(0,Math.min(100,+dk.ctx||0))}%"></i></div>`;
+  if(dk.model)h+=row('Model',str(dk.model,24));
+  if(dk.branch)h+=row('Branch',str(dk.branch,30));
+  if(dk.tasks&&dk.tasks.total)h+=row('Tasks',`${dk.tasks.done} of ${dk.tasks.total}`);
+  h+=tokensHtml(dk);
+  return h||'<p class="none">Nothing reported yet</p>';
+}
+// The card takes the room's board colours, its text kept readable; the Claude's own colour is the accent.
+function cardColours(ch){
+  const bg=TH.boardBg||'#FFFDF8',ink=readable(TH.boardInk||'#1F1E1D',bg,7),dark=lum(bg)<.35;
+  const v={'--bg':bg,'--ink':ink,'--dim':readable(TH.boardDim||ink,bg,4.5),'--frame':TH.boardFrame||ink,'--well':mix(bg,ink,.1),
+    '--c':ch.look.c,'--ca':readable(ch.look.c,bg,3),'--good':readable(dark?'#5FD08A':'#2E8A57',bg,4.5),'--bad':readable(dark?'#FF8A7A':'#B03A2E',bg,4.5),'--warn':readable(dark?'#FFC266':'#B26A00',bg,4.5)};
+  for(const k in v)card.style.setProperty(k,v[k]);
+}
 function renderCard(){
   if(!cardId)return;const ch=chars.get(cardId);if(!ch||ch.removed){closeCard();return;}
-  const dk=ch.desk||{},inf=etaInfo(dk,Date.now());
-  card.style.setProperty('--c',ch.look.c);
+  const dk=ch.desk||{},inf=etaInfo(dk,Date.now()),nlog=(Array.isArray(dk.log)?dk.log:[]).filter(Boolean).length;
+  cardColours(ch);
   let h=`<button class="x" type="button" aria-label="Close">×</button><h3><i></i>${esc(str(dk.name||'Claude',24))}</h3><div class="sub">${esc(statusOf(ch))}</div>`;
-  h+=pickRow('acc')+pickRow('col');
-  const det=str(dk.detail,140);if(det&&ch.act!=='idle')h+=`<div class="now">${esc(det)}</div>`;
-  if(inf.total)h+='<ol>'+inf.steps.map(s=>{const cur=s===inf.cur;return `<li class="${s.doneMs?'done':cur?'cur':''}"><span>${s.doneMs?'✓':cur?'▸':'·'}</span><span>${esc(str(s.label,70))}</span></li>`;}).join('')+'</ol>';
-  const eta=etaLine(inf);
-  if(eta)h+=`<div class="eta">${eta}</div>`;
-  const nh=(Array.isArray(dk.interns)?dk.interns:[]).length;if(nh)h+=`<div class="eta">${nh} helper${nh>1?'s':''} on it</div>`;
-  h+=historyHtml(dk);
-  const facts=[dk.branch&&'Branch '+str(dk.branch,30),dk.model&&str(dk.model,24),dk.ctx!=null&&'Context '+dk.ctx+'%',dk.tasks&&dk.tasks.total&&`Tasks ${dk.tasks.done} of ${dk.tasks.total}`].filter(Boolean);
-  if(facts.length)h+=`<div class="eta">${esc(facts.join(' · '))}</div>`;
-  h+=tokensHtml(dk);
-  if(h!==card._h){card.innerHTML=h;card._h=h;}
+  h+='<div class="tabs" role="tablist">'+CARD_TABS.map(([k,l])=>`<button type="button" role="tab" id="ct-${k}" aria-selected="${cardTab===k}" tabindex="${cardTab===k?0:-1}" data-tab="${k}">${l}${k==='hist'&&nlog?` <em>${nlog}</em>`:''}</button>`).join('')+'</div>';
+  h+=`<div class="pane" role="tabpanel" aria-labelledby="ct-${cardTab}">`+(cardTab==='session'?sessionHtml(dk):cardTab==='look'?pickRow('acc')+pickRow('col'):cardTab==='hist'?historyHtml(dk):workHtml(ch,dk,inf))+'</div>';
+  if(h!==card._h){const f=document.activeElement&&card.contains(document.activeElement)&&document.activeElement.dataset.tab;card.innerHTML=h;card._h=h;if(f){const b=card.querySelector(`[data-tab="${f}"]`);if(b)b.focus();}}
   placeCard(ch);
 }
 function placeCard(ch){
@@ -149,7 +167,11 @@ function placeCard(ch){
   x=Math.max(6,x);y=Math.max(6,Math.min(cssH-hh-6,y));
   card.style.left=Math.round(x)+'px';card.style.top=Math.round(y)+'px';
 }
-card.addEventListener('click',e=>{if(e.target.closest('.x'))closeCard();if(e.target.closest('[data-hist]')){cardHist=!cardHist;renderCard();}const b=e.target.closest('[data-pick]');if(b)stepPick(b.dataset.pick,+b.dataset.step);});
+function showTab(k){cardTab=k;renderCard();const b=card.querySelector(`[data-tab="${k}"]`);if(b)b.focus();}
+card.addEventListener('click',e=>{if(e.target.closest('.x'))closeCard();const t=e.target.closest('[data-tab]');if(t){cardTab=t.dataset.tab;renderCard();}const b=e.target.closest('[data-pick]');if(b)stepPick(b.dataset.pick,+b.dataset.step);});
+// the tabs follow the arrow keys, Home and End
+card.addEventListener('keydown',e=>{const t=e.target.closest&&e.target.closest('[data-tab]');if(!t)return;const ks=CARD_TABS.map(x=>x[0]),i=ks.indexOf(t.dataset.tab);
+  const j=e.key==='ArrowRight'?(i+1)%ks.length:e.key==='ArrowLeft'?(i+ks.length-1)%ks.length:e.key==='Home'?0:e.key==='End'?ks.length-1:-1;if(j<0)return;e.preventDefault();e.stopPropagation();showTab(ks[j]);});
 
 /* ---------- the room ---------- */
 // A /my-office-theme from a session: the page follows each one once, then T goes on working as usual.

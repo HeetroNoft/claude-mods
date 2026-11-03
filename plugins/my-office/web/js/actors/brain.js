@@ -97,7 +97,7 @@ function chooseIdle(ch,tp,now){
   const others=[...chars.values()].filter(o=>o!==ch&&!o.hidden&&!o.removed);
   const busyPlace=pl=>others.some(o=>o.idle&&o.idle.phase!=='pick'&&PLACE[o.idle.act]===pl);
   const busyPair=grp=>others.some(o=>o.idle&&o.idle.pair&&IDLES[o.idle.act]&&IDLES[o.idle.act].pair===grp);
-  const partner=others.find(o=>o.act==='idle'&&o.idle&&!o.errand&&!o.held&&!o.path.length&&!o.idle.pair&&!KEEP_DOING.includes(o.idle.act)&&(o.idle.phase==='pick'||o.idle.phase==='do'));
+  const partner=others.find(o=>o.act==='idle'&&!o.spot&&o.idle&&!o.errand&&!o.held&&!o.path.length&&!o.idle.pair&&!KEEP_DOING.includes(o.idle.act)&&(o.idle.phase==='pick'||o.idle.phase==='do'));
   const extra=THEME_IDLES[themeKey]||{},ok=[];
   for(const a in IDLES){
     const D=IDLES[a],w=D.weight?D.weight():extra[a]!=null?extra[a]:D.w;
@@ -188,7 +188,7 @@ function rpsTick(ch,I,tp){const s=rpsState(ch,tp);if(!s||s.u<RPS_SHOW||I.shown==
 function sceneHighFive(id){
   const ch=chars.get(id);if(!ch||ch.hidden)return;const tp=performance.now();
   const others=[...chars.values()].filter(o=>o!==ch&&!o.hidden&&!o.removed&&!o.held);
-  const free=others.filter(o=>o.act==='idle'&&!o.errand&&!(o.idle&&o.idle.pair)).sort((a,b)=>Math.hypot(a.x-ch.x,a.y-ch.y)-Math.hypot(b.x-ch.x,b.y-ch.y));
+  const free=others.filter(o=>o.act==='idle'&&!o.spot&&!o.errand&&!(o.idle&&o.idle.pair)).sort((a,b)=>Math.hypot(a.x-ch.x,a.y-ch.y)-Math.hypot(b.x-ch.x,b.y-ch.y));
   const buddy=free[0];
   others.forEach(o=>{if(o!==buddy&&!o.path.length)o.clapUntil=tp+1600;});
   if(!buddy)return;
@@ -206,6 +206,7 @@ function drawJuggle(g,ch,tp,t0,col){if(ch.headTop==null)return;for(let j=0;j<2;j
   ball(g,ch.x+(u<.5?-5+u*20:5-(u-.5)*20),ch.headTop+3-Math.sin(Math.PI*h)*9,col||(j?TH.ball:shade(TH.ball,.35)));}}
 function drawIdleProps(g,ch,tp){
   const I=ch.idle;if(I&&I.act==='tidy')drawCarried(g,ch);
+  if(ch.spot){if(ch.spot.pose==='juggle')drawJuggle(g,ch,tp,ch.spot.start);return;} // actors/spotlight.js
   if(I&&IDLES[I.act]&&IDLES[I.act].props)IDLES[I.act].props(g,ch,tp,I);
   if(!I||I.phase!=='do'||ch.path.length)return;
   if(I.act==='juggle')drawJuggle(g,ch,tp,I.start);

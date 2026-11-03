@@ -4,7 +4,7 @@
 const BREATHE=new Set(['sit','stand','sip','look','talk','sleep','read']);
 function animChar(ch,tp,dt,now){
   sceneFrame(ch,dt,tp); // actors/scenes.js
-  if(!ch.removed&&ch.idle&&!ch.errand)thinkIdle(ch,tp,now);
+  if(!ch.removed&&ch.idle&&!ch.errand&&!ch.spot)thinkIdle(ch,tp,now); // a Claude with its card open is on hold (actors/spotlight.js)
   if(ch.hidden)return;
   // squash and stretch: a damped spring that pokes, jumps and landings kick
   ch.sqv+=(-ch.sq*260-ch.sqv*16)*dt; ch.sq+=ch.sqv*dt;
