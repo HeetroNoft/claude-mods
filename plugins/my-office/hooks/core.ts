@@ -65,6 +65,25 @@ export type Desk = {
   // the task list its helpers work through
   tasks?: { done: number; total: number }
   log?: LogLine[]
+  // what the office itself costs this session in tokens (Tokens)
+  tokens?: Tokens
+}
+
+// The tokens the office adds to this session. hint, calls and cmds are estimated from their text (the engine
+// counts no single message): the plan hint each time it goes out, each office tool call (what the model
+// writes and the answer it gets), each /my-office-* command's output. defs is the office tools' schemas,
+// counted once a session with the token-count API, kept apart: they ride along with every request, cached.
+export type Tokens = { hint: number; calls: number; cmds: number; defs?: number; defsLoaded?: boolean }
+export const estTokens = (s: string) => Math.ceil(String(s ?? '').length / 4)
+export function addTokens(d: Desk, kind: 'hint' | 'calls' | 'cmds', text: string) {
+  const t = d.tokens ?? { hint: 0, calls: 0, cmds: 0 }
+  d.tokens = { ...t, [kind]: t[kind] + estTokens(text) }
+}
+// The office tools in a full context breakdown ($.session.usage({ breakdown: 'full' })).
+export function officeDefs(breakdown: any): { tokens: number; loaded: boolean } | undefined {
+  const mine = (breakdown?.mcpTools ?? []).filter((t: any) => String(t?.name ?? '').startsWith('mcp__my-office__'))
+  if (!mine.length) return undefined
+  return { tokens: mine.reduce((n: number, t: any) => n + (Number(t.tokens) || 0), 0), loaded: mine.some((t: any) => t.isLoaded) }
 }
 
 export const newDesk = (id: string, name: string, now: number): Desk => ({

@@ -32,6 +32,8 @@ body.clean #set,body.clean #prefs,body.clean #items{display:none}
 #card li.done{color:#2E8A57}
 #card li.cur{color:#1F1E1D;font-weight:800}
 #card .eta{margin-top:.5em;font-size:.95em}
+#card .tok{margin-top:.5em;font-size:.95em}
+#card .tok small{display:block;color:#5A554C;font-size:.92em}
 #card .x{position:absolute;top:.25em;right:.4em;border:0;background:none;font:inherit;font-size:1.35em;line-height:1;cursor:pointer;color:#6B6458;padding:.1em .3em}
 #card .x:hover{color:#1F1E1D}
 #card .acc{display:flex;align-items:center;gap:.4em;margin-bottom:.5em}

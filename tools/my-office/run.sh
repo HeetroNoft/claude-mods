@@ -7,12 +7,12 @@
 #   tools/my-office/run.sh scenario <theme> <a|b|t>
 #   tools/my-office/run.sh gallery [held|looks|motion|bubbles|front]   every mascot pose in a grid, the props in hand, the accessories, film strips of the springs, or the speech bubbles
 #   tools/my-office/run.sh preview [off]      copy the page to ~/.claude/my-office and keep it there: sessions starting no longer replace it
-# Env: N (desks, default 6), OUT (default: $TMPDIR/office-shots), BROWSER (path to Edge or Chrome).
+# Env: N (desks, default 6), OUT (default: $TMPDIR/office-shots), BROWSER (path to Chrome or Edge; Chrome is tried first: a headless Edge can print nothing).
 set -u
 HERE="$(cd "$(dirname "$0")" && pwd)"; WEB="$HERE/../../plugins/my-office/web"
 OUT="${OUT:-${TMPDIR:-/tmp}/office-shots}"; mkdir -p "$OUT"
 BROWSER="${BROWSER:-}"
-for b in "/c/Program Files (x86)/Microsoft/Edge/Application/msedge.exe" "/c/Program Files/Google/Chrome/Application/chrome.exe" "$(command -v chromium || true)" "$(command -v google-chrome || true)"; do
+for b in "/c/Program Files/Google/Chrome/Application/chrome.exe" "/c/Program Files (x86)/Microsoft/Edge/Application/msedge.exe" "$(command -v chromium || true)" "$(command -v google-chrome || true)"; do
   [ -z "$BROWSER" ] && [ -n "$b" ] && [ -x "$b" ] && BROWSER="$b"; done
 [ -z "$BROWSER" ] && { echo "no browser found: set BROWSER"; exit 1; }
 SITE="$(mktemp -d)"; trap 'rm -rf "$SITE"' EXIT
