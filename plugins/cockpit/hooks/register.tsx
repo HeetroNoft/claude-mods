@@ -21,6 +21,8 @@ const plainRows = atom({ plugin: 'cockpit', key: 'plainRows' } as const, true)
 const tab = atom({ plugin: 'cockpit', key: 'tab' } as const, 'mission' as Tab)
 const others = atom({ plugin: 'cockpit', key: 'others' } as const, [] as Card[])
 const isHidden = atom({ plugin: 'cockpit', key: 'isHidden' } as const, false)
+// The band folded to one line, like an accordion; kept for this session only ($.state).
+const folded = atom({ plugin: 'cockpit', key: 'folded' } as const, false)
 const nowMs = atom({ plugin: 'cockpit', key: 'nowMs' } as const, 0)
 
 // How its own tool calls read in the transcript.
@@ -165,6 +167,7 @@ async function doSetup($: any) {
   for (const t of TOOLS) await $.tool.register(t)
   await $.command.register({ name: 'cockpit', description: 'Clear the Mission tab of the cockpit' })
   await $.command.register({ name: 'cockpit-rows', description: 'Turn the plain-English tool rows on or off' })
+  await $.command.register({ name: 'cockpit-fold', description: 'Fold the cockpit to one line, or open it again' })
   await $.command.register({ name: 'cockpit-sessions', description: 'List your other open sessions, and show or hide their tab' })
   // After a reload the clock's timer is gone while a turn may still run: start it again.
   if ((await read($, mission)).running) tickClock($)
@@ -518,6 +521,34 @@ function GraphicSessions({ ask, el, list, now }: { ask: (c: Card) => () => void;
   )
 }
 
+// The folded band: one line with the state, the bar, the step under way, the time and who needs you.
+function FoldedLine({ el, m, list, terminal, handle, width }: { el: any; m: Mission; list: Card[]; terminal: boolean; handle: any; width: number }) {
+  const { Box, Text } = el
+  const phase = phaseOf(m)
+  const look = LOOK[phase]
+  const n = m.steps.length
+  const current = m.steps.find(s => s.status === 'now')
+  const t = summary(list)
+  const tail = [
+    current && phase !== 'done' ? `› ${current.label}` : '',
+    m.startedMs ? clock(m.nowMs - m.startedMs) : '',
+    t.needs ? `⚑ ${t.needs} waiting` : list.length ? `${list.length} other session${list.length > 1 ? 's' : ''}` : '',
+  ].filter(Boolean).join('  ·  ')
+  return (
+    <Box flexDirection="row" flexWrap="nowrap" alignItems="center" gap={terminal ? 1 : 'sm'} width={terminal ? width : '100%'}>
+      {handle}
+      <Box flexShrink={1} minWidth={0}>
+        <Text wrap="truncate-end">
+          <Text bold color={look.color}>{`${look.glyph} ${look.label}  `}</Text>
+          {terminal && n > 0 && Progress({ el, m, phase, cells: 12, label: false })}
+          {n > 0 && <Text>{`  ${bar(m.steps, 1).label}`}</Text>}
+          {tail && <Text color={t.needs ? 'warning' : 'inactive'}>{`  ·  ${tail}`}</Text>}
+        </Text>
+      </Box>
+    </Box>
+  )
+}
+
 const hasContent = (m: Mission) => m.running || !!m.doneBanner || m.steps.length > 0 || m.asks.length > 0 || m.feed.length > 0
 
 export const register: Register = on => {
@@ -538,6 +569,12 @@ export const register: Register = on => {
     await setup($)
     await update($, mission, () => EMPTY)
     return { text: 'Cockpit: Mission tab cleared.' }
+  })
+
+  on('command.run', { command: 'cockpit-fold' }, async $ => {
+    await setup($)
+    await update($, folded, f => !f)
+    return { text: (await read($, folded)) ? 'Cockpit folded to one line (c or /cockpit-fold opens it).' : 'Cockpit open.' }
   })
 
   on('command.run', { command: 'cockpit-sessions' }, async $ => {
@@ -699,16 +736,28 @@ export const register: Register = on => {
     const ask = (c: Card) => () => void $.prompt.fill({ text: askText(c) })
     const tally = summary(list)
     const sessionsLabel = `Sessions ${list.length}${tally.needs ? ` · ⚑ ${tally.needs}` : ''}`
+    const isFolded = await read($, folded)
+    const toggle = () => void update($, folded, f => !f)
+    const terminal = e.surface === 'terminal'
+    // The accordion's handle: ▾ folds the band, ▸ opens it; c presses it while the band has the focus.
+    const handle = (open: boolean) => {
+      const { Button } = el
+      return terminal
+        ? <Button key="fold" plain hotkey="c" onPress={toggle}>{open ? '▾' : '▸'}</Button>
+        : <Button key="fold" variant="secondary" hotkey="c" onPress={toggle}>{open ? '▾' : '▸'}</Button>
+    }
+    if (isFolded) return FoldedLine({ el, m, list, terminal, handle: handle(false), width: Math.max(30, Math.min(100, p.bodyColumns ?? 80)) })
 
     // Only the terminal lays text out in cells; the others get the page-like layout.
     if (e.surface !== 'terminal') {
       const { Box, Button } = el
       return (
         <Box flexDirection="column" width="100%" gap="sm">
-          {list.length > 0 && (
-            <Box flexDirection="row" gap="sm">
-              <Button key="tab-mission" variant={current === 'mission' ? 'primary' : 'secondary'} hotkey="1" onPress={pick('mission')}>Mission</Button>
-              <Button key="tab-sessions" variant={current === 'sessions' ? 'primary' : 'secondary'} hotkey="2" onPress={pick('sessions')}>{sessionsLabel}</Button>
+          {(
+            <Box flexDirection="row" gap="sm" alignItems="center">
+              {handle(true)}
+              {list.length > 0 && <Button key="tab-mission" variant={current === 'mission' ? 'primary' : 'secondary'} hotkey="1" onPress={pick('mission')}>Mission</Button>}
+              {list.length > 0 && <Button key="tab-sessions" variant={current === 'sessions' ? 'primary' : 'secondary'} hotkey="2" onPress={pick('sessions')}>{sessionsLabel}</Button>}
             </Box>
           )}
           {current === 'mission' ? GraphicPanel({ el, m }) : GraphicSessions({ ask, el, list, now })}
@@ -719,10 +768,12 @@ export const register: Register = on => {
     const width = Math.max(30, Math.min(current === 'sessions' ? 100 : 80, p.bodyColumns ?? 80))
     const short = (p.maxRows ?? 12) < 10
     const { Box, Text, Button } = el
-    const tabs = list.length > 0 && (
+    const tabs = (
       <Box flexDirection="row" gap={2}>
-        <Button key="tab-mission" plain hotkey="1" dimColor={current !== 'mission'} onPress={pick('mission')}>Mission</Button>
-        <Button key="tab-sessions" plain hotkey="2" dimColor={current !== 'sessions'} onPress={pick('sessions')}>{sessionsLabel}</Button>
+        {handle(true)}
+        {list.length > 0 && <Button key="tab-mission" plain hotkey="1" dimColor={current !== 'mission'} onPress={pick('mission')}>Mission</Button>}
+        {list.length > 0 && <Button key="tab-sessions" plain hotkey="2" dimColor={current !== 'sessions'} onPress={pick('sessions')}>{sessionsLabel}</Button>}
+        {!list.length && <Text color="inactive">Cockpit</Text>}
       </Box>
     )
     // A short window leaves two or three rows: no frame, the tabs on top of the short form.
@@ -736,7 +787,6 @@ export const register: Register = on => {
         </Box>
       )
     }
-    if (!tabs) return Panel({ el, m, width, framed: true })
     const needsYou = phaseOf(m) === 'waiting' || tally.needs > 0
     return (
       <Box flexDirection="column" borderStyle="round" borderColor={needsYou ? 'warning' : 'promptBorder'} borderDimColor={!needsYou} paddingX={1} width={width}>

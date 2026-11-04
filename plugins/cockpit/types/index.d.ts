@@ -32,6 +32,6 @@ export type Card = {
 
 declare module 'claude-code' {
   interface PluginState {
-    cockpit: { mission: Mission; plainRows: boolean; tab: Tab; others: Card[]; isHidden: boolean; nowMs: number }
+    cockpit: { mission: Mission; plainRows: boolean; tab: Tab; others: Card[]; isHidden: boolean; nowMs: number; folded: boolean }
   }
 }
