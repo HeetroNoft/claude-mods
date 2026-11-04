@@ -8,10 +8,15 @@ export type Sent = { key: string; to: string; words: string; ms: number }
 export type Got = { key: string; from: string; words: string; ms: number }
 export type Eta = { finishMs: number; plannedMs: number; lateMin: number; allDone: boolean; paused?: boolean }
 // The session is waiting for the user: a question it asked, a permission it needs, or a turn that ended on a question.
-export type Waiting = { kind: 'question' | 'permission' | 'reply'; text: string; since: number; key?: string; tool?: string }
+export type Waiting = { kind: 'question' | 'permission' | 'reply' | 'form'; text: string; since: number; key?: string; tool?: string }
 // The account's usage windows (percent used, 0..100) and when each resets, as last reported.
 export type Rate = { fiveHour?: number; sevenDay?: number; fiveResets?: string; sevenResets?: string; ms: number }
 export type Room = { theme?: string; ms?: number }
+// What the session is busy with right now, more precisely than its activity.
+export type Task = { kind: 'tests' | 'build' | 'commit' | 'push' | 'compact'; ms: number; auto?: boolean }
+// Something that just happened: the board shows it for a few seconds and the mascot reacts once.
+export type Flash = { kind: 'fail' | 'denied' | 'pass' | 'ship' | 'move' | 'model'; text: string; ms: number }
+export type LogLine = { ms: number; kind: string; text: string }
 export type Desk = {
   id: string
   name: string
@@ -44,6 +49,41 @@ export type Desk = {
   planTurn?: number
   missionSteps?: number
   pausedMs?: number
+  // the plan hint is in this conversation already: it is not sent again until a compaction
+  hinted?: boolean
+  // the turn stopped with steps left, by an error or by the user; cleared by the next prompt
+  stopped?: { kind: 'error' | 'interrupted'; ms: number; error?: string }
+  task?: Task
+  flash?: Flash
+  planMode?: boolean
+  // percent of the context window in use
+  ctx?: number
+  // the turn left something running in the background, or a wake-up: the session is not on a break
+  bg?: { kind: 'job' | 'wakeup'; since: number; until?: number }
+  branch?: string
+  model?: string
+  // the task list its helpers work through
+  tasks?: { done: number; total: number }
+  log?: LogLine[]
+  // what the office itself costs this session in tokens (Tokens)
+  tokens?: Tokens
+}
+
+// The tokens the office adds to this session. hint, calls and cmds are estimated from their text (the engine
+// counts no single message): the plan hint each time it goes out, each office tool call (what the model
+// writes and the answer it gets), each /my-office-* command's output. defs is the office tools' schemas,
+// counted once a session with the token-count API, kept apart: they ride along with every request, cached.
+export type Tokens = { hint: number; calls: number; cmds: number; defs?: number; defsLoaded?: boolean }
+export const estTokens = (s: string) => Math.ceil(String(s ?? '').length / 4)
+export function addTokens(d: Desk, kind: 'hint' | 'calls' | 'cmds', text: string) {
+  const t = d.tokens ?? { hint: 0, calls: 0, cmds: 0 }
+  d.tokens = { ...t, [kind]: t[kind] + estTokens(text) }
+}
+// The office tools in a full context breakdown ($.session.usage({ breakdown: 'full' })).
+export function officeDefs(breakdown: any): { tokens: number; loaded: boolean } | undefined {
+  const mine = (breakdown?.mcpTools ?? []).filter((t: any) => String(t?.name ?? '').startsWith('mcp__my-office__'))
+  if (!mine.length) return undefined
+  return { tokens: mine.reduce((n: number, t: any) => n + (Number(t.tokens) || 0), 0), loaded: mine.some((t: any) => t.isLoaded) }
 }
 
 export const newDesk = (id: string, name: string, now: number): Desk => ({
@@ -87,6 +127,33 @@ export function activityOf(tool: string, input: any): { activity: string; detail
       return { activity: 'think', detail: 'Thinking' }
   }
 }
+
+// What a shell command is about, read from the command itself; git first, it can follow a test run.
+export function bashTask(cmd: unknown): Task['kind'] | undefined {
+  const c = String(cmd ?? '')
+  if (/\bgit\s+push\b/.test(c)) return 'push'
+  if (/\bgit\s+commit\b/.test(c)) return 'commit'
+  if (/\b(npm|pnpm|yarn|bun)\s+(run\s+)?test\b|\bpytest\b|\bjest\b|\bvitest\b|\b(go|cargo)\s+test\b|\bplugin test\b|\brun\.sh check\b/.test(c)) return 'tests'
+  if (/\b(npm|pnpm|yarn|bun)\s+(run\s+)?build\b|\btsc\b|\bmake\b|\b(go|cargo)\s+build\b|\bvite build\b/.test(c)) return 'build'
+  return undefined
+}
+export function branchOf(cmd: unknown): string | undefined {
+  const c = String(cmd ?? '')
+  return (c.match(/\bgit\s+(?:worktree\s+add\b.*?\s-b|checkout\s+-b|switch\s+-c)\s+([\w./-]+)/) ?? c.match(/\bgit\s+(?:checkout|switch)\s+(?!-)([\w./-]+)/))?.[1]
+}
+// How a finished tool call reads on the board. Refused: the user said no. No flash for a plain success.
+export function toolFlash(kind: Task['kind'] | undefined, isError: boolean, text: string, now: number): Flash | undefined {
+  if (isError && /doesn.t want to proceed|rejected|denied/i.test(text)) return { kind: 'denied', text: 'DENIED', ms: now }
+  if (kind === 'tests' || kind === 'build') {
+    const w = kind === 'tests' ? 'TESTS' : 'BUILD'
+    return isError ? { kind: 'fail', text: `${w} FAILED`, ms: now } : { kind: 'pass', text: `${w} OK`, ms: now }
+  }
+  if (kind === 'commit' || kind === 'push') {
+    return isError ? { kind: 'fail', text: `${kind.toUpperCase()} FAILED`, ms: now } : { kind: 'ship', text: kind === 'push' ? 'PUSHED' : 'COMMITTED', ms: now }
+  }
+  return isError ? { kind: 'fail', text: 'OOPS', ms: now } : undefined
+}
+export const note = (d: Desk, kind: string, text: string, now: number) => { d.log = push(d.log ?? [], { ms: now, kind, text: clean(text, 60) }, 12) }
 
 // Paths and long ids never reach the page: a bubble shows words, not where files live.
 export const clean = (s: string, n: number) => {
@@ -182,6 +249,11 @@ export function applyTool(d: Desk, tool: string, input: any, key: string, now: n
   const a = activityOf(tool, input)
   if (!a) return d
   const out = { ...d, activity: a.activity, detail: a.detail, activityMs: now }
+  const kind = tool === 'Bash' ? bashTask(input?.command) : undefined
+  out.task = kind ? { kind, ms: now } : undefined
+  const branch = tool === 'Bash' ? branchOf(input?.command) : undefined
+  if (branch) out.branch = clean(branch, 30)
+  if (a.detail !== d.detail) out.log = push(d.log ?? [], { ms: now, kind: a.activity, text: a.detail }, 12)
   const f = plainFile(baseName(input?.file_path ?? input?.notebook_path))
   if (a.file && f) out.files = push(d.files.filter(x => x.name !== f), { name: f, ms: now, kind: a.file }, 12)
   if (a.activity === 'agent') {
@@ -215,7 +287,7 @@ export function usageLine(desks: Desk[]) {
 
 // Takes the plan off the board.
 export function clearPlan(d: Desk) {
-  d.steps = []; d.planMs = 0; d.doneMs = 0; d.pausedMs = undefined; d.planSource = undefined; d.planTurn = undefined; d.missionSteps = undefined
+  d.steps = []; d.planMs = 0; d.doneMs = 0; d.pausedMs = undefined; d.stopped = undefined; d.planSource = undefined; d.planTurn = undefined; d.missionSteps = undefined
 }
 
 // The name to show for a teammate: the role this Claude gave it, else its own session name.
@@ -258,12 +330,51 @@ export function rateOf(windows: unknown, now: number): Rate | undefined {
   return r.fiveHour == null && r.sevenDay == null ? undefined : r
 }
 
+// Usage windows and their resets. A date in the past means that window has started again.
+export const passed = (iso: string | undefined, now: number) => { const t = Date.parse(iso ?? ''); return !isNaN(t) && t <= now }
+const windowsOf = (r?: Rate) => (r ? [[r.fiveHour, r.fiveResets], [r.sevenDay, r.sevenResets]] as [number | undefined, string | undefined][] : [])
+// The reading was taken before a reset that has since gone by: it says nothing about now.
+export const rateStale = (d: Desk, now: number) => windowsOf(d.rate).some(([, at]) => passed(at, now) && Date.parse(at ?? '') > (d.rate?.ms ?? 0))
+// A reading can lag behind a reset: a window past its reset date is empty again, whatever it still says.
+export function freshRate(r: Rate, now: number): Rate {
+  const out = { ...r }
+  if (passed(r.fiveResets, now)) { out.fiveHour = 0; out.fiveResets = undefined }
+  if (passed(r.sevenResets, now)) { out.sevenDay = 0; out.sevenResets = undefined }
+  return out
+}
+// When a session stopped by the limit can go on: at the reset of the window that is empty, not of the
+// nearest one (a full week's limit outlasts the five hours); the nearest only when none reads as empty.
+export function limitReset(r?: Rate) {
+  const w = windowsOf(r).filter(([, at]) => at)
+  const full = w.filter(([used]) => (used ?? 0) >= 100).map(([, at]) => at as string).sort()
+  return full[full.length - 1] ?? w.map(([, at]) => at as string).sort()[0]
+}
+// Called once the reset has gone by, with what the usage reads now: true when the session can resume.
+// Still empty, it waits for that window's own reset.
+export function limitOver(d: Desk, fresh: Rate | undefined, now: number) {
+  if (!d.limited || !passed(d.limited.resetsAt, now)) return false
+  const still = fresh ? limitReset(freshRate(fresh, now)) : undefined
+  if (fresh && windowsOf(freshRate(fresh, now)).some(([used]) => (used ?? 0) >= 100) && still) { d.limited = { ...d.limited, resetsAt: still }; return false }
+  return true
+}
+
+// A turn that ends normally finishes its plan: every step left is ticked.
+export function finishPlan(d: Desk, now: number) {
+  d.steps = d.steps.map(s => (s.doneMs ? s : { ...s, startMs: s.startMs ?? now, doneMs: now }))
+  d.pausedMs = undefined
+}
+// A turn stopped by an error or by the user leaves its steps as they are, frozen until the next prompt.
+export function stopPlan(d: Desk, kind: 'error' | 'interrupted', now: number, error?: string) {
+  if (error || d.steps.some(s => !s.doneMs)) { d.stopped = { kind, ms: now, ...(error ? { error } : {}) }; pausePlan(d, now) }
+}
+
 // While the session waits for the user the plan is paused, so waiting never reads as running late:
 // on resume, every time the plan counts from moves forward by the length of the pause.
 export function pausePlan(d: Desk, now: number) {
   if (!d.pausedMs && d.steps.some(s => !s.doneMs)) d.pausedMs = now
 }
 export function resumePlan(d: Desk, now: number) {
+  d.stopped = undefined
   if (!d.pausedMs) return
   const gap = now - d.pausedMs
   d.pausedMs = undefined

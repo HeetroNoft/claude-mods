@@ -36,9 +36,38 @@ function curtainClick(tp){
 // A Claude who comes to look out opens what is in the way.
 function openForAView(){if(curtainsShut)curtainsShut=false;else if(TH.window==='blinds'&&!winOpen)winOpen=true;else if((TH.window==='round'||TH.window==='porthole')&&winOpen)winOpen=false;}
 
+// What the season tints the day sky with, and how much.
+const SEASON_SKY={summer:['#7CC4F0',.2],autumn:['#E8C9A0',.2],winter:['#C8D2DC',.45]};
 function windowView(g,tp,n,clip){
-  const T=TH,[a,b]=T.sky(n),gr=g.createLinearGradient(0,30,0,64);gr.addColorStop(0,a);gr.addColorStop(1,b);
-  g.save();g.beginPath();clip(g);g.clip();g.fillStyle=gr;g.fillRect(274,28,42,38);T.view(g,tp,n);g.restore();
+  const T=TH,gr=g.createLinearGradient(0,30,0,64);let [a,b]=T.sky(n);
+  SEASON=seasonNow();
+  const tint=!T.noWeather&&SEASON_SKY[SEASON];if(tint){a=mix(a,tint[0],tint[1]*(1-n));b=mix(b,tint[0],tint[1]*(1-n));}
+  gr.addColorStop(0,a);gr.addColorStop(1,b);
+  g.save();g.beginPath();clip(g);g.clip();g.fillStyle=gr;g.fillRect(274,28,42,38);T.view(g,tp,n);
+  if(!T.noWeather){windowWeather(g,tp,n);windowGlass(g,tp,n);}
+  g.restore();
+}
+// Behind the glass: snow, falling leaves, petals; in summer birds by day and fireflies by night.
+function windowWeather(g,tp,n){
+  const t=tp/1000;
+  if(SEASON==='winter')for(let i=0;i<16;i++)R(g,276+((i*7.3+Math.sin(t*.9+i)*2.5+38)%38),28+((i*13.7+t*7)%38),1,1,'#FFFFFF');
+  else if(SEASON==='summer'){
+    if(n<.5){const x=270+((t*6)%60);[[0,34],[7,37]].forEach(([d,y])=>{R(g,x+d,y,1,1,'#3A4250');R(g,x+d+1,y+1,1,1,'#3A4250');R(g,x+d+2,y,1,1,'#3A4250');});}
+    else for(let i=0;i<6;i++)if(Math.sin(t*1.6+i*2.1)>.2)R(g,278+i*6+Math.sin(t*.5+i)*2,52+(i*5)%10,1,1,'#E8F06A');
+  }else{
+    const cols=SEASON==='autumn'?['#D9662E','#E8A33A','#B8402E','#E8C24A']:['#F7B6C8','#FFD9E4','#F7B6C8','#FFFFFF'],speed=SEASON==='autumn'?5:4;
+    for(let i=0;i<5;i++){const x=276+((i*11-t*speed*.8+380)%38),y=28+((i*19+t*speed)%38),c=cols[i%4];R(g,x,y,2,1,c);R(g,x+(Math.sin(t*2+i)>0?1:0),y+1,1,1,c);}
+  }
+}
+// On the glass itself: frost, a leaf stuck by the rain, spring drops, a summer glare.
+const FROST=[];for(let x=276;x<314;x++)FROST.push(hash('frost'+x)%3);
+function windowGlass(g,tp,n){
+  const t=tp/1000,round=TH.window==='round'||TH.window==='porthole';
+  if(SEASON==='winter')FROST.forEach((f,i)=>{const x=276+i,e=Math.abs(x-295)/19,dx=x+.5-WIN.x,bot=round?Math.round(WIN.y+Math.sqrt(Math.max(0,WIN.r*WIN.r-dx*dx))):64,h=f+(round?3:Math.round(e*e*7)+1);
+    R(g,x,bot-h,1,h,'rgba(232,242,252,.8)');if(!round){const top=Math.round(e*e*e*5);if(top)R(g,x,30,1,top,'rgba(232,242,252,.8)');}});
+  else if(SEASON==='autumn'){R(g,305,50,3,2,'#C8592E');R(g,306,49,1,4,'#C8592E');R(g,306,51,1,1,'#7A3A22');}
+  else if(SEASON==='spring'){[[284,0],[305,14]].forEach(([x,k])=>R(g,x,30+((t*8+k)%34),1,2,'rgba(225,242,255,.75)'));R(g,303,38,2,1,'#F7B6C8');}
+  else if(n<.6){g.fillStyle=`rgba(255,255,255,${.2*(1-n)})`;for(let i=0;i<14;i++)g.fillRect(286+i,60-i*2,4,2);}
 }
 function roundPath(r){return g=>g.arc(WIN.x,WIN.y,r,0,Math.PI*2);}
 function ring(g,r0,r1,col){for(let y=WIN.y-r1-1;y<=WIN.y+r1+1;y++)for(let x=WIN.x-r1-1;x<=WIN.x+r1+1;x++){const k=Math.hypot(x+.5-WIN.x,y+.5-WIN.y);if(k>r0&&k<=r1)R(g,x,y,1,1,col);}}
@@ -115,7 +144,7 @@ function drawRound(g,tp,n){
   }
   ring(g,WIN.r,WIN.r+2,T.trim); ring(g,WIN.r+1,WIN.r+2,shade(T.trim,-.25)); ring(g,WIN.r-1,WIN.r,shade(T.trim,.25));
   glint(g,tp,WIN.x-WIN.r,WIN.y-WIN.r,2*WIN.r,2*WIN.r);
-  const p=winAmt<.5?.02:0; if(T.petals&&Math.random()<p)leaves.push({x:288+Math.random()*14,y:40+Math.random()*12,vx:-10-Math.random()*12,vy:3,life:4,p:Math.random()*6,w:Math.random()<.5?2:1,c:Math.random()<.6?'#F7B6C8':'#FFD9E4'});
+  windowDrift(winAmt<.5,n,288,14,40);
   beamAndBreeze(g,tp,n,false);
 }
 // The porthole: a riveted metal ring, a blast shutter whose two halves close towards the middle,
@@ -134,11 +163,28 @@ function drawPorthole(g,tp,n){
   glint(g,tp,WIN.x-WIN.r,WIN.y-WIN.r,2*WIN.r,2*WIN.r);
   beamAndBreeze(g,tp,n,false);
 }
+// What comes in by an open window, by season: petals, pollen by day and fireflies by night, dead leaves,
+// snowflakes. Every room with a real outside gets the same; the porthole and the painting have none.
+// The motes in the sunbeam take the season's light (world/loop.js).
+const DUST_TINT={spring:'255,236,240',summer:'255,240,190',autumn:'255,214,160',winter:'224,238,255'};
+const SEASON_DRIFT={
+  spring:{p:.008,life:3.6,vy:3,w:2,cols:()=>['#F7B6C8','#FFD9E4','#FFFFFF']},
+  summer:{p:.006,life:2.6,vy:-1,w:1,cols:n=>n>.5?['#E8F06A','#D8E85A']:['#FFE9A8','#FFF6D0']},
+  autumn:{p:.006,life:3.4,vy:4,w:2,cols:()=>LEAF_COLS},
+  winter:{p:.025,life:2.6,vy:9,w:1,cols:()=>['#FFFFFF','#DCEBF7']},
+};
+const windowIsOpen=()=>(TH.window==='round'?winAmt<.5:winAmt>.5&&curAmt<.5);
+function windowDrift(open,n,x0,span,y0){
+  if(!open||TH.noWeather)return;
+  const D=SEASON_DRIFT[SEASON];if(Math.random()>=D.p)return;
+  const cols=D.cols(n);
+  leaves.push({x:x0+Math.random()*span,y:y0+Math.random()*12,vx:-10-Math.random()*14,vy:D.vy,life:D.life,p:Math.random()*6,w:D.w===2&&Math.random()<.5?1:D.w,c:cols[(Math.random()*cols.length)|0]});
+}
 function beamAndBreeze(g,tp,n,breeze){
   const T=TH,day=(1-n)*(T.beam||0)*windowLight();
   if(day>.01){g.fillStyle=`rgba(255,246,220,${.10*day})`;g.beginPath();g.moveTo(276,85);g.lineTo(314,85);g.lineTo(302,138);g.lineTo(246,138);g.closePath();g.fill();}
-  if(breeze&&!T.rain&&!T.petals&&Math.random()<.02)leaves.push({x:300,y:50+Math.random()*10,vx:-14-Math.random()*10,vy:2,life:3,p:Math.random()*6,w:Math.random()<.5?2:1,c:Math.random()<.5?T.leafB:'#F2B8C6'});
-  if(winAmt>.5&&T.rain&&(T.window||'curtains')==='curtains'&&Math.random()<.3)leaves.push({x:277+Math.random()*36,y:63,vx:0,vy:-8,life:.25,p:0,w:1,c:'rgba(170,195,240,.8)'});
+  windowDrift(breeze,n,296,14,50);
+  if(winAmt>.5&&T.rain&&SEASON!=='winter'&&(T.window||'curtains')==='curtains'&&Math.random()<.3)leaves.push({x:277+Math.random()*36,y:63,vx:0,vy:-8,life:.25,p:0,w:1,c:'rgba(170,195,240,.8)'});
 }
 // Three calm paintings in a heavy frame with gilded corners and a small picture lamp above (on in the
 // evening); a click fades to the next one.

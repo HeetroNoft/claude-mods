@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>The Office</title>
+<link rel="icon" id="favicon" type="image/png">
 <link rel="stylesheet" href="office.css">
 </head>
 <body>
@@ -11,7 +12,8 @@
   <canvas id="world" width="320" height="180"></canvas>
   <canvas id="ov"></canvas>
   <div id="card" role="dialog" aria-label="Session"></div>
-  <div id="usage"><canvas id="gcv" width="60" height="18" role="img" aria-label="Usage left"></canvas><button id="gtab" type="button" aria-label="Show or hide the usage gauge"></button><div id="gtip"></div></div>
+  <div id="plan" role="dialog" aria-label="Plan"></div>
+  <div id="usage"><canvas id="gcv" width="70" height="18" role="img" aria-label="Usage left"></canvas><button id="gtab" type="button" aria-label="Show or hide the usage gauge"><canvas id="gtcv" width="7" height="12"></canvas></button><div id="gtip"></div></div>
   <button id="set" type="button" aria-label="Settings" aria-expanded="false" data-tip="Settings · S"></button>
   <div id="prefs" role="dialog" aria-label="Settings"></div>
   <div id="items" role="toolbar" aria-label="Items to give"></div>
@@ -44,12 +46,15 @@
 <script src="js/world/door.js"></script>
 <script src="js/world/lighting.js"></script>
 <script src="js/world/cat.js"></script>
+<script src="js/world/favicon.js"></script>
 <script src="js/world/rooms.js"></script>
 <script src="js/world/gauge.js"></script>
 <script src="js/world/labels.js"></script>
 <script src="js/world/loop.js"></script>
 <script src="js/actors/life.js"></script>
 <script src="js/actors/brain.js"></script>
+<script src="js/actors/spotlight.js"></script>
+<script src="js/actors/scenes.js"></script>
 <script src="js/actors/reactions.js"></script>
 <script src="js/ui/ui.js"></script>
 <script src="js/ui/play.js"></script>

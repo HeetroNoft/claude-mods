@@ -58,7 +58,7 @@ function reminder(m: Mission) {
   const open = m.asks.filter(a => !a.done)
   const lines = [
     'MISSION CONTROL (mission-control mod). The user watches a live panel of this turn.',
-    'For any task of 2+ steps, first call mcp__mission-control__set_plan with short plain steps in the user\'s language, then mcp__mission-control__step_done as each one finishes.',
+    'For any task of 2+ steps, first call mcp__mission-control__set_plan with short plain steps in the user\'s language, then mcp__mission-control__step_done in the same round as real work, never in a round of their own; skip the last step, the end of the turn closes the plan.',
   ]
   if (open.length) {
     lines.push(`Asks on the panel: ${open.map(a => `#${a.id} "${short(a.text, 70)}"`).join('; ')}.`)
@@ -519,10 +519,13 @@ export const register: Register = on => {
     const reason = (e as any).reason ?? (e.isAborted ? 'aborted' : 'answer')
     const outcome = reason === 'aborted' ? 'stopped' : reason === 'error' ? 'error' : reason === 'refusal' ? 'refusal' : 'done'
     const head = { done: 'Terminé', stopped: 'Interrompu', error: 'Arrêté par une erreur', refusal: 'Refusé' }[outcome]
+    // a turn that ends well closes its plan, so nobody has to tick the last step; a question leaves it open
+    const closed = outcome === 'done' && !String(e.answer ?? '').trim().endsWith('?')
+    const steps = closed ? m.steps.map(s => ({ ...s, status: 'done' as const })) : m.steps
     const parts = [`${head} après ${clock(now - m.startedMs)}`]
-    if (m.steps.length) parts.push(`${m.steps.filter(s => s.status === 'done').length}/${m.steps.length} étapes`)
+    if (steps.length) parts.push(`${steps.filter(s => s.status === 'done').length}/${steps.length} étapes`)
     if (m.asks.length) parts.push(`${m.asks.filter(a => a.done).length}/${m.asks.length} demandes`)
-    await set($, () => ({ running: false, nowMs: now, doneBanner: parts.join(' · '), outcome, waiting: undefined, waitingTool: undefined }))
+    await set($, () => ({ steps, running: false, nowMs: now, doneBanner: parts.join(' · '), outcome, waiting: undefined, waitingTool: undefined }))
     // The chime means "done": an interrupted, failed or refused turn ends quietly.
     if (outcome === 'done') await $.audio.play({ asset: 'sounds/done.wav' }).catch(() => undefined)
     return next(e)

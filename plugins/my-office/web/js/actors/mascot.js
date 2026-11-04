@@ -4,19 +4,30 @@
 // A blocky Claude mascot: wide body, two slit eyes, stubby side arms, four little legs.
 // o: look, pose, frame, blink, dir, small, sq (-2..2: + is taller and thinner, - is squashed),
 //    gaze (-1..1: where the eyes look), mood (happy|love|surprised|dizzy|sleep), sway, pop (px: what it wears trails the head, see trailOf), glow
+//    floor (sits on the floor: the legs fold), spin (tumbling: no shadow, the caller draws it)
 //    held ({kind,...}: a prop in hand, see actors/props.js), lift (raises it), raise (0..1: a drink or a bite on its way to the mouth, else frame), carry (a file's colour, under the arm), breath (0/1)
 const EYE='#141413';
+// A phone held to the Claude's face: we see its back, a thumb working its edge, and the feed only as the
+// light on the Claude (actors/reactions.js): a post every four rows, flicked up every 1.6 s.
+const FEED=['#FF8FB8','#FF8FB8','#FF8FB8','#FFFFFF','#7FD1FF','#7FD1FF','#7FD1FF','#FFFFFF','#FFD84A','#FFD84A','#FFD84A','#FFFFFF','#8FDB8A','#8FDB8A','#8FDB8A','#FFFFFF'];
+function phoneFeed(t){const n=Math.floor(t/1.6),k=Math.min(1,(t/1.6-n)/.3),e=1-(1-k)*(1-k);return {scroll:n*4+Math.round(e*4),thumb:k<1?5-Math.round(k*3):5};}
+function drawPhone(g,x,y,o,skin){
+  R(g,x,y,5,7,'#2B2F3A');R(g,x,y,5,1,'#4A5163');R(g,x,y,1,7,'#3D4352');R(g,x+4,y+1,1,6,'#1F2230');
+  R(g,x+1,y+1,2,2,'#14131C');R(g,x+1,y+1,1,1,'#7F8AA0'); // the camera
+  R(g,x+2,y+4,1,1,'#7F8AA0'); // the maker's mark
+  R(g,x+4,y+(o.thumb|0),1,1,skin);
+}
 function drawPerson(g,cx,fy,o){
   const sm=!!o.small,pose=o.pose,f=o.frame|0;
   let sq=sm?0:Math.max(-2,Math.min(2,o.sq|0));
   if(pose==='sleep'&&!sm)sq=Math.min(sq,-1);
-  const bw=(sm?8:14)-sq,bh=(sm?6:11)+sq,lh=sm?2:4,aw=sm?1:2,ah=sm?1:2;
+  const bw=(sm?8:14)-sq,bh=(sm?6:11)+sq,lh=sm?2:o.floor?1:4,aw=sm?1:2,ah=sm?1:2;
   const L=Math.round(cx-bw/2),T=Math.round(fy-bh-lh),ly=T+bh,ay=T+(sm?3:Math.round(bh*.45));
   const lk=o.look,c=lk.c,hi=shade(c,.2),shd=shade(c,-.22),dk=shade(c,-.45),rim=shade(c,-.1),ol=shade(c,-.62),shine=shade(c,.45);
   const back=pose==='look',ey=T+2;
   // the shadow stays on the ground (o.air px below the feet) and shrinks as the body rises
   const air=Math.max(0,o.air|0),sh=Math.min(Math.floor(air/3),(bw>>1)-2);
-  R(g,L-1+sh,fy+air,bw+2-2*sh,1,air?'rgba(0,0,0,.18)':'rgba(0,0,0,.24)'); R(g,L+1+sh,fy+air+1,bw-2-2*sh,1,'rgba(0,0,0,.1)');
+  if(!o.spin){R(g,L-1+sh,fy+air,bw+2-2*sh,1,air?'rgba(0,0,0,.18)':'rgba(0,0,0,.24)'); R(g,L+1+sh,fy+air+1,bw-2-2*sh,1,'rgba(0,0,0,.1)');}
 
   // Arms are chains of small squares from the shoulder to the hand, with a dark rim. Arms at the
   // sides go behind the body's edge (they grow out of it); arms reaching in front cross the body.
@@ -74,6 +85,9 @@ function drawPerson(g,cx,fy,o){
     case 'clap':if(f){up(-1,0,3);up(1,0,3);}else{nub(-1,-2,1);nub(1,-2,1);}break;
     case 'game':{const gx=L+(bw>>1)-3,gy=ay+2;if(sm){nub(-1,2);nub(1,2);}else twoHands(gx,6,gy+1);
       extras.push(()=>{R(g,gx,gy,6,3,'#2B2F3A');R(g,gx+1,gy+1,4,1,f?'#7FE8FF':'#5BD08A');if(!sm){R(g,gx,gy+3,6,1,'#1A1D24');thumbs(gx,6,gy+1);}});break;}
+    case 'phone':{const px=L+(bw>>1)-2,py=T+5;if(sm||o.seated){nub(-1,2);nub(1,2);break;}twoHands(px,5,py+3);extras.push(()=>drawPhone(g,px,py,o,c));break;}
+    case 'climb':up(-1,0,f?6:3);up(1,0,f?3:6);break;
+    case 'wind':nub(-side,1);reach(side,side>0?L+bw+3:L-5,T+1+(f?-2:1));break;
     case 'hold':if(sm||!o.held){nub(-1,1,1);nub(1,1,1);hand={x:L+(bw>>1),y:ay+2,side:0};}else holdFront(ay+2-lift,o.held.kind);break;
     case 'fold':{const px=L+(bw>>1)-2;if(sm){nub(-1,1,f?1:0);nub(1,1,f?0:1);}else twoHands(px-(f?1:0),4+(f?1:0),ay);
       extras.push(()=>{R(g,px,ay,4,2,'#FFFFFF');R(g,px+1,ay-1,2,1,'#FFFFFF');R(g,px,ay+1,4,1,'#D5DAE2');});break;}

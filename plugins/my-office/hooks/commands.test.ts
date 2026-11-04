@@ -5,7 +5,7 @@ import { register } from './register'
 import { pageInTest } from './room'
 
 // A tiny in-memory engine: enough of `$` for the slash commands and the end of a turn.
-function engine(id: string, files: Map<string, string>) {
+function engine(id: string, files: Map<string, string>, mtimes = new Map<string, number>(), stuck = new Set<string>()) {
   const handlers: { ev: string, filter?: any, fn: any }[] = []
   const store = new Map<string, unknown>()
   const played: string[] = []
@@ -22,8 +22,10 @@ function engine(id: string, files: Map<string, string>) {
     fs: {
       read: async (p: string) => { if (!files.has(p)) throw new Error('missing'); return files.get(p) },
       write: async (p: string, s: string) => { files.set(p, s) },
-      list: async (d: string) => [...files.keys()].filter(k => k.startsWith(d + '/')).map(k => ({ name: k.slice(d.length + 1), mtimeMs: now })),
+      list: async (d: string) => [...files.keys()].filter(k => k.startsWith(d + '/')).map(k => ({ name: k.slice(d.length + 1), mtimeMs: mtimes.get(k.slice(d.length + 1)) ?? now })),
+      exists: async (p: string) => files.has(p),
     },
+    process: { run: async (argv: string[]) => { const p = argv[argv.length - 1]; if (!stuck.has(p)) files.delete(p); return { exitCode: 0, stdout: '', stderr: '' } } },
   }
   register(((ev: string, a: any, b?: any) => handlers.push(b ? { ev, filter: a, fn: b } : { ev, fn: a })) as any)
   const fire = async (ev: string, e: any) => {
@@ -69,6 +71,44 @@ test('/my-office-leave others sends everyone else home', async () => {
   expect((await a.fire('command.run', { command: 'my-office-leave', args: 'others' })).text).toContain('went home')
   expect(data(files).desks.map((d: Desk) => d.id)).toEqual(['eeee5555'])
   expect((await a.fire('command.run', { command: 'my-office-leave', args: 'others' })).text).toBe('Nobody else is in the office.')
+})
+
+test('/my-office-who leaves out sessions that ended', async () => {
+  const files = new Map<string, string>()
+  files.set('/home/.claude/my-office/desks/bbbb2222.json', JSON.stringify({ ...newDesk('bbbb2222', 'Ended', 1), activity: 'gone' }))
+  const a = engine('aaaa1111', files)
+  await a.fire('session.start', {})
+  expect((await a.fire('command.run', { command: 'my-office-who', args: '' })).text).not.toContain('Ended')
+  expect((await a.fire('command.run', { command: 'my-office-who', args: 'ended' })).text).toContain('No desk called')
+})
+
+test('/my-office-clear deletes ended and silent desks, however old, and keeps the rest', async () => {
+  const dir = '/home/.claude/my-office'
+  const files = new Map<string, string>()
+  const put = (id: string, extra: object) => files.set(`${dir}/desks/${id}.json`, JSON.stringify({ ...newDesk(id, id.slice(0, 4), 1), ...extra }))
+  put('ended111', { activity: 'gone' })
+  put('oldended', { activity: 'gone' })
+  put('silent11', {})
+  put('activeee', {})
+  put('waiting1', { waiting: { kind: 'question', text: 'Which one?', since: 1 } })
+  put('limited1', { limited: { since: 1 } })
+  put('stuck111', { activity: 'gone' })
+  files.set(`${dir}/left.json`, JSON.stringify({ ended111: 999_000, activeee: 999_000 }))
+  const longAgo = -10_000_000 // over LIVE_MS before the test clock starts
+  const mtimes = new Map(['oldended', 'silent11', 'waiting1', 'limited1'].map(id => [`${id}.json`, longAgo]))
+  const a = engine('aaaa1111', files, mtimes, new Set([`${dir}/desks/stuck111.json`]))
+  await a.fire('session.start', {})
+
+  const r = await a.fire('command.run', { command: 'my-office-clear' })
+  expect(r.text).toContain('Cleared ende (ended111), olde (oldended), sile (silent11).')
+  expect(r.text).toContain('Could not delete stuc (stuck111).')
+  const left = [...files.keys()].filter(k => k.includes('/desks/')).map(k => k.slice(`${dir}/desks/`.length, -5)).sort()
+  expect(left).toEqual(['aaaa1111', 'activeee', 'limited1', 'stuck111', 'waiting1'])
+  expect(JSON.parse(files.get(`${dir}/left.json`) ?? '{}')).toEqual({ activeee: 999_000 })
+  expect(data(files).desks.map((d: Desk) => d.id)).not.toContain('ended111')
+
+  files.delete(`${dir}/desks/stuck111.json`)
+  expect((await a.fire('command.run', { command: 'my-office-clear' })).text).toBe('Nothing to clear.')
 })
 
 test('/my-office-quiet silences the end of a turn', async () => {

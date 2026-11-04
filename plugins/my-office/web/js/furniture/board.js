@@ -102,13 +102,14 @@ function boardPixels(g,x,dk,now,tp){
   // row 1: role icon and the desk's name
   const nameCol=readable(col,bg,3.5);
   const ic=drawIcon(g,iconFor(dk),L,31+Math.floor((5-ICONS[iconFor(dk)].length)/2),nameCol);
-  pixMarquee(g,dk.name||'Claude',L+ic.w+3,31,CW-ic.w-3,nameCol,tp,seed);
+  pixMarquee(g,dk.branch&&Math.floor((tp+seed)/7000)%3===2?dk.branch:dk.name||'Claude',L+ic.w+3,31,CW-ic.w-3,nameCol,tp,seed); // now and then, the branch it works on
+  if(dk.ctx>=70&&dk.activity!=='gone')R(g,L,37,Math.max(1,Math.round(CW*Math.min(100,dk.ctx)/100)),1,dk.ctx>=85?'#E5484D':AMBER); // the context filling up
   if(dk.activity==='gone'){pixText(g,'AWAY',centre(pixWidth('AWAY')),47,dimInk);return;}
   // row 2: one pip per step, together as wide as the face: green done, blinking desk colour now, dark to come
   const n=inf.total;
   if(n){
     const gap=n>8?1:2,pw=Math.max(1,Math.floor((CW-gap*(n-1))/n)),x0=centre(n*pw+gap*(n-1));
-    inf.steps.forEach((st,i)=>{const px=x0+i*(pw+gap),cur=st===inf.cur;
+    inf.steps.forEach((st,i)=>{const px=x0+i*(pw+gap),cur=st===inf.cur&&inf.mode!=='stopped';
       // a step ticked in the last 1.6 s flashes white before it settles green
       const fresh=st.doneMs&&now-st.doneMs<1600,c=fresh&&Math.floor(tp/120)%2?'#FFFFFF':st.doneMs?GREEN:cur?(Math.floor(tp/450)%2?col:shade(col,.45)):off;
       if(fresh)R(g,px+((pw-1)>>1),37-Math.floor((now-st.doneMs)/400),1,1,'#FFD84A');
@@ -117,9 +118,15 @@ function boardPixels(g,x,dk,now,tp){
   }else{const k=Math.floor(tp/400)%4,x0=centre(13);for(let i=0;i<3;i++)R(g,x0+i*5,40,3,2,i<k?col:off);}
   // row 3: what is being done now
   // what is happening now: the step in progress, and every few seconds what the session is really doing
-  const w=dk.waiting,warn=readable(AMBER,bg,3.5),red=readable('#E5484D',bg,3.5),live=dk.detail&&!['idle','gone','asleep'].includes(dk.activity)&&Math.floor((tp+seed)/5000)%3===2;
+  const beat=deskBeat(dk,now),w=dk.waiting,warn=readable(AMBER,bg,3.5),red=readable('#E5484D',bg,3.5),live=dk.detail&&!['idle','gone','asleep'].includes(dk.activity)&&Math.floor((tp+seed)/5000)%3===2;
   if(dk.limited)pixMarquee(g,'OUT OF USAGE',L,47,CW,red,tp,seed);
-  else if(w)pixMarquee(g,Math.floor(tp/2600)%2?w.text:(w.kind==='permission'?'NEEDS YOUR OK':w.kind==='question'?'QUESTION FOR YOU':'YOUR TURN'),L,47,CW,Math.floor(tp/500)%2?warn:ink,tp,seed);
+  else if(w)pixMarquee(g,Math.floor(tp/2600)%2?w.text:(w.kind==='permission'?'NEEDS YOUR OK':w.kind==='question'?'QUESTION FOR YOU':w.kind==='form'?'FORM FOR YOU':'YOUR TURN'),L,47,CW,Math.floor(tp/500)%2?warn:ink,tp,seed);
+  else if(inf.mode==='stopped')pixMarquee(g,inf.label,L,47,CW,inf.kind==='error'?red:warn,tp,seed);
+  else if(beat)pixMarquee(g,beat.text,L,47,CW,beat.tone==='bad'?red:beat.tone==='warn'?warn:beat.tone==='good'?readable(GREEN,bg,3.5):ink,tp,seed);
+  else if(!n&&dk.tasks&&dk.tasks.total)pixMarquee(g,`TASKS ${dk.tasks.done} OF ${dk.tasks.total}`,L,47,CW,ink,tp,seed);
+  else if(chars.get(String(dk.id))&&chars.get(String(dk.id)).doodle){ // drawn on a break, stroke by stroke (actors/scenes.js)
+    const dd=chars.get(String(dk.id));g.save();g.beginPath();g.rect(centre(7),46,Math.ceil(7*(dd.doodleU==null?1:dd.doodleU)),7);g.clip();drawIcon(g,dd.doodle,centre(7),46,nameCol);g.restore();
+  }
   else pixMarquee(g,live?dk.detail:n?(inf.cur?inf.cur.label:'ALL STEPS DONE'):'NO PLAN YET',L,47,CW,live?soft:n&&inf.cur?ink:dimInk,tp,seed);
   // row 4: a draining bar and the finish time; a narrow board shows the time alone, centred
   const T5=19,wide=CW>=T5+20,barW=CW-T5-4,tx=wide?L+CW-T5:centre(T5);
@@ -134,6 +141,12 @@ function boardPixels(g,x,dk,now,tp){
     const m=Math.max(0,Math.floor((now-dk.waiting.since)/60000)),t=m<1?'NOW':m<100?m+'M':'99M',warn=readable(AMBER,bg,3.5);
     if(wide){R(g,L,56,barW,3,off);R(g,L,56,Math.max(1,Math.round(barW*Math.min(1,m/30))),3,AMBER);pixText(g,'?',L+barW+1,55,warn);}
     pixText(g,t,wide?tx:centre(pixWidth(t)),55,warn);return;
+  }
+  if(inf.mode==='stopped'){
+    // stopped by an error or by the user: how far it got, and when
+    const c=inf.kind==='error'?red:warn;
+    if(wide){R(g,L,56,barW,3,off);if(inf.done)R(g,L,56,Math.max(1,Math.round(barW*inf.done/n)),3,c);}
+    pixText(g,hhmm(inf.at),tx,55,c);return;
   }
   if(inf.mode==='paused'){
     // paused while the session waits: the time left, frozen, behind a pause sign

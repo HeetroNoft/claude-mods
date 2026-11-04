@@ -9,6 +9,8 @@ import { dataJs, type Desk, type Room } from './core'
 //   index.html, office.css, js/  the page itself, copied from the mod's web/ folder
 
 export const LIVE_MS = 2 * 60 * 60_000
+// A desk with no write for this long counts as abandoned for /my-office-clear.
+export const SILENT_MS = 30 * 60_000
 
 // HOME is unset in a Windows session started outside Git Bash; USERPROFILE is the same folder.
 export async function officeDir($: any): Promise<string> {
@@ -76,6 +78,34 @@ export async function pageInTest($: any, dir: string): Promise<boolean> {
 export async function presentDesks($: any, dir: string, now: number): Promise<Desk[]> {
   const left = await readLeft($, dir)
   return (await liveDesks($, dir, now)).filter(d => !left[d.id])
+}
+
+// The desks a person sees in the room: the page does not seat a session that ended.
+export async function officeDesks($: any, dir: string, now: number): Promise<Desk[]> {
+  return (await presentDesks($, dir, now)).filter(d => d.activity !== 'gone')
+}
+
+// The desks /my-office-clear takes away, however old: sessions that ended, and silent ones. A session
+// waiting for the user or for its usage to come back is silent on purpose and stays.
+export async function uselessDesks($: any, dir: string, now: number, mine?: string): Promise<Desk[]> {
+  const desks: Desk[] = []
+  const entries = await $.fs.list(`${dir}/desks`).catch(() => [])
+  for (const en of entries) {
+    if (!en.name.endsWith('.json') || en.name === `${mine}.json`) continue
+    try {
+      const d: Desk = JSON.parse(await $.fs.read(`${dir}/desks/${en.name}`))
+      const silent = now - en.mtimeMs > SILENT_MS && !d.waiting && !d.limited
+      if (d.activity === 'gone' || silent) desks.push(d)
+    } catch { /* a desk mid-write is skipped this time */ }
+  }
+  return desks.sort((a, b) => a.id.localeCompare(b.id))
+}
+
+// The engine has no file delete: rm where it exists, else Windows' own del. Answers true once the file is gone.
+export async function removeDesk($: any, dir: string, id: string): Promise<boolean> {
+  const file = `${dir}/desks/${id}.json`
+  await $.process.run(['rm', '-f', file]).catch(() => $.process.run(['cmd', '/c', 'del', '/f', '/q', file.replace(/\//g, '\\')])).catch(() => undefined)
+  return !(await $.fs.exists(file))
 }
 
 export async function publish($: any, dir: string) {

@@ -33,10 +33,26 @@ function skyOf(n,day,night,dusk){dusk=dusk||['#E9885A','#F7D59C'];
 function nightSky(g,tp,n,mx,my){if(n<=.05)return;g.globalAlpha=n;
   STARS.forEach((s,i)=>{if(Math.sin(tp/700+i*1.7)>-.4)R(g,s[0],s[1],1,1,'#FFFFFF');});
   R(g,mx,my,5,5,'#F4F1DE');R(g,mx-1,my+1,7,3,'#F4F1DE');R(g,mx+2,my-1,4,5,'rgba(11,22,56,.85)');g.globalAlpha=1;}
+// The season outside: the real date (astronomical dates, north unless the settings say south), or the
+// settings' choice, or ?season=winter for tests. windowView sets SEASON once per frame.
+const SEASONS=['spring','summer','autumn','winter'],SEASON_ASKED=(Q.match(/season=(spring|summer|autumn|winter)/)||[])[1]||null;
+let SEASON='summer';
+function seasonOf(d,south){const k=d.getMonth()*100+d.getDate(),i=k<220?3:k<521?0:k<822?1:k<1121?2:3;return SEASONS[south?(i+2)%4:i];}
+function seasonNow(){return SEASON_ASKED||(PREFS.season!=='auto'&&PREFS.season)||seasonOf(new Date(),PREFS.hemi==='south');}
+// The ground in this season, from a theme's [day, night] colours.
+function seasonGround(day,night){
+  if(SEASON==='spring')return [mix(day,'#9CCB6E',.35),night];
+  if(SEASON==='summer')return [mix(day,'#5E9E48',.4),night];
+  if(SEASON==='autumn')return [mix(day,'#C98A3E',.7),mix(night,'#3A2A1E',.5)];
+  return ['#EEF3F7',mix(night,'#7E8FB4',.6)];
+}
+// Snow lying along the top of something, in winter.
+function snowOn(g,x,y,w,n){if(SEASON==='winter')R(g,x,y,w,1,mix('#FFFFFF','#9AA6C4',n));}
 // Rolling hills along the bottom of a window view (x 276..313). hillTop(x) is where the ground is, so
 // anything drawn on the hills (a house, a tree) stands on it instead of floating.
 function hillTop(x,seed){const u=x+(seed||0);return 56+Math.round(1.6*Math.sin(u/6)+.9*Math.sin(u/2.6));}
 function drawHills(g,n,day,night,seed){
+  [day,night]=seasonGround(day,night);
   const c=mix(day,night,n),top=mix(shade(day,.18),shade(night,.12),n),far=mix(shade(day,.12),shade(night,-.1),n);
   for(let x=276;x<314;x++){const t=hillTop(x+11,seed)-3;R(g,x,t,1,66-t,far);}          // a paler ridge behind
   for(let x=276;x<314;x++){const t=hillTop(x,seed);R(g,x,t,1,66-t,c);R(g,x,t,1,1,top);}
@@ -67,13 +83,14 @@ function paintFloor(g,T){
   for(let y=85,row=0;y<H;y+=6,row++){
     R(g,0,y,W,6,row%2?T.floorA:T.floorB); R(g,0,y+5,W,1,T.seam);
     const off=(row*23)%40; for(let x=off;x<W;x+=40)R(g,x,y,1,5,T.seam);
-    for(let i=0;i<14;i++){const gx=(hash('g'+row+'_'+i)%W);R(g,gx,y+1+(i%3),3,1,row%2?T.grainA:T.grainB);}
+    // the grain stays on its board: a streak over a joint would break the line
+    for(let i=0;i<14;i++){const gx=(hash('g'+row+'_'+i)%W);if((gx-off+400)%40>36||(gx-off+400)%40===0)continue;R(g,gx,y+1+(i%3),3,1,row%2?T.grainA:T.grainB);}
   }
 }
 const PARTS={
   rug(d,T){
     R(d,147,140,88,28,T.rugEdge); R(d,149,142,84,24,T.rugMid); R(d,151,144,80,20,T.rugIn);
-    for(let i=0;i<7;i++){const cx=158+i*11;R(d,cx,152,3,1,T.rugDot);R(d,cx+1,151,1,3,T.rugDot);}
+    for(let i=0;i<7;i++){const cx=158+i*11;R(d,cx,153,3,1,T.rugDot);R(d,cx+1,152,1,3,T.rugDot);}
     R(d,153,146,76,1,T.rugLine); R(d,153,161,76,1,T.rugLine);
     for(let y=141;y<168;y+=2){R(d,145,y,2,1,T.rugDot);R(d,235,y,2,1,T.rugDot);}
   },
@@ -111,15 +128,16 @@ const PART_SHADOWS={
 };
 // A light switch by the door and two sockets low on the wall, clear of the boards, the desks and the
 // space station's vents; painted on the wall itself (no rim). A theme drops them with parts.fixtures: null.
+const SOCKETS=[118,220];
 function paintFixtures(g,T){
   const plate=mix(T.wall,'#FFFFFF',.55),edge=shade(T.wall,-.3);
   R(g,29,55,3,5,edge);R(g,29,55,3,4,plate);R(g,30,56,1,2,edge);
-  [118,220].forEach(x=>{R(g,x,76,4,5,edge);R(g,x,76,4,4,plate);R(g,x+1,77,1,1,edge);R(g,x+2,77,1,1,edge);});
+  SOCKETS.forEach(x=>{R(g,x,76,4,5,edge);R(g,x,76,4,4,plate);R(g,x+1,77,1,1,edge);R(g,x+2,77,1,1,edge);});
 }
 function partOf(T,name){return T.parts&&name in T.parts?T.parts[name]:PARTS[name];}
 // What stands on the floor but is painted with the room: a copy of it, with its rim, goes back over
-// whoever is behind it (standingItems). [x,y,w,h,d]: the part to copy and the depth of its back edge.
-// The counter's goes just under the live coffee maker. Its floor shadow stays out of the copy.
+// whoever is behind it (standingItems). [x,y,w,h,d]: the part to copy and the depth of its front edge,
+// so a Claude standing beside it stays behind it. The counter's goes just under the live coffee maker. Its floor shadow stays out of the copy.
 const standing=document.createElement('canvas'),standingRaw=document.createElement('canvas');
 standing.width=standingRaw.width=W;standing.height=standingRaw.height=H;
 function paintStanding(T){
@@ -130,7 +148,7 @@ function paintStanding(T){
   const rim=traceOutline(x=>x.drawImage(standingRaw,0,0),T.ol);if(rim)c.drawImage(rim.c,rim.x,rim.y);
   c.drawImage(standingRaw,0,0);
 }
-function standingBoxes(T){return [...(partOf(T,'plant')?[[1,148,18,32,156]]:[]),...(partOf(T,'counter')?[[COUNTER.x-2,146,44,34,157.9]]:[]),...(T.standing||[])];}
+function standingBoxes(T){return [...(partOf(T,'plant')?[[1,148,18,32,179.1]]:[]),...(partOf(T,'counter')?[[COUNTER.x-2,146,44,34,179.4]]:[]),...(T.standing||[])];}
 function standingItems(items){standingBoxes(TH).forEach(([x,y,w,h,d])=>items.push({d,f:()=>wx.drawImage(standing,x,y,w,h,x,y,w,h)}));}
 function buildBg(){
   const g=bg.getContext('2d'),T=TH; g.clearRect(0,0,W,H);
@@ -154,6 +172,6 @@ function buildBg(){
 function carpet(g,T,fine){
   R(g,0,85,W,H-85,T.floorA);
   for(let i=0;i<(fine?500:900);i++){const h=hash('c'+i);R(g,h%W,85+(h>>>9)%(H-85),1,1,(h>>>4)%2?T.floorB:T.grainA);}
-  if(!fine)for(let x=0;x<W;x+=32)R(g,x,85,1,H-85,T.seam);
+  if(!fine)for(let x=16;x<W;x+=32)R(g,x,85,1,H-85,T.seam); // tiles cut evenly at both walls
   if(!fine)for(let y=101;y<H;y+=32)R(g,0,y,W,1,T.seam);
 }

@@ -22,6 +22,6 @@ defineTheme('pixel',null,{name:'Pixel · day & night',swatch:['#8CC6E6','#EADCC4
       drawClouds(g,tp,1-n*.75,'#FFFFFF');
       drawHills(g,n,'#7FB08A','#1B3038',0);
       const gy=Math.max(hillTop(287),hillTop(291))+1; // the house's floor, on the lower of the ground under its walls
-      R(g,287,gy-5,5,5,mix('#E9D9C0','#2A2F45',n)); R(g,286,gy-6,7,1,mix('#B85F3E','#3A2430',n)); R(g,288,gy-7,3,1,mix('#B85F3E','#3A2430',n));
+      R(g,287,gy-5,5,5,mix('#E9D9C0','#2A2F45',n)); R(g,286,gy-6,7,1,mix('#B85F3E','#3A2430',n)); R(g,288,gy-7,3,1,mix('#B85F3E','#3A2430',n));snowOn(g,286,gy-6,7,n);snowOn(g,288,gy-7,3,n);
       R(g,289,gy-4,1,1,n>.5?'#FFD27A':'#7A6A55'); R(g,290,gy-2,1,2,mix('#8A5A3A','#1E1A22',n));
     }});

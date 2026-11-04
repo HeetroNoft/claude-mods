@@ -3,6 +3,7 @@
 startThemes();
 resize();
 buildBg();
+showFavicon();
 poll(); setInterval(poll,1000);
 setInterval(renderCard,500);
 requestAnimationFrame(frame);

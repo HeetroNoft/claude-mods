@@ -60,6 +60,7 @@ function drawBoardText(dk,x,now){
   else if(info.mode==='late'){const a=readable(AMBER,bg,3.5);clockIcon(ix,ty,fs*.42,a);
     if(info.left>0){text('Now done by '+hhmm(info.fin),tx,ty,fs,a,'left',tw);text(about(info.late*60000)+' behind plan',tx,P(53.4),fs*.92,a,'left',tw);}
     else{text('Should be done',tx,ty,fs,a,'left',tw);text('Over by '+about(-info.left),tx,P(53.4),fs*.92,a,'left',tw);}}
+  else if(info.mode==='stopped'){const c=readable(info.kind==='error'?'#E5484D':AMBER,bg,3.5);clockIcon(ix,ty,fs*.42,c);text((info.kind==='error'?'Ended ':'Interrupted · ')+info.done+' of '+info.total+' at '+hhmm(info.at),tx,ty,fs,c,'left',tw);}
   else if(info.mode==='finished'){const gr=readable(GREEN,bg,3.5);clockIcon(ix,ty,fs*.42,gr);text('Finished at '+hhmm(info.at),tx,ty,fs,gr,'left',tw);}
   else text(info.total?'No time estimate':'',bx,ty,fs*.92,soft,'left',bw);
   if(dim)text('Away',bx+bw,P(58.6),fs,soft,'right');

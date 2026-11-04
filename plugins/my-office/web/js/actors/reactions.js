@@ -1,9 +1,44 @@
 // Reactions: emotes, chat bubbles, dizzy stars, thought clouds, sound effects.
 'use strict';
-function drawZz(g,x,ht,tp){
-  const k=(tp/1000)%3;
-  for(let i=0;i<3;i++){const ph=(k+i)%3;const a=1-ph/3;g.globalAlpha=a;const zx=Math.round(x+3+ph*3),zy=Math.round(ht-3-ph*4),z=i===2?3:2;
-    R(g,zx,zy,z+1,1,'#FFFFFF');R(g,zx+z-1,zy+1,1,z-1,'#FFFFFF');R(g,zx,zy+z,z+1,1,'#FFFFFF');}
+// A sleeper's Zs grow as they rise and sway; seed keeps two sleepers out of step.
+const ZS=[['1111','..1.','.1..','1111'],['11111','...1.','..1..','.1...','11111'],['111111','....1.','...1..','..1...','.1....','111111']];
+function drawZz(g,x,ht,tp,seed){
+  const t=tp/1000+seed*7,rise=3.6;
+  for(let i=0;i<3;i++){const ph=(t/rise+i/3)%1;
+    const rows=ZS[ph<.34?0:ph<.67?1:2],zx=Math.round(x+9+ph*8+Math.sin(ph*7+i)*1.2),zy=Math.round(ht+2-rows.length-ph*17);
+    g.globalAlpha=Math.min(1,ph/.12,(1-ph)/.3);
+    // a dark rim, so a Z reads on a pale wall as well as a dark one
+    [[-1,0],[1,0],[0,-1],[0,1]].forEach(([dx,dy])=>pattern(g,rows,zx+dx,zy+dy,'#26304F'));pattern(g,rows,zx,zy,'#FFFFFF');}
+  g.globalAlpha=1;
+}
+// What work gives off, by activity: code bits jump from the keyboard, a terminal's lines rise from the
+// desk, pages flutter off the cabinet, a signal runs up from the machine, sparks at the door for a helper.
+const SYNTAX=['#7CC7FF','#FFD84A','#FF8FB1','#FFFFFF'];
+const BITS={prompt:['1....','.1...','1.111'],page:['2222','2112','2222','2112','2222'],plus:['.1.','111','.1.']};
+const BIT_ODDS={edit:.85,bash:.5,read:.16,web:.4,agent:.22}; // chance per spawn tick
+function workBit(ch){
+  const r=Math.random,side=r()<.5?-1:1,bar=n=>['1'.repeat(n)];
+  switch(ch.act){
+    case 'edit':return {x:ch.x+side*(5+r()*6),y:103,vx:side*(3+r()*6),vy:-(20+r()*10),ay:34,rows:bar(1+(r()*3|0)),c:[...SYNTAX,ch.look.c][(r()*5)|0],life:.95,ch:GLYPHS[(r()*GLYPHS.length)|0]};
+    case 'bash':{const p=r()<.3;return {x:ch.x+side*(5+r()*6),y:101,vx:0,vy:-9,rows:p?BITS.prompt:bar(3+(r()*4|0)),c:'#5BD08A',life:1.5,ch:p?'>':'_'};}
+    case 'read':return {x:ch.x+side*(3+r()*5),y:ch.y-13,vx:side*2,vy:-7,sway:1,rows:BITS.page,c:'#8A94A6',c2:'#FFFFFF',life:2,ch:'='};
+    case 'web':return {x:ch.x+side*(2+r()*4),y:ch.y-14,vx:0,vy:-14,sway:1,rows:bar(1),c:'#7FD6FF',life:1.1,ch:'.'};
+    case 'agent':return {x:ch.x+side*(5+r()*6),y:ch.y-16+r()*6,vx:0,vy:-6,twinkle:1,rows:BITS.plus,c:ch.look.c,life:1.2,ch:'+'};
+  }
+}
+function spawnWork(ch,pose){
+  const odds=BIT_ODDS[ch.act];if(!odds||Math.random()>odds*(calmMotion()?.35:1))return;
+  if((ch.act==='edit'||ch.act==='bash')&&pose!=='type')return; // the hands rest: nothing flies
+  const b=workBit(ch);b.max=b.life;b.seed=Math.random()*6;glyphs.push(b);
+}
+function drawWorkBit(g,b,tp){
+  const u=Math.max(2,Math.round(S*.9)),x=Math.round(P(b.x+(b.sway?Math.sin(tp/260+b.seed)*1.5:0))),y=Math.round(P(b.y));
+  const rows=b.twinkle&&Math.floor(tp/130+b.seed)%3===0?['...','.1.','...']:b.rows;
+  g.globalAlpha=Math.min(1,b.life/(b.max*.4));
+  rows.forEach((row,j)=>{for(let i=0;i<row.length;i++){if(row[i]==='.')continue;
+    g.fillStyle='rgba(0,0,0,.3)';g.fillRect(x+(i-1)*u,y+(j+1)*u,u,u);}});
+  rows.forEach((row,j)=>{for(let i=0;i<row.length;i++){if(row[i]==='.')continue;
+    g.fillStyle=row[i]==='2'?b.c2:b.c;g.fillRect(x+i*u,y+j*u,u,u);}});
   g.globalAlpha=1;
 }
 const SOFT='rgba(0,0,0,.25)'; // no outline: a soft shadow, down and left, lifts bubbles off the room
@@ -40,6 +75,42 @@ const EMO={
 // What two Claudes say to each other: a line, then its answer.
 const CHAT_TALKS=[['quest','bulb'],['quest','excl'],['cup','heart'],['zap','star'],['note','smile'],['spark','star'],['bulb','zap'],['heart','smile']];
 function drawEmo(g,icon,x,y,col){const E=EMO[icon];if(E)pattern(g,E.p,x,y,col||E.c);}
+// What a desk's latest news does to its Claude, once; and what stays on it, a sweat when the context is nearly full.
+function reactToDesk(ch,dk){
+  const f=dk.flash,tp=performance.now();
+  if(dk.ctx>=85&&!ch.hidden&&ch.headTop!=null&&Math.random()<.4)leaves.push({x:ch.x+5,y:ch.headTop+3,vx:7,vy:-10,life:.7,p:0,w:1,c:'#9FE6FF'});
+  if(!ch.hidden&&ch.act!=='idle'&&deskBeat(dk,Date.now())?.text==='STUCK?'&&tp>(ch.nextEmote||0)){ch.nextEmote=tp+6000;emote(ch,'excl');}
+  if(!f||f.ms===ch.flashSeen)return;
+  const first=ch.flashSeen==null;ch.flashSeen=f.ms;if(first||Date.now()-f.ms>FLASH_MS)return;
+  if(f.kind==='fail'){setMood(ch,'surprised',1200);emote(ch,'excl');ch.sqv-=20;if(soundFor('fail'))blip(240,.12,'triangle');}
+  else if(f.kind==='denied'){setMood(ch,'dizzy',1500);emote(ch,'excl');if(soundFor('denied'))blip(200,.14,'triangle');}
+  else if(f.kind==='pass'){setMood(ch,'happy',1200);emote(ch,'note');if(soundFor('pass'))blip(880,.05);}
+  else if(f.kind==='ship'){setMood(ch,'happy',1800);ch.jumpUntil=tp+800;ch.starT=tp;emote(ch,'heart');if(soundFor('ship'))chime(.5);}
+  else{ch.sqv+=18;emote(ch,'note');}
+}
+// The screen a Claude is using, as a light on it: where it stands, how far it reaches, its colour.
+// A desk's laptop or monitor faces its Claude, as the machine does the one using it; a phone's light is its feed.
+const FEED_SCREEN=[1,5,9,13].map(i=>hexRgb(shade(FEED[i],.3)).join(','));
+function screenOf(ch,pose,o){
+  const glow=TH.screenGlow||'160,215,255',I=ch.idle,doing=I&&I.phase==='do'?I.act:null;
+  if(pose==='phone')return ch.seated?{x:ch.x,y:103,r:15,c:FEED_SCREEN[Math.floor((o.scroll|0)/4)%4]}:{x:ch.x,y:ch.y-7,r:15,c:FEED_SCREEN[Math.floor((o.scroll|0)/4)%4]};
+  if(pose==='game')return {x:ch.x,y:ch.y-6,r:14,c:'127,232,255'};
+  if(I&&I.act==='selfie'&&I.role===0&&I.sync&&!I.shot){const s=dirOf(ch);return {x:ch.x+s*11,y:ch.y-23,r:16,c:'127,208,232'};}
+  if(ch.path.length)return null;
+  if(ch.seated)return ch.act==='idle'||ch.act==='limit'||pose==='sleep'?null:{x:['cubicle','pod'].includes(TH.desk)?ch.x-deskHalf(desks.length)+6:ch.x,y:100,r:16,c:glow};
+  if(ch.act==='web'||doing==='arcade'||doing==='tinker')return {x:ch.x+Math.sign(105-ch.x)*10,y:ch.y-12,r:15,c:glow};
+  return null;
+}
+// The light lands on the Claude alone: its own pixels, drawn apart, take a soft gradient that fades to
+// nothing and is added over it, stronger at night. Nothing here reaches the outlines' alpha (.6).
+const litC=document.createElement('canvas');litC.width=44;litC.height=48;const litX=litC.getContext('2d');
+function drawScreenLight(g,L,x,y,o,n){
+  const ox=Math.round(x)-22,oy=Math.round(y)-38,a=.2+.08*n,gr=litX.createRadialGradient(L.x-ox,L.y-oy,0,L.x-ox,L.y-oy,L.r);
+  gr.addColorStop(0,`rgba(${L.c},${a})`);gr.addColorStop(.5,`rgba(${L.c},${a*.55})`);gr.addColorStop(1,`rgba(${L.c},0)`);
+  litX.globalCompositeOperation='source-over';litX.clearRect(0,0,44,48);drawPerson(litX,x-ox,y-oy,o);
+  litX.globalCompositeOperation='source-in';litX.fillStyle=gr;litX.fillRect(0,0,44,48);
+  g.globalCompositeOperation='lighter';g.drawImage(litC,ox,oy);g.globalCompositeOperation='source-over';
+}
 function emote(ch,icon){emotes.push({ch,icon,t0:performance.now()});}
 function emoteAt(x,y,icon){emotes.push({x,y,icon,t0:performance.now()});}
 function drawEmotes(g,tp){

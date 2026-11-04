@@ -7,7 +7,7 @@
 'use strict';
 startThemes();resize();
 const SET=(location.search.match(/set=(\w+)/)||[])[1]||'poses';
-const POSES=['stand','walk','type','sit','read','sip','wave','cheer','juggle','talk','water','look','sleep','dance','clap','game','eat','hold','fold','rps','dangle','yoga','float','hug','highfive','pet','press','stretch','catch','slump'];
+const POSES=['stand','walk','type','sit','read','sip','wave','cheer','juggle','talk','water','look','sleep','dance','clap','game','climb','wind','phone','eat','hold','fold','rps','dangle','yoga','float','hug','highfive','pet','press','stretch','catch','slump'];
 // [label, pose, frame, held, extra]
 const HELD=[['mug',  'sip',0,{kind:'mug',fill:1}],['sip','sip',1,{kind:'mug',fill:.6}],['tea','sip',0,{kind:'teacup'}],['tea sip','sip',1,{kind:'teacup'}],
   ['cookie','eat',0,{kind:'cookie',bites:0}],['bite','eat',1,{kind:'cookie',bites:2}],['donut','eat',0,{kind:'donut'}],['munch','eat',1,{kind:'donut'}],

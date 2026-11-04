@@ -1,10 +1,11 @@
 import type { Register } from 'claude-code'
 
 import {
-  activityOf, applyTool, clean, clearPlan, type Desk, eta, finishStep, firstWords, hhmm, lastQuestion, msgKey, newDesk,
-  parseReceived, pausePlan, peerName, planLines, planSteps, push, rateOf, resumePlan, todoSteps, usageLine, whoLine,
+  freshRate, limitOver, limitReset, passed, rateStale,
+  activityOf, addTokens, applyTool, baseName, clean, clearPlan, note, toolFlash, type Desk, eta, finishStep, firstWords, hhmm, lastQuestion, msgKey, newDesk,
+  finishPlan, officeDefs, parseReceived, pausePlan, peerName, planLines, planSteps, push, rateOf, resumePlan, stopPlan, todoSteps, usageLine, whoLine,
 } from './core'
-import { deskList, installPage, LIVE_MS, carryOver, officeDir, pageInTest, presentDesks, publish, readDesk, readLeft, themeKeys, writeDesk, writeLeft, writeRoom } from './room'
+import { deskList, installPage, LIVE_MS, carryOver, officeDesks, officeDir, pageInTest, presentDesks, publish, readDesk, readLeft, removeDesk, themeKeys, uselessDesks, writeDesk, writeLeft, writeRoom } from './room'
 import { COMMANDS, PROMPT_HINT, TOOLS } from './tools'
 
 // The office: every session that runs this mod gets a desk in one shared pixel-art room.
@@ -85,12 +86,65 @@ async function awaitAnswer($: any, e: any, run: Promise<any>) {
   return result
 }
 
+// The context window's fill, as the status line has it; best effort, like the usage.
+async function readCtx($: any) {
+  const u = await Promise.resolve().then(() => $.session.usage()).catch(() => undefined)
+  const p = u?.context?.percent
+  if (p != null) await save($, d => { d.ctx = Math.round(p) })
+}
+
 function startTicker($: any) {
   ticker?.cancel()
   ticker = $.clock.every(15_000, () => {
     if (!desk?.eta || desk.eta.allDone) { ticker?.cancel(); ticker = undefined; return }
     if (!desk.pausedMs) void save($, () => undefined)
   })
+}
+
+// At a reset the desk reads the usage again, and a session the limit stopped takes up its work by itself.
+const RESUME_TEXT = 'The usage limit has reset. Carry on with what you were doing.'
+let resetWatch: { cancel: () => void } | undefined
+let checking = false
+export async function resetCheck($: any) {
+  if (!desk || checking) return
+  const now = await $.clock.now()
+  if (!rateStale(desk, now) && !passed(desk.limited?.resetsAt, now)) return
+  checking = true
+  const usage = await Promise.resolve().then(() => $.session.usage()).catch(() => undefined)
+  const fresh = rateOf(usage?.rateLimits, now)
+  let resume = false
+  await save($, (d, at) => {
+    if (fresh) d.rate = freshRate(fresh, at)
+    else if (d.rate) d.rate = { ...freshRate(d.rate, at), ms: at }
+    resume = limitOver(d, fresh, at)
+    if (resume) { d.limited = undefined; d.activity = 'think'; d.detail = 'Back to work'; d.activityMs = at; note(d, 'limit', 'Usage back: resuming', at) }
+  })
+  checking = false
+  if (resume) await Promise.resolve().then(() => $.prompt.submit({ text: RESUME_TEXT })).catch(() => undefined)
+}
+
+// What the model wrote to call an office tool: its arguments, as the schema names them.
+function toolInput(name: string, e: any) {
+  const keys = Object.keys(TOOLS.find(t => t.name === name)?.inputSchema.properties ?? {})
+  return JSON.stringify(Object.fromEntries(keys.filter(k => e[k] !== undefined).map(k => [k, e[k]])))
+}
+
+// The office tools' schemas, counted once a session by the token-count API (as /context counts them).
+// Best effort and in the background: it sends one count request per tool and memory file of the session.
+async function measureDefs($: any) {
+  const u = await Promise.resolve().then(() => $.session.usage({ breakdown: 'full' })).catch(() => undefined)
+  const m = officeDefs(u?.context?.breakdown)
+  if (m) await save($, d => { d.tokens = { hint: 0, calls: 0, cmds: 0, ...d.tokens, defs: m.tokens, defsLoaded: m.loaded } })
+}
+
+// An office command's output and an office tool's answer go into the conversation: both count (Tokens).
+async function said($: any, text: string) {
+  await save($, d => addTokens(d, 'cmds', text))
+  return { text }
+}
+async function answered($: any, e: any, name: string, result: string) {
+  await save($, d => addTokens(d, 'calls', `mcp__my-office__${name}${toolInput(name, e)}${result}`))
+  return { result }
 }
 
 // Setup runs once: at session start or, after /reload-plugins (which does not fire
@@ -107,13 +161,18 @@ async function doSetup($: any) {
   if (dir && !(await pageInTest($, dir))) await installPage($, `${$.plugin.root}/web`, dir).catch(() => undefined) // the page copy is best effort
   // usage is best effort: an engine without it (or a failing call) must not stop the setup
   const usage = await Promise.resolve().then(() => $.session.usage()).catch(() => undefined)
+  const model = await Promise.resolve().then(() => $.session.model()).catch(() => undefined)
   await save($, (d, now) => {
     const r = rateOf(usage?.rateLimits, now)
     if (r) d.rate = r
+    if (model) d.model = clean(String(model), 24)
     // a session started again after hitting the usage limit is back to normal
     if (d.limited) { d.limited = undefined; d.activity = 'idle'; d.detail = 'Coffee' }
   })
   if (desk?.eta && !desk.eta.allDone) startTicker($)
+  if (desk && desk.tokens?.defs == null) void measureDefs($)
+  resetWatch?.cancel()
+  resetWatch = $.clock.every(30_000, () => { void resetCheck($) })
 }
 
 // A session that starts again (VS Code reopened, a resumed conversation, after /my-office-leave) walks back
@@ -137,9 +196,9 @@ export const register: Register = on => {
 
   on('command.run', { command: 'my-office-desk' }, async ($, e: any) => {
     const name = clean(String(e.args ?? e.text ?? '').trim(), 14)
-    if (!name) return { text: `Your desk is called ${desk?.name ?? 'Claude'}. Rename it with /my-office-desk <name>.` }
+    if (!name) return said($, `Your desk is called ${desk?.name ?? 'Claude'}. Rename it with /my-office-desk <name>.`)
     await rename($, name)
-    return { text: `Your desk is now called ${name}.` }
+    return said($, `Your desk is now called ${name}.`)
   })
 
   on('command.run', { command: 'my-office-leave' }, async ($, e: any) => {
@@ -150,63 +209,82 @@ export const register: Register = on => {
     const here = await presentDesks($, dir, now)
     const others = arg === 'others'
     const hits = others ? here.filter(d => d.id !== desk?.id) : arg ? here.filter(d => d.name.toLowerCase() === arg || d.id.startsWith(arg)) : here.filter(d => d.id === desk?.id)
-    if (others && !hits.length) return { text: 'Nobody else is in the office.' }
-    if (!hits.length) return { text: arg ? `No desk called "${arg}". In the office: ${deskList(here)}.` : 'This session is not in the office.' }
-    if (!others && hits.length > 1) return { text: `Several desks match "${arg}": ${deskList(hits)}. Use /my-office-leave <start of the id>.` }
+    if (others && !hits.length) return said($, 'Nobody else is in the office.')
+    if (!hits.length) return said($, arg ? `No desk called "${arg}". In the office: ${deskList(here)}.` : 'This session is not in the office.')
+    if (!others && hits.length > 1) return said($, `Several desks match "${arg}": ${deskList(hits)}. Use /my-office-leave <start of the id>.`)
     // who left long ago is off the board anyway: the list only keeps who could still show
     const left = Object.fromEntries(Object.entries(await readLeft($, dir)).filter(([, ms]) => now - ms < LIVE_MS))
     await writeLeft($, dir, { ...left, ...Object.fromEntries(hits.map(d => [d.id, now])) })
     await save($, () => undefined)
-    if (others) return { text: `${deskList(hits)} went home. Each comes back with a new prompt or when its session is opened again.` }
+    if (others) return said($, `${deskList(hits)} went home. Each comes back with a new prompt or when its session is opened again.`)
     const gone = hits[0]
     const mine = gone.id === desk?.id
-    return { text: `${gone.name} went home and freed a desk.${mine ? ' This session comes back on its next prompt or when it is opened again.' : ' It comes back when that session gets a new prompt or is opened again.'}` }
+    return said($, `${gone.name} went home and freed a desk.${mine ? ' This session comes back on its next prompt or when it is opened again.' : ' It comes back when that session gets a new prompt or is opened again.'}`)
+  })
+
+  on('command.run', { command: 'my-office-clear' }, async $ => {
+    await setup($)
+    await ensure($)
+    const now = await $.clock.now()
+    const useless = await uselessDesks($, dir, now, desk?.id)
+    if (!useless.length) return said($, 'Nothing to clear.')
+    const done = new Map<string, boolean>()
+    for (const d of useless) done.set(d.id, await removeDesk($, dir, d.id))
+    const cleared = useless.filter(d => done.get(d.id))
+    const stuck = useless.filter(d => !done.get(d.id))
+    // who left long ago is off the board anyway, and a cleared desk needs no entry
+    await writeLeft($, dir, Object.fromEntries(Object.entries(await readLeft($, dir)).filter(([id, ms]) => now - ms < LIVE_MS && !done.get(id))))
+    await save($, () => undefined)
+    return said($, [
+      cleared.length ? `Cleared ${deskList(cleared)}. A session that is still open comes back at its next activity.` : '',
+      stuck.length ? `Could not delete ${deskList(stuck)}.` : '',
+    ].filter(Boolean).join('\n'))
   })
 
   on('command.run', { command: 'my-office' }, async $ => {
     await ensure($)
-    return { text: `Open this page in your browser: file:///${dir.replace(/^\//, '')}/index.html\nEvery session with the my-office mod gets a desk there. Rename yours with /my-office-desk <name>.` }
+    return said($, `Open this page in your browser: file:///${dir.replace(/^\//, '')}/index.html\nEvery session with the my-office mod gets a desk there. Rename yours with /my-office-desk <name>.`)
   })
 
   on('command.run', { command: 'my-office-who' }, async ($, e: any) => {
     await ensure($)
     const now = await $.clock.now()
-    const here = await presentDesks($, dir, now)
+    const here = await officeDesks($, dir, now)
     const arg = String(e.args ?? '').trim().toLowerCase()
     if (arg) {
       const d = here.find(x => x.name.toLowerCase() === arg || x.id.startsWith(arg))
-      if (!d) return { text: `No desk called "${arg}". In the office: ${deskList(here)}.` }
-      return { text: [whoLine(d, d.id === desk?.id), ...planLines(d)].join('\n') }
+      if (!d) return said($, `No desk called "${arg}". In the office: ${deskList(here)}.`)
+      return said($, [whoLine(d, d.id === desk?.id), ...planLines(d)].join('\n'))
     }
-    if (!here.length) return { text: 'Nobody is in the office.' }
-    return { text: [...here.map(d => whoLine(d, d.id === desk?.id)), usageLine(here)].filter(Boolean).join('\n') }
+    if (!here.length) return said($, 'Nobody is in the office.')
+    return said($, [...here.map(d => whoLine(d, d.id === desk?.id)), usageLine(here)].filter(Boolean).join('\n'))
   })
 
   on('command.run', { command: 'my-office-board' }, async ($, e: any) => {
     await ensure($)
     if (String(e.args ?? '').trim().toLowerCase() === 'clear') {
       await save($, clearPlan)
-      return { text: 'Your board is clear.' }
+      return said($, 'Your board is clear.')
     }
-    return { text: desk?.steps.length ? [...planLines(desk), desk.eta && !desk.eta.allDone ? `Due ${hhmm(desk.eta.finishMs)}.` : ''].filter(Boolean).join('\n') : 'No plan on your board.' }
+    return said($, desk?.steps.length ? [...planLines(desk), desk.eta && !desk.eta.allDone ? `Due ${hhmm(desk.eta.finishMs)}.` : ''].filter(Boolean).join('\n') : 'No plan on your board.')
   })
 
   on('command.run', { command: 'my-office-quiet' }, async ($, e: any) => {
     const arg = String(e.args ?? '').trim().toLowerCase()
-    if (arg && arg !== 'on' && arg !== 'off') return { text: 'Use /my-office-quiet on, /my-office-quiet off, or /my-office-quiet to switch.' }
+    if (arg && arg !== 'on' && arg !== 'off') return said($, 'Use /my-office-quiet on, /my-office-quiet off, or /my-office-quiet to switch.')
     const quiet = arg ? arg === 'on' : !(await $.store.get('quiet'))
     await $.store.set('quiet', quiet)
-    return { text: quiet ? 'No more sound at the end of a turn.' : 'The sound at the end of a turn is back.' }
+    return said($, quiet ? 'No more sound at the end of a turn.' : 'The sound at the end of a turn is back.')
   })
 
   on('command.run', { command: 'my-office-theme' }, async ($, e: any) => {
     await ensure($)
     const keys = await themeKeys($, `${$.plugin.root}/web`)
     const arg = String(e.args ?? '').trim().toLowerCase()
-    if (!arg || !keys.includes(arg)) return { text: `${arg ? `No room called "${arg}". ` : ''}Rooms: ${keys.join(', ')}. Use /my-office-theme <room>.` }
+    if (!arg || !keys.includes(arg)) return said($, `${arg ? `No room called "${arg}". ` : ''}Rooms: ${keys.join(', ')}. Use /my-office-theme <room>.`)
     await writeRoom($, dir, { theme: arg, ms: await $.clock.now() })
     await save($, () => undefined)
-    return { text: `The office is now the ${arg} room.` }
+    return said($, `The office is now the ${arg} room.`)
   })
 
   on('prompt.submit', async ($, e, next) => {
@@ -214,16 +292,19 @@ export const register: Register = on => {
     const left = await readLeft($, dir)
     if (desk && left[desk.id]) { delete left[desk.id]; await writeLeft($, dir, left) }
     // the user answered: no more waiting, the usage limit is behind us, and a paused plan goes on
+    let hint = false
     await save($, (d, now) => {
-      d.waiting = undefined; d.limited = undefined; resumePlan(d, now)
+      d.waiting = undefined; d.limited = undefined; d.bg = undefined; resumePlan(d, now)
+      hint = !d.hinted; d.hinted = true
+      if (hint) addTokens(d, 'hint', PROMPT_HINT)
       d.activity = 'think'; d.detail = 'Reading the ask'; d.activityMs = now
     })
-    return next({ ...e, context: [...(e.context ?? []), PROMPT_HINT] })
+    return next(hint ? { ...e, context: [...(e.context ?? []), PROMPT_HINT] } : e)
   })
 
   on('turn.start', async ($, e: any, next) => {
     if (e.agentId) return next(e)
-    await save($, (d, now) => { d.turnMs = now; resumePlan(d, now); if (d.activity === 'idle') { d.activity = 'think'; d.detail = 'Thinking'; d.activityMs = now } })
+    await save($, (d, now) => { d.turnMs = now; d.bg = undefined; resumePlan(d, now); if (d.activity === 'idle' || d.activity === 'wait') { d.activity = 'think'; d.detail = 'Thinking'; d.activityMs = now } })
     return next(e)
   })
 
@@ -235,36 +316,36 @@ export const register: Register = on => {
     })
     startTicker($)
     const due = desk?.eta ? ` Done by ${hhmm(desk.eta.finishMs)}.` : ''
-    return { result: `Plan on your desk board: ${n} steps.${due}` }
+    return answered($, e, 'plan', `Plan on your desk board: ${n} steps.${due}`)
   })
 
   on('tool.call', { tool: 'mcp__my-office__name_desk' }, async ($, e: any) => {
     const name = clean(String(e.name ?? '').trim(), 14)
-    if (!name) return { result: 'Not renamed: the name was empty.' }
+    if (!name) return answered($, e, 'name_desk', 'Not renamed: the name was empty.')
     await ensure($)
     await rename($, name)
-    return { result: `Your desk is now called ${name}.` }
+    return answered($, e, 'name_desk', `Your desk is now called ${name}.`)
   })
 
   on('tool.call', { tool: 'mcp__my-office__name_peer' }, async ($, e: any) => {
     const who = String(e.who ?? '').trim()
     const name = clean(String(e.name ?? '').trim(), 14)
-    if (!who || !name) return { result: 'Not saved: who and name are both needed.' }
+    if (!who || !name) return answered($, e, 'name_peer', 'Not saved: who and name are both needed.')
     await save($, d => {
       d.peers = { ...(d.peers ?? {}), [who]: name }
       const relabel = (x: string) => (x && peerName({ peers: { [who]: name }, seen: d.seen }, x) === name ? name : x)
       d.got = d.got.map(g => ({ ...g, from: relabel(g.from) }))
       d.sent = d.sent.map(s => ({ ...s, to: relabel(s.to) }))
     })
-    return { result: `${who} shows as ${name} on your board.` }
+    return answered($, e, 'name_peer', `${who} shows as ${name} on your board.`)
   })
 
   on('tool.call', { tool: 'mcp__my-office__step_done' }, async ($, e: any) => {
     const n = Number(e.step)
-    if (!desk?.steps[n - 1]) return { result: `No step ${n}.` }
+    if (!desk?.steps[n - 1]) return answered($, e, 'step_done', `No step ${n}.`)
     await save($, (d, now) => { d.steps = finishStep(d.steps, n, now) })
     const t = desk?.eta
-    return { result: t ? `Step ${n} done. Now due ${hhmm(t.finishMs)}${t.lateMin ? `, ${t.lateMin} min late` : ''}.` : `Step ${n} done.` }
+    return answered($, e, 'step_done', t ? `Step ${n} done. Now due ${hhmm(t.finishMs)}${t.lateMin ? `, ${t.lateMin} min late` : ''}.` : `Step ${n} done.`)
   })
 
   on('tool.call', async ($, e: any, next) => {
@@ -282,7 +363,15 @@ export const register: Register = on => {
     const background = isHelper && Boolean(e.run_in_background)
     await save($, (d, now) => { Object.assign(d, applyTool(d, e.tool, e, key, now)) })
     const result = await awaitAnswer($, e, next(e))
-    if (isHelper && !background) await save($, d => { d.interns = d.interns.filter(i => i.key !== key) })
+    await save($, (d, now) => {
+      if (isHelper && !background) d.interns = d.interns.filter(i => i.key !== key)
+      const f = toolFlash(d.task?.kind, Boolean(result?.isError || result?.deny), String(result?.text ?? result?.deny ?? ''), now)
+      if (f) { d.flash = f; note(d, f.kind, f.text, now) }
+      d.task = undefined
+      if (e.tool === 'ScheduleWakeup') d.bg = { kind: 'wakeup', since: now, until: now + Number(e.delaySeconds ?? 0) * 1000 }
+      else if (e.run_in_background || e.tool === 'Monitor') d.bg = { kind: 'job', since: now }
+    })
+    await readCtx($)
     return result
   })
 
@@ -297,15 +386,70 @@ export const register: Register = on => {
     return next(e)
   })
 
+  on('classic.PreToolUse', async ($, e: any, next) => {
+    const planning = e.permission_mode === 'plan'
+    if (Boolean(desk?.planMode) !== planning) await save($, d => { d.planMode = planning })
+    return next(e)
+  })
+
+  on('classic.PermissionDenied', async ($, e: any, next) => {
+    await save($, (d, now) => { d.flash = { kind: 'denied', text: 'DENIED', ms: now }; note(d, 'denied', `Refused: ${String(e.tool_name ?? 'a tool')}`, now) })
+    return next(e)
+  })
+
+  // An MCP server asks the user to fill something in: the session waits like for a question.
+  on('classic.Elicitation', async ($, e: any, next) => {
+    await save($, (d, now) => { d.waiting = { kind: 'form', text: firstWords(String(e.message ?? 'A form for you'), 12), since: now } })
+    return next(e)
+  })
+  on('classic.ElicitationResult', async ($, e: any, next) => {
+    await save($, d => { if (d.waiting?.kind === 'form') d.waiting = undefined })
+    return next(e)
+  })
+
+  on('classic.PostModelSwitch', async ($, e: any, next) => {
+    await save($, (d, now) => {
+      d.model = clean(String(e.to_model ?? ''), 24); d.flash = { kind: 'model', text: 'NEW MODEL', ms: now }
+      note(d, 'model', `Model: ${d.model}`, now)
+    })
+    return next(e)
+  })
+
+  on('classic.CwdChanged', async ($, e: any, next) => {
+    await save($, (d, now) => {
+      d.branch = undefined; d.flash = { kind: 'move', text: 'MOVED', ms: now }
+      note(d, 'move', `Moved to ${baseName(e.new_cwd)}`, now)
+    })
+    return next(e)
+  })
+
+  on('classic.TaskCreated', async ($, e: any, next) => {
+    await save($, d => { d.tasks = { done: d.tasks?.done ?? 0, total: (d.tasks?.total ?? 0) + 1 } })
+    return next(e)
+  })
+  on('classic.TaskCompleted', async ($, e: any, next) => {
+    await save($, d => { if (d.tasks) d.tasks = { ...d.tasks, done: Math.min(d.tasks.total, d.tasks.done + 1) } })
+    return next(e)
+  })
+
+  // Compacting: the main conversation's only, a helper's own and the background precompute show nothing.
+  on('session.compact', async ($, e: any, next) => {
+    if (e.agentId || e.trigger === 'precompute') return next(e)
+    await save($, (d, now) => { d.task = { kind: 'compact', ms: now, auto: e.trigger === 'auto' }; d.activity = 'think'; d.detail = 'Compacting'; d.activityMs = now; note(d, 'compact', 'Compacting', now) })
+    const result = await next(e)
+    await save($, d => { d.task = undefined; d.hinted = false })
+    return result
+  })
+
   // The usage limit stopped the session: it stays at its desk, knocked out, until it is started again.
   on('classic.StopFailure', async ($, e: any, next) => {
     if (e.error === 'rate_limit') {
       await save($, (d, now) => {
-        const resets = [d.rate?.fiveResets, d.rate?.sevenResets].filter(Boolean).sort()[0]
+        const resets = limitReset(d.rate)
         d.limited = { since: now, resetsAt: resets }; d.waiting = undefined
         d.activity = 'limit'; d.detail = 'Out of usage'; d.activityMs = now
       })
-    }
+    } else await save($, (d, now) => { stopPlan(d, 'error', now, String(e.error || 'unknown')); note(d, 'error', `Error: ${String(e.error || 'unknown')}`, now) })
     return next(e)
   })
 
@@ -343,23 +487,29 @@ export const register: Register = on => {
     await save($, (d, now) => {
       if (d.limited) { d.activity = 'limit'; d.detail = 'Out of usage'; return }
       d.activity = 'idle'; d.detail = 'Coffee'; d.activityMs = now
-      // a turn that ends on a question waits for the reply; an unfinished plan pauses meanwhile
+      // a turn that ends on a question waits for the reply, and its plan pauses meanwhile; one the user
+      // interrupted keeps its steps, like one an error stopped (see StopFailure); any other finishes its plan
       const q = e.isAborted ? '' : lastQuestion(e.answer)
-      if (q) { d.waiting = { kind: 'reply', text: q, since: now }; d.detail = 'Waiting for you' }
-      pausePlan(d, now)
-      if (!e.isAborted && d.turnMs && now - d.turnMs >= 15_000) {
+      d.task = undefined
+      if (q) { d.waiting = { kind: 'reply', text: q, since: now }; d.detail = 'Waiting for you'; pausePlan(d, now) }
+      else if (e.isAborted) stopPlan(d, 'interrupted', now)
+      else if (d.bg) { d.activity = 'wait'; d.detail = 'Waiting on a background task'; pausePlan(d, now) }
+      else if (!d.stopped) finishPlan(d, now)
+      if (!e.isAborted && !d.stopped && d.turnMs && now - d.turnMs >= 15_000) {
         d.doneMs = now
         const s = d.steps.length ? ` · ${d.steps.filter(x => x.doneMs).length} of ${d.steps.length} steps` : ''
         d.doneLine = `Done in ${Math.round((now - d.turnMs) / 1000)}s${s}`
       }
     })
+    await readCtx($)
     if (!e.isAborted && desk?.doneMs && desk.doneMs >= desk.turnMs && !(await $.store.get('quiet'))) await $.audio.play({ asset: 'sounds/done.wav' }).catch(() => undefined)
     return next(e)
   })
 
   on('session.end', async ($, e, next) => {
     ticker?.cancel()
-    await save($, (d, now) => { d.endedMs = now; d.activity = 'gone'; d.detail = 'Gone home' })
+    resetWatch?.cancel()
+    await save($, (d, now) => { if ((e as any).reason === 'clear') { clearPlan(d); d.hinted = false } d.endedMs = now; d.activity = 'gone'; d.detail = 'Gone home' })
     return next(e)
   })
 }

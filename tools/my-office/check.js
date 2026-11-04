@@ -38,7 +38,7 @@
   }
   // 6. nothing overlaps: room elements (and the buttons and item bar drawn over the room) keep apart
   const box=(n,x,y,w,h)=>({n,x,y,w,h}),hit=(a,b)=>a.x<b.x+b.w&&b.x<a.x+a.w&&a.y<b.y+b.h&&b.y<a.y+a.h;
-  const room=[box('gauge',2,1,30,16),box('sign',1,30,29,7),box('door',3,38,25,46),box('left shelf',6,18,116,6),box('right shelf',198,18,116,6),box('clock',149,2,24,24),
+  const room=[box('gauge',2,1,73,16),box('sign',1,30,29,7),box('door',3,38,25,46),box('left shelf',6,18,116,6),box('right shelf',198,18,116,6),box('clock',149,2,24,24),
     box('cabinet',18,138,22,42),box('machine',86,133,40,47),box('counter',COUNTER.x-1,152,42,28),box('plant',292,92,22,40),box('small plant',3,158,12,21),
     box('settings button',306,169,14,11),box('bottom bar',141,169,39,10),box('item bar over the floors',141,158,39,10)];
   const pairs=[];room.forEach((a,i)=>room.slice(i+1).forEach(b=>{if(hit(a,b))pairs.push(a.n+' / '+b.n);}));
@@ -97,7 +97,7 @@
   {const cv=document.createElement('canvas');cv.width=cv.height=48;const g=cv.getContext('2d',{willReadFrequently:true});
     const px=o=>{g.clearRect(0,0,48,48);drawPerson(g,24,40,o);return g.getImageData(0,0,48,48).data;},c='#8E6CCF';
     const mug={kind:'mug',fill:1},tea={kind:'teacup'},cookie={kind:'cookie'},donut={kind:'donut'},flower={kind:'flower'},gift={kind:'gift'},ball={kind:'ball'};
-    const CASES=[['walk',0,{carry:'#4FA3E0'}],['walk',1,{carry:'#4FA3E0'}],['read',1],['game',1],['fold',0],['fold',1],['water',1],
+    const CASES=[['walk',0,{carry:'#4FA3E0'}],['walk',1,{carry:'#4FA3E0'}],['read',1],['game',1],['phone',1],['fold',0],['fold',1],['water',1],
       ...[mug,tea].flatMap(h=>[0,.5,1].map(r=>['sip',1,{held:h,raise:r}])),...[cookie,donut].flatMap(h=>[0,.5,1].map(r=>['eat',1,{held:h,raise:r}])),
       ['hold',0,{held:flower}],['hold',0,{held:flower,lift:4}],['hold',0,{held:gift}],['hold',0,{held:ball}]];
     for(let style=1;style<LOOKS.length;style++)for(const dir of [1,-1])for(const [pose,frame,extra] of CASES){
@@ -110,11 +110,11 @@
     bs.forEach((a,i)=>{log(a.x>=306&&a.y>=169,`button ${a.n} leaves the corner: ${a.x.toFixed(1)},${a.y.toFixed(1)}`);});
     log(stage.querySelectorAll(':scope>button').length===1,'more than one action button');
     // 13. settings: open, each choice takes effect and is remembered, keys and defaults work
-    const b=id=>document.getElementById(id),on=q=>document.querySelector('#prefs '+q);
+    const b=id=>document.getElementById(id),on=q=>document.querySelector('#prefs '+q),showTab=k=>on(`[data-tab=${k}]`).click();
     b('set').click();log(b('prefs').classList.contains('open'),'settings do not open');
-    on('[data-sw=calm]').click();log(document.body.classList.contains('calm')&&calmMotion(),'less motion not applied');
+    showTab('display');on('[data-sw=calm]').click();log(document.body.classList.contains('calm')&&calmMotion(),'less motion not applied');
     on('[data-sw=badges]').click();log(PREFS.badges===false,'head icons not switched');
-    on('[data-seg=time][data-v=night]').click();const stored=JSON.parse(localStorage.getItem('office.prefs')||'{}');
+    showTab('room');on('[data-seg=time][data-v=night]').click();showTab('display');const stored=JSON.parse(localStorage.getItem('office.prefs')||'{}');
     log(stored.calm===true&&stored.badges===false&&stored.time==='night','settings not remembered: '+JSON.stringify(stored));
     const w0=b('set').offsetWidth;on('[data-sw=compact]').click();log(b('set').offsetWidth<w0,'compact buttons not smaller');
     on('[data-sw=items]').click();log(barOn===false&&b('items').classList.contains('hide'),'item bar not hidden');
@@ -146,13 +146,58 @@
       const spots=CAT_SPOTS.map(s=>{const p={...s};outOfFurniture(p);return p;});
       spots.forEach(a=>spots.forEach(t=>{let p=a;catRoute(a,t).forEach(q=>{const along=p.y===WALK_Y&&q.y===WALK_Y;
         FLOOR_BLOCK.concat(TH.obstacles||[]).forEach(o=>{if(!along&&crosses(p,q,o))log(false,`${k}: the cat crosses (${o.x0},${o.y0}) from ${p.x},${p.y} to ${q.x},${q.y}`);});p=q;});}));
-      (TH.obstacles||[]).forEach(o=>log(standingBoxes(TH).some(([x,,w])=>x<o.x1&&x+w>o.x0),`${k}: a table is not sorted with the Claudes`));}
+      (TH.obstacles||[]).forEach(o=>log(standingBoxes(TH).some(([x,,w])=>x<o.x1&&x+w>o.x0),`${k}: a table is not sorted with the Claudes`));
+      // 19. what stands on the floor sorts at its front edge, so nobody beside it is painted over it
+      paintStanding(TH);const bottom=f=>{const c=document.createElement('canvas');c.width=W;c.height=H;const g=c.getContext('2d');f(g);const d=g.getImageData(0,0,W,H).data;for(let y=H-1;y>=0;y--)for(let x=0;x<W;x++)if(d[(y*W+x)*4+3]>150)return y;return 0;};
+      standingBoxes(TH).forEach(([x,y,w,h,d])=>{const b=bottom(g=>g.drawImage(standing,x,y,w,h,x,y,w,h));log(b<=d,`${k}: what is painted at ${x},${y} reaches ${b} but sorts at ${d}`);});
+      [['cabinet',g=>drawCabinet(g,0,0)],['machine',g=>drawMachine(g,0,'idle')]].forEach(([n,f])=>{const b=bottom(f);log(b<=FRONT[n]&&FRONT[n]>=179,`${k}: the ${n} reaches ${b} but sorts at ${FRONT[n]}`);});}
+    // 23. the cabinet opens a drawer at random, each in turn of every kind, stays on it while open, and never the same twice running
+    {const g=document.createElement('canvas').getContext('2d');
+      Object.entries(CABINETS).forEach(([k,K])=>{if(K.drawers.length<2)return;TH={...THEMES[keep],cabinetKind:k};const seen=new Set();let last=-1,same=false,moved=false;
+        for(let i=0;i<600;i++){drawCabinet(g,0,0);drawCabinet(g,1,0);const d=cabDrawer;drawCabinet(g,1,0);if(cabDrawer!==d)moved=true;if(d===last)same=true;last=d;seen.add(d);}
+        log(seen.size===K.drawers.length&&!same&&!moved,`${k}: drawers opened ${[...seen]}, same twice ${same}, moved ${moved}`);});
+      drawCabinet(g,0,0);}
+    // 24. a mopped stain leaves nothing on the floor, and what is wiped stays wiped when another Claude takes over
+    {const c=document.createElement('canvas');c.width=W;c.height=H;const g=c.getContext('2d'),count=()=>{g.clearRect(0,0,W,H);drawStain(g,stain);const d=g.getImageData(0,0,W,H).data;let n=0;for(let i=3;i<d.length;i+=4)if(d[i])n++;return n;},was=stain;
+      stain={floor:curFloor,x:200,y:150,left:1,wet:0,gone:new Set()};log(count()===STAIN_PIXELS,'a fresh stain is not whole');
+      const t=performance.now(),I={until:t+5000,start:t,dur:5000};for(let i=0;i<400;i++)mopTick({},I,t+i*5);const left=stain.left;mopTick({},{until:t+1e4,start:t+9000,dur:1000},t+9000);
+      log(left<1&&left>.3&&stain.left<=left,'the mop is off its pace or lets a stain grow back: '+left);
+      mopEnd({},I,t);log(stain.left===0&&count()===0,'pixels stay after the mop');stain=was;}
+    // 25. the door: wait for it, step through, gone only once it has shut; and the same way in
+    {const was=doorAmt,e={...newChar('door',{c:'#fff'}),x:DOOR.x,y:DOOR.y,tgt:{exit:true,key:'x'},hidden:false};
+      gateOut(e);doorAmt=0;stepGate(e,.1);log(e.gate.step==='wait'&&gateHolds(e),'someone does not wait for the door to open');
+      doorAmt=1;for(let i=0;i<20;i++)stepGate(e,.05);log(e.gate&&e.gate.step==='shut'&&e.y===GATE.y&&!gateHolds(e)&&!e.hidden,'someone leaves before the door has shut');
+      doorAmt=0;stepGate(e,.05);log(e.hidden&&!e.gate,'someone is still there behind the shut door');
+      const f={...newChar('door2',{c:'#fff'})};gateIn(f);doorAmt=0;stepGate(f,.1);log(f.gate.step==='wait'&&f.y===GATE.y,'someone comes in through the shut door');
+      doorAmt=1;for(let i=0;i<20;i++)if(f.gate)stepGate(f,.05);log(!f.gate&&f.y===DOOR.y,'someone does not reach the room through the door');doorAmt=was;}
     themeKey=keep;TH=THEMES[keep];buildBg();
+    // 20. a Claude pets a cat that waits for it, within reach, or gives up: never a stroke from afar
+    {cat=cat||newCat(performance.now());const live=[...chars.entries()],was={...cat},mk=(id,x,y)=>{const e={...newChar(id,{c:'#fff'}),hidden:false,x,y,path:[],tgt:{x,y},arrived:true,idle:{phase:'pick',t:0}};chars.set(id,e);return e;};
+      const walking=()=>Object.assign(cat,{away:false,job:null,z:0,air:null,x:200,y:150,path:[{x:60,y:150}]});
+      chars.clear();const me=mk('pet',120,150);walking();startIdle(me,'catpet');
+      log(!cat.path.length&&catReach(me.tgt),'a Claude walks to a cat still on its way somewhere else');
+      decor.push({x:200,y:120,vx:1,vy:0,life:2});cat.planeCD=0;watchPlanes(performance.now());decor.pop();
+      log(!cat.job,'a plane draws off the cat a Claude came to pet');
+      mk('side',190,151);me.tgt=null;me.idle={phase:'pick',t:0};walking();startIdle(me,'catpet');
+      log(me.idle.phase==='pick'&&cat.path.length===1,'no room by the cat, yet a Claude goes to pet it');
+      Object.assign(cat,{x:60,y:150,path:[]});me.idle={act:'catpet',phase:'do',until:performance.now()+5000};idleTick(me,me.idle,performance.now());
+      log(me.idle.until===0,'a Claude goes on petting a cat out of reach');
+      // 22. a Claude up the ladder really reaches the clock, and comes back down to the floor
+      const up=performance.now();me.path=[];me.idle={act:'clock',phase:'do',start:up-4000,until:up+4000};
+      log(sceneAir(me,up)===CLOCK_TOP&&CLOCK_SPOT+10>=CLOCK.x-CLOCK.r&&89-CLOCK_TOP-15<=CLOCK.y+CLOCK.r,'a Claude on the ladder does not reach the clock');
+      me.idle.until=up+10;log(sceneAir(me,up+10)===0,'a Claude stays up the ladder');
+      chars.clear();live.forEach(([k,v])=>chars.set(k,v));Object.assign(cat,was);}
     // 14. the cat's name: kept clean, remembered, and typing it presses no shortcut
-    const room=themeKey,cn=on('#pcat');cn.value='Mïmi! the great';cn.dispatchEvent(new Event('input',{bubbles:true}));
+    showTab('room');const room=themeKey,cn=on('#pcat');cn.value='Mïmi! the great';cn.dispatchEvent(new Event('input',{bubbles:true}));
     log(catName==='Mimi the g'&&localStorage.getItem('office.catName')===catName,'cat name not cleaned or kept: '+catName);
     cn.dispatchEvent(new KeyboardEvent('keydown',{key:'t',bubbles:true}));log(themeKey===room,'typing the name changed the room');
     catTagUntil=performance.now()+1e4;drawCatTag(wx,performance.now());setCatName('');
+    // 21. the office's name: kept clean, in the tab's title, and typing it presses no shortcut; the tab's icon follows the room
+    const pn=on('#poffice'),keepName=officeName,keepTheme=themeKey;pn.value='  Ma   boîte ';pn.dispatchEvent(new Event('input',{bubbles:true}));
+    log(officeName==='Ma boîte'&&document.title.endsWith('Ma boîte'),'office name not in the title: '+document.title);
+    pn.dispatchEvent(new KeyboardEvent('keydown',{key:'t',bubbles:true}));log(themeKey===keepTheme,'typing the office name changed the room');
+    setOfficeName('');log(document.title.endsWith(BASE_TITLE),'an empty office name loses the title');setOfficeName(keepName);
+    const icons=new Set(THEME_KEYS.map(k=>faviconFor(THEMES[k].catLook)));log(faviconEl.href.startsWith('data:image/png')&&icons.size===new Set(THEME_KEYS.map(k=>THEMES[k].catLook)).size,'each cat should have its own tab icon');
     window.dispatchEvent(new KeyboardEvent('keydown',{key:'Escape'}));log(!b('prefs').classList.contains('open'),'Esc does not close settings');}
   // one line per failure: the browser log keeps only the first line of a message
   if(!fails.length)console.log('CHECK OK all layout checks passed');

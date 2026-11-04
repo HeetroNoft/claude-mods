@@ -19,6 +19,8 @@ function dodge(e,left,dt){
 function stepEntity(e,dt){
   // a Claude held by the pointer hangs under it, a little behind, like on a string
   if(e.held){const k=Math.min(1,dt*16);e.x+=(e.held.x-e.x)*k;e.y+=(e.held.y+16-e.y)*k;return false;}
+  if(e.gate&&!e.hidden){stepGate(e,dt);return true;}
+  if(e.spot){e.v=0;return false;} // its card is open: it stays where it is, its way kept for later (actors/spotlight.js)
   if(e.hidden||!e.path.length){e.v=0;return false;}
   let left=0,from=e;e.path.forEach(p=>{left+=Math.hypot(p.x-from.x,p.y-from.y);from=p;});
   if(!e.small)dodge(e,left,dt);
@@ -35,15 +37,19 @@ function stepEntity(e,dt){
     e.arrived=true; e.v=0; e.sqv=(e.sqv||0)-8; // a small settle on arriving
     if(e.tgt&&e.tgt.dir)e.face=e.tgt.dir;
     if(e.tgt&&e.tgt.seated){e.seated=true;e.seatX=e.tgt.x;}
-    if(e.tgt&&e.tgt.exit){e.hidden=true;}
+    if(e.tgt&&e.tgt.exit)gateOut(e); // through the door, and gone once it has shut
   }
   return true;
 }
 // The pose this frame, by priority: held, walking, a gift in hand, a scene (high five, clapping,
 // waving), then what the work or the break calls for.
 function poseFor(ch,tp){
-  if(ch.held)return 'dangle';
+  if(ch.held||ch.fly)return 'dangle';
+  if(ch.gate)return ch.gate.step==='walk'?'walk':ch.gate.step==='shut'?'look':'stand';
+  if(ch.spot)return spotPose(ch,tp);
   if(ch.path.length)return 'walk';
+  if(tp<(ch.getUpUntil||0))return 'slump';
+  if(tp<(ch.lampReach||0))return 'press';
   // the cat: a stroke for it, a stop while it sits on the desk, a nap broken for a moment
   if(tp<(ch.catPetUntil||0))return 'pet';
   if(ch.seated&&tp<(ch.catBlockUntil||0))return ch.catBlockPose||'sit';
@@ -72,10 +78,13 @@ function poseFor(ch,tp){
     case 'agent':return 'wave';
     case 'ask':return ((tp/1000+ch.blinkT)%2.2)<1.5?'wave':'cheer';
     case 'limit':return 'slump';
+    case 'wait':return 'phone';
     case 'idle':return 'sip';
     default:return 'sit';
   }
 }
+// Depth of what reaches the front of the room: every spot beside it, up to y 179, stays behind it.
+const FRONT={cabinet:179.2,machine:179.3,coffee:179.5};
 let cabOpen=0,doorAmt=0,lastT=performance.now(),spawnT=0,steamT=0;
 function frame(tp){
   const dt=Math.min(.05,Math.max(0,(tp-lastT)/1000)); lastT=tp;
@@ -90,10 +99,7 @@ function frame(tp){
   // spawn effects
   spawnT+=dt; steamT+=dt;
   if(spawnT>.16){spawnT=0;
-    chars.forEach(ch=>{
-      if(ch.hidden||ch.path.length||!ch.seated)return;
-      if((ch.act==='edit'||ch.act==='bash')&&Math.random()<.85)glyphs.push({x:ch.x+(Math.random()<.5?-1:1)*(4+Math.random()*7),y:103,vy:-(9+Math.random()*7),vx:(Math.random()-.5)*4,ch:GLYPHS[(Math.random()*GLYPHS.length)|0],c:Math.random()<.5?ch.look.c:'#FFFFFF',life:1.3});
-    });
+    chars.forEach(ch=>{if(!ch.hidden&&!ch.path.length&&!ch.held)spawnWork(ch,poseFor(ch,tp));}); // actors/reactions.js
   }
   chars.forEach(ch=>{
     if(ch.hidden||ch.path.length||ch.act!=='send'||!ch.seated)return;
@@ -111,12 +117,10 @@ function frame(tp){
   // clock hands
   clockPixels(wx,now,tp);
   // dust motes in window light, or neon sparks
-  if(TH.dust==='sun'&&n<.7)dust.forEach(m=>{m.y-=m.v*dt*.3;m.x+=Math.sin(tp/1000+m.p)*dt*2;if(m.y<86){m.y=136;m.x=250+Math.random()*55;}const a=(.25+.2*Math.sin(tp/600+m.p))*(1-n);wx.fillStyle=`rgba(255,250,230,${a})`;wx.fillRect(Math.round(m.x),Math.round(m.y),1,1);});
+  if(TH.dust==='sun'&&n<.7)dust.forEach(m=>{m.y-=m.v*dt*.3;m.x+=Math.sin(tp/1000+m.p)*dt*2;if(m.y<86){m.y=136;m.x=250+Math.random()*55;}const a=(.25+.2*Math.sin(tp/600+m.p))*(1-n);wx.fillStyle=`rgba(${DUST_TINT[SEASON]},${a})`;wx.fillRect(Math.round(m.x),Math.round(m.y),1,1);});
   // door open? (someone walking through, or a knock)
-  let doorOpen=false; const near=e=>!e.hidden&&Math.hypot(e.x-DOOR.x,e.y-DOOR.y)<16;
+  let doorOpen=false; const near=e=>!e.hidden&&(gateHolds(e)||!e.gate&&Math.hypot(e.x-DOOR.x,e.y-DOOR.y)<16);
   chars.forEach(c=>{if(near(c))doorOpen=true;});if(cat&&!cat.away&&near(cat))doorOpen=true; interns.forEach(e=>{if(near(e))doorOpen=true;});
-  // the door opens the room's own way as someone comes near, and closes behind them (world/door.js)
-  drawDoor(wx,tp,dt,doorOpen);
   // one light per desk on the door sign, in the room's style; it darkens with the night (world/door.js)
   if(!LABELS)drawSignLeds(wx);
   const xs=deskXs(desks.length);
@@ -128,11 +132,12 @@ function frame(tp){
   let mmode='idle'; chars.forEach(c=>{if(!c.hidden&&!c.path.length){if(c.act==='bash')mmode='bash';else if(c.act==='web'&&mmode!=='bash')mmode='web';}});
   cabOpen+=((reading||tp<cabPulse?1:0)-cabOpen)*Math.min(1,dt*7); // the drawer slides rather than jumps
   standingItems(items);
-  items.push({d:176,f:()=>outlinedLive(wx,'cabinet',[18,130,32,51],g=>drawCabinet(g,cabOpen,tp))});
-  items.push({d:177,f:()=>outlinedLive(wx,'machine',[86,132,42,49],g=>drawMachine(g,tp,mmode))});
-  items.push({d:158,f:()=>outlined(wx,'coffee',g=>drawCoffee(g,tp,coffeeBusy),g=>drawCoffee(g,0,false))});
+  items.push({d:FRONT.cabinet,f:()=>outlinedLive(wx,'cabinet',[18,130,32,51],g=>drawCabinet(g,cabOpen,tp))});
+  items.push({d:FRONT.machine,f:()=>outlinedLive(wx,'machine',[86,132,42,49],g=>drawMachine(g,tp,mmode))});
+  items.push({d:FRONT.coffee,f:()=>outlined(wx,'coffee',g=>drawCoffee(g,tp,coffeeBusy),g=>drawCoffee(g,0,false))});
   items.push({d:129,f:()=>outlinedLive(wx,'plant',[290,90,27,43],g=>drawPlant(g,tp))});
   catDrawables(items,tp); // the cat, what it knocked over, its ball (world/cat.js)
+  roomItems(items,wx); // what the breaks left behind (actors/scenes.js)
   desks.forEach((dk,i)=>{
     const x=xs[i],dim=dk.activity==='gone'; const ch=chars.get(String(dk.id));
     const typing=ch&&!ch.hidden&&ch.seated&&!ch.path.length&&(ch.act==='edit'||ch.act==='send'||ch.act==='bash')&&!(tp<(ch.catBlockUntil||0));
@@ -150,50 +155,60 @@ function frame(tp){
     const pose=poseFor(ch,tp);
     let jy=0; if(tp<ch.jumpUntil){jy=-Math.round(Math.abs(Math.sin((ch.jumpUntil-tp)/1000*Math.PI*2.6))*6);}
     const bob=pose==='walk'?(stepOf(ch)?-1:0):0;
-    const rate={walk:6,type:7,press:3,wave:4,sip:.5,talk:5,water:4,juggle:3,catch:2,dance:2.5,eat:3,fold:2,rps:6,dangle:5,clap:5,pet:3,game:1.5}[pose]||2;
+    const rate={climb:4,wind:4,walk:6,type:7,press:3,wave:4,sip:.5,talk:5,water:4,juggle:3,catch:2,dance:2.5,eat:3,fold:2,rps:6,dangle:5,clap:5,pet:3,game:1.5}[pose]||2;
     // how high off the floor: held up by the pointer, or floating in the space station
-    const air=ch.held?7:(ch.idle&&ch.idle.act==='float'&&ch.idle.phase==='do')?Math.round(4+2*Math.sin(tp/700)):0;
-    const sway=pose==='dance'?(frameOf(ch,rate)?1:-1):0;
+    const air=ch.held?7:ch.fly?Math.round(ch.fly.h):sceneAir(ch,tp)||(ch.idle&&ch.idle.act==='float'&&ch.idle.phase==='do'?Math.round(4+2*Math.sin(tp/700)):0);
+    const sway=(pose==='dance'?(frameOf(ch,rate)?1:-1):0)+sceneLean(ch,tp);
     // what is in hand: a treat's own state, else what the break activity calls for
     const st=treatNow(ch,tp),I=ch.idle,doing=I&&I.phase==='do'&&!ch.path.length?I.act:null;
+    const scene=doing?IDLES[doing]:null;ch.aloft=!!(scene&&scene.aloft); // up a ladder: over the boards, as a held Claude is
     const held=st?st.held:doing==='donut'?{kind:'donut'}:doing==='tea'?{kind:'teacup'}:null;
     const o={look:ch.look,pose,frame:st&&st.frame!=null?st.frame:pose==='walk'?stepOf(ch):frameOf(ch,rate),blink:blinking(ch,tp),dir:dirOf(ch),sq:sqOf(ch,tp,pose,jy),gaze:gazeOf(ch,tp),
-      mood:st&&st.mood?st.mood:moodOf(ch,tp,pose),glow:n>.5,air,held,
+      mood:st&&st.mood?st.mood:moodOf(ch,tp,pose),glow:n>.5,air,held,floor:sceneFloor(ch),
       carry:ch.errand&&ch.errand.phase==='go'?ch.errand.col:null,breath:((tp/1000+ch.blinkT)%2.8)<1.4?0:1};
     // a treat says when the arm goes up; a snack on a break is a bite now and then, not a chew a beat
+    // on the phone: the feed goes by, and a post gets a like now and then
+    if(pose==='phone'){Object.assign(o,phoneFeed(tp/1000+ch.blinkT*3),{seated:ch.seated});if(tp>(ch.nextLike||0)){if(ch.nextLike)emote(ch,'heart');ch.nextLike=tp+4000+Math.random()*6000;}}
     const raiseTo=pose!=='sip'&&pose!=='eat'?0:st&&st.raise!=null?st.raise:(st||pose==='sip')?o.frame:((tp/1000+ch.blinkT)%1.6<.5?1:0);
     const tr=trailOf(ch,ch.x+sway,ch.y+jy+bob-air,pose,o.mood,raiseTo,st&&st.lift||0,tp);
     o.sway=Math.round(tr.x);o.pop=Math.round(-tr.y);o.raise=tr.raise;o.lift=Math.round(tr.lift);
+    ch.screen=ch.fly?null:screenOf(ch,pose,o);
     const body=()=>{
       if(cardId===ch.id)drawRing(wx,ch.x,ch.y,ch.look.c,tp);
       ch.bodyTop=ch.y+jy+bob-air-15;
-      ch.headTop=drawPerson(wx,ch.x+sway,ch.y+jy+bob-air,o);
+      if(scene&&scene.behind)scene.behind(wx,ch,tp,I);
+      ch.headTop=ch.fly?drawFlying(wx,ch,o,ch.x+sway,ch.y+jy+bob-air):drawPerson(wx,ch.x+sway,ch.y+jy+bob-air,o);
+      if(ch.screen)drawScreenLight(wx,ch.screen,ch.x+sway,ch.y+jy+bob-air,o,n);
       drawIdleProps(wx,ch,tp);
       if(st)drawTreat(wx,ch,tp,st);
       if(tp<(ch.flowerUntil||0)&&ch.bodyTop!=null)drawProp(wx,'blossom',Math.round(ch.x+3+o.sway),HATS.has(ch.look.style)?Math.round(ch.headTop+1-o.pop):Math.round(ch.bodyTop-2)); // tucked in the hat band, or on the head
     };
-    if(ch.held)lifted.push(body);else items.push({d:ch.y,f:body});
+    const top=ch.held||ch.aloft;
+    if(top)lifted.push(body);else if(inDoorway(ch))doorway.push(body);else items.push({d:ch.y,f:body});
     // the badge steps up out of the way of balls in the air, and comes down after
     ch.badgeUp=(ch.badgeUp||0)+(((st&&(st.juggle||st.caught||st.star))||doing==='juggle'?10:0)-(ch.badgeUp||0))*Math.min(1,dt*10);
-    (ch.held?lifted:over).push(()=>{
+    (top?lifted:over).push(()=>{
       const ht=ch.headTop; if(ht==null)return;
       if(pose==='sit'&&ch.act==='think')drawThought(wx,ch,tp);else ch.thoughtAt=0;
-      if(pose==='sleep')drawZz(wx,ch.x,ht,tp);
+      if(pose==='phone'&&ch.seated)drawPhone(wx,Math.round(ch.x)-2,99,o,ch.look.c); // above the desk, under the eyes
+      if(pose==='sleep')drawZz(wx,ch.x,ht,tp,ch.blinkT||0);
       if(o.mood==='dizzy')drawDizzy(wx,ch.x,ht,tp);
       drawChatBubble(wx,ch,tp);drawRps(wx,ch,tp);
     });
-    (ch.held?lifted:post).push(()=>{
+    (top?lifted:post).push(()=>{
       if(ch.headTop==null)return;const ht=ch.headTop-Math.round(ch.badgeUp);
-      if(!LABELS&&(PREFS.badges||ch.act==='limit'||ch.act==='ask')){const dk=ch.desk||{};const badge=ch.act==='limit'?['skull','#B03A2E']:ch.act==='ask'?['quest',Math.floor(tp/300)%2?AMBER:ch.look.c]:[iconFor(dk),ch.look.c];
+      if(!LABELS&&!ch.aloft&&!ch.gate&&(PREFS.badges||ch.act==='limit'||ch.act==='ask')){const dk=ch.desk||{};const beat=deskBeat(dk,Date.now()),badge=ch.act==='limit'?['skull','#B03A2E']:ch.act==='ask'?['quest',Math.floor(tp/300)%2?AMBER:ch.look.c]:beat?[beat.icon,beat.tone==='bad'?'#B03A2E':beat.tone==='good'?'#2E8A57':beat.tone==='warn'?AMBER:ch.look.c]:[iconFor(dk),ch.look.c];
         drawBadge(wx,badge[0],ch.x,ht,badge[1],tp,ch.id);
         if(tp<ch.jumpUntil+2500&&ch.starT&&tp-ch.starT<4000)drawStar(wx,Math.round(ch.x),Math.round(ht-21+Math.sin(tp/150)),Math.floor(tp/200)%2?'#FFD84A':'#FFFFFF');}
     });
   });
   interns.forEach(e=>{
     if(e.hidden)return;
-    const pose=e.path.length?'walk':'type',hop=tp<(e.hopUntil||0)?-Math.round(Math.sin((e.hopUntil-tp)/400*Math.PI)*3):0;
-    items.push({d:e.y,f:()=>{e.headTop=drawPerson(wx,e.x,e.y+hop,{look:e.look,pose,small:true,frame:pose==='walk'?stepOf(e):Math.floor(tp/1000*6+e.blinkT)%2,blink:((tp/1000+e.blinkT)%4)<.12});}});
+    const pose=e.gate?(e.gate.step==='walk'?'walk':'stand'):e.path.length?'walk':'type',hop=tp<(e.hopUntil||0)?-Math.round(Math.sin((e.hopUntil-tp)/400*Math.PI)*3):0;
+    (inDoorway(e)?{push:o=>doorway.push(o.f)}:items).push({d:e.y,f:()=>{e.headTop=drawPerson(wx,e.x,e.y+hop,{look:e.look,pose,small:true,frame:pose==='walk'?stepOf(e):Math.floor(tp/1000*6+e.blinkT)%2,blink:((tp/1000+e.blinkT)%4)<.12});}});
   });
+  // the door opens the room's own way as someone comes near, and shuts behind them (world/door.js)
+  drawDoor(wx,tp,dt,doorOpen);
   items.sort((a,b)=>a.d-b.d).forEach(it=>it.f());
 
   // steam
@@ -249,12 +264,12 @@ function frame(tp){
   drawGaugeText(now);
   desks.forEach((dk,i)=>drawBoardText(dk,xs[i]+(boardShift(dk)||0),now));
   // the room's text lives on this upper canvas: a held Claude goes in front of it too
-  chars.forEach(ch=>{if(ch.held&&!ch.hidden&&ch.headTop!=null)ox.clearRect(P(ch.x-10),P(ch.headTop-1),P(20),P(ch.y-ch.headTop-5));});
+  chars.forEach(ch=>{if((ch.held||ch.aloft)&&!ch.hidden&&ch.headTop!=null)ox.clearRect(P(ch.x-10),P(ch.headTop-1),P(20),P(ch.y-ch.headTop-5));});
   }
   // glyphs
-  if(!LABELS){glyphs=glyphs.filter(gl=>{gl.life-=dt;gl.y+=gl.vy*dt;gl.x+=gl.vx*dt;if(gl.life<=0)return false;
-    const g2=ox,sz=Math.max(2,S*.9);g2.globalAlpha=Math.min(1,gl.life*1.4);g2.fillStyle=gl.c;g2.fillRect(Math.round(P(gl.x)),Math.round(P(gl.y)),sz*(gl.ch.charCodeAt(0)%3+1),sz);g2.globalAlpha=1;return true;});}
-  else glyphs=glyphs.filter(gl=>{gl.life-=dt;gl.y+=gl.vy*dt;gl.x+=gl.vx*dt;if(gl.life<=0)return false;ox.globalAlpha=Math.min(1,gl.life*1.4);font(Math.max(12,2.1*S*TS));ox.textAlign='center';ox.textBaseline='middle';ox.lineWidth=3;ox.strokeStyle='rgba(0,19,47,.85)';ox.strokeText(gl.ch,P(gl.x),P(gl.y));ox.fillStyle=gl.c;ox.fillText(gl.ch,P(gl.x),P(gl.y));ox.globalAlpha=1;return true;});
+  glyphs=glyphs.filter(gl=>{gl.life-=dt;gl.vy+=(gl.ay||0)*dt;gl.y+=gl.vy*dt;gl.x+=gl.vx*dt;if(gl.life<=0)return false;
+    if(!LABELS){drawWorkBit(ox,gl,tp);return true;}
+    ox.globalAlpha=Math.min(1,gl.life*1.4);font(Math.max(12,2.1*S*TS));ox.textAlign='center';ox.textBaseline='middle';ox.lineWidth=3;ox.strokeStyle='rgba(0,19,47,.85)';ox.strokeText(gl.ch,P(gl.x),P(gl.y));ox.fillStyle=gl.c;ox.fillText(gl.ch,P(gl.x),P(gl.y));ox.globalAlpha=1;return true;});
   if(LABELS){
   // tags
   const tagItems=[];

@@ -12,6 +12,59 @@ setTimeout(()=>{
   ok(floorsEl.querySelector('[data-f="1"] i.limit'),'no red light for the out-of-usage desk');
   const r=floorsEl.getBoundingClientRect(),st=stage.getBoundingClientRect();
   ok(Math.abs((r.left+r.right)/2-(st.left+st.width/2))<2,'panel at '+Math.round((r.left-st.left)/st.width*W)+'..'+Math.round((r.right-st.left)/st.width*W)+', not centred');
+  // seasons: the real dates, both hemispheres, and the settings pin one
+  [['2026-03-19','winter'],['2026-03-20','spring'],['2026-06-20','spring'],['2026-06-21','summer'],['2026-09-21','summer'],['2026-09-22','autumn'],['2026-12-20','autumn'],['2026-12-21','winter'],['2026-01-15','winter']].forEach(([d,s])=>ok(seasonOf(new Date(d+'T12:00:00'),false)===s,d+' is not '+s));
+  ok(seasonOf(new Date('2026-01-15T12:00:00'),true)==='summer'&&seasonOf(new Date('2026-07-15T12:00:00'),true)==='winter','the south has the north\'s seasons');
+  setPref('season','winter');ok(seasonNow()==='winter','the setting did not pin the season');setPref('season','auto');ok(seasonNow()===seasonOf(new Date(),false),'Live does not follow the date');
+  setPref('hemi','south');ok(seasonNow()===seasonOf(new Date(),true),'the south setting is ignored');setPref('hemi','north');
+  // the settings: tabs, arrows, focus kept through a redraw and handed back on closing
+  openPrefs(true);const tab=k=>prefsEl.querySelector('[data-tab="'+k+'"]'),key=(el,k)=>el.dispatchEvent(new KeyboardEvent('keydown',{key:k,bubbles:true}));
+  ok(document.activeElement===tab('room'),'opening does not focus the tab');
+  key(tab('room'),'ArrowRight');ok(prefsTab==='display'&&prefsEl.querySelector('[data-sw="labels"]'),'the arrow did not change tab');
+  renderPrefs();ok(document.activeElement===tab('display'),'the redraw lost the tab focus');
+  key(tab('display'),'ArrowLeft');key(tab('room'),'ArrowLeft');ok(prefsTab==='keys'&&prefsEl.querySelector('dl'),'the arrows do not wrap round');
+  tab('room').click();renderPrefs();const seg0=prefsEl.querySelector('[data-seg="time"][data-v="auto"]');seg0.focus();key(seg0,'ArrowRight');
+  ok(PREFS.time==='day'&&document.activeElement.dataset.v==='day','the arrow did not choose in a radio group');setPref('time','auto');
+  const pr=prefsEl.getBoundingClientRect();ok(prefsEl.scrollWidth<=prefsEl.clientWidth&&pr.width>=300,'the panel is too narrow');
+  [...prefsEl.querySelectorAll('button')].forEach(b=>{const r=b.getBoundingClientRect();ok(r.height>=34,'a control is only '+r.height+' px high: '+b.textContent);});
+  openPrefs(false);ok(document.activeElement===setBtn,'closing does not hand the focus back');prefsEl.blur();setBtn.blur();
+  // the new scenes: every one runs through its begin, tick, pose, props and end, in every season
+  callCleaner.at=Infinity; // nobody is called away while these run by hand
+  const sc=[...chars.values()][0],sb=[...chars.values()][1],keepIdle=sc.idle,keepIdleB=sb.idle;
+  SEASONS.forEach(s=>{SEASON=s;['season','sweep','charge','clock','doodle','shelfread','share','mop'].forEach(a=>{const D=IDLES[a],I={act:a,phase:'do',start:0,dur:1000,until:1e12};sc.idle=I;stain=stain||{floor:curFloor,x:100,y:176,left:1,wet:0,gone:new Set()};if(!lying().length)shaken.push({floor:curFloor,x:150,gy:150,h:0,c:'#D9662E',kind:'tree',seed:0,drift:0,rest:Date.now()});if(D.air)ok(D.air(sc,1)>=0,a+' sinks');
+    try{if(D.spot)D.spot(sc);if(D.begin)D.begin(sc,I,0);if(D.tick)D.tick(sc,I,1);ok(typeof D.pose(sc,1)==='string',a+' has no pose');if(D.props)D.props(wx,sc,1,I);if(D.end)D.end(sc,I,1);}catch(err){ok(false,a+' in '+s+': '+err.message);}});
+    ['snowball','selfie','napside'].forEach(a=>{const D=IDLES[a],I={act:a,phase:'do',pair:sb,role:0,sync:1,dur:9000,start:0,until:1e12};sc.idle=I;sb.idle={act:a,phase:'do',pair:sc,role:1,dur:9000,start:0,until:1e12};
+    try{if(D.tick){D.tick(sc,I,5000);D.tick(sc,I,7000);}ok(typeof D.pose(sc,5000)==='string',a+' has no pose');if(D.props)D.props(wx,sc,5000,I);if(D.lean)D.lean(sc,5000);}catch(err){ok(false,a+' in '+s+': '+err.message);}});
+    const its=[];floorThing=s==='autumn'||s==='summer'?null:{floor:curFloor,kind:s,born:0,until:Date.now()+1e4,u:1,left:1,scarf:'#D9534F'};try{roomItems(its,wx);its.forEach(i=>i.f());}catch(err){ok(false,'room items in '+s+': '+err.message);}});
+  ok(photos.length>0,'the selfie left no photo');stain={floor:curFloor,x:100,y:176,left:1,wet:0,gone:new Set()};ok(IDLES.mop.weight()>0,'a stain does not call for a mop');mopEnd(sc);ok(stain.left===0&&IDLES.mop.weight()===0,'mopping left the stain');stain=null;
+  // whatever lies on the ground is picked up, one by one, sheets and leaves alike
+  shaken=[];[[150,'paper'],[152,'tree'],[220,'leaf']].forEach(([x,kind])=>shaken.push({floor:curFloor,x,gy:150,h:0,c:'#D9662E',kind,seed:0,drift:0,rest:Date.now()}));
+  ok(IDLES.sweep.weight()>0,'nobody comes for what lies on the ground');
+  const SI={act:'sweep',phase:'do',start:0,dur:40000,until:1e12};sc.idle=SI;sc.path=[];sc.arrived=true;sc.x=150;sc.y=150;sweepTick(sc,SI,1);SI.pick=1;sweepTick(sc,SI,2);
+  ok(shaken.length===1&&SI.sheets===1&&SI.bag===1,'the near ones were not taken');
+  sc.path=[];sc.arrived=true;sc.x=213;SI.pick=1;sweepTick(sc,SI,3);ok(!shaken.length&&SI.until<1e12,'the last one stayed');shaken.push({floor:curFloor,x:220,gy:150,h:0,c:'#D9662E',kind:'tree',seed:0,drift:0,rest:Date.now()});sc.idle={phase:'pick',t:0};ok(choreNow(sc)==='sweep','cleaning does not come first');startIdle(sc,'sweep',null);ok(choreNow(sb)===null||IDLES.mop.can(sb),'two Claudes on one chore');ok(sc.idle.act==='sweep'&&sc.tgt&&Math.abs(sc.tgt.x-213)<20,'the sweep sends nobody to the leaf');sc.path=[];shaken=[];
+  // a photo past its time is unpinned and filed, before anything else on a break
+  photos=[{floor:curFloor,i:1,a:'#D97557',b:'#2A9D8F',until:Date.now()-1,born:0}];sc.idle={phase:'pick',t:0};ok(choreNow(sc)==='unpin','an old photo calls nobody');
+  startIdle(sc,'unpin',null);const UI=sc.idle;UI.phase='do';sc.path=[];sc.arrived=true;unpinTick(sc,UI,1);UI.t=1;unpinTick(sc,UI,2);ok(!photos.length&&UI.stage===1,'the photo was not taken down');sc.path=[];sc.arrived=true;unpinTick(sc,UI,3);ok(UI.stage===2,'the photo was not filed');unpinProps(wx,sc,3,{phase:'do',stage:1});
+  floorThing=null;photos=[];sc.idle=keepIdle;sb.idle=keepIdleB;
+  // the pointer: a Claude let go in flight lands, dizzy, and the floor can be tapped
+  const fx=sc.x;flingClaude(sc,200,60,0);for(let i=0;i<400&&sc.fly;i++)flyTick(sc,.02,i);ok(!sc.fly&&sc.x>=8&&sc.x<=312,'the throw never landed');ok(sc.mood==='dizzy','the thrown Claude is not dizzy');sc.x=fx;sc.resumeAt=0;
+  const realRandom=Math.random;Math.random=()=>.9;shaken=[];floorTap({x:150,y:150},performance.now());ok(!shaken.some(x=>x.kind==='paper'),'a sheet fell on every tremble');Math.random=()=>.1;floorTap({x:150,y:150},performance.now());const sheets=shaken.filter(x=>x.kind==='paper').length;floorTap({x:150,y:150},performance.now());ok(shaken.filter(x=>x.kind==='paper').length===sheets,'a desk lost a second sheet');Math.random=realRandom;ok(shaken.some(x=>x.kind==='paper')&&shaken.some(x=>x.kind==='leaf'),'the tremble shook nothing loose');leafGust();ok(shaken.some(x=>x.kind==='tree'),'no gust of leaves');const itF=[];roomItems(itF,wx);itF.forEach(i=>i.f());shaken=[];
+  callCleaner.at=0;
+  // charging: one Claude to a socket, and no socket, no charging
+  const keepTh=TH,sockA=[...chars.values()][0],sockB=[...chars.values()][1],keepC1=sockA.idle,keepC2=sockB.idle;
+  sockA.idle={act:'charge'};sockB.idle={act:'charge'};const spotA=chargeSpot(sockA),spotB=chargeSpot(sockB);
+  ok(sockA.idle.socket!==sockB.idle.socket&&spotA.shelf&&spotB.shelf,'two Claudes on one socket');ok(!IDLES.charge.can([...chars.values()][2]),'a third Claude finds a socket');
+  sockA.idle=keepC1;sockB.idle=keepC2;
+  THEME_KEYS.forEach(k=>{TH=THEMES[k];ok(IDLES.charge.can(sockA)===(k!=='retro'),k+': charging does not follow its sockets');});TH=keepTh;
+  // at the reset: the gauge is full again and a knocked-out desk gets up, before any session has said so
+  const gd=everyDesk[0],keepRate=gd.rate,past=new Date(Date.now()-1000).toISOString();gd.rate={fiveHour:100,fiveResets:past,ms:Date.now()-60000};
+  everyDesk.forEach(x=>{if(x!==gd&&x.rate)x.rate=null;});ok(gaugeWindows()[0].left===100&&!gaugeEmpty(),'the gauge stays empty past its reset');gd.rate=keepRate;
+  const kd=JSON.parse(JSON.stringify(lastData));kd.desks[0].limited={since:1,resetsAt:past};ingest(kd,true);ok(!kd.desks[0].limited&&kd.desks[0].activity==='idle','a desk stays knocked out past its reset');ingest(lastData,true);
+  // what the window lets in follows the season, in every room with an outside, and is never the old green
+  const rndW=Math.random,keepTheme=themeKey;Math.random=()=>0;leaves=[];
+  ['pixel','cosy','japan','neon','paper','claude'].forEach(k=>{TH=THEMES[k];SEASONS.forEach(s=>{SEASON=s;leaves=[];windowDrift(true,0,296,14,50);ok(leaves.length===1&&SEASON_DRIFT[s].cols(0).includes(leaves[0].c),k+' in '+s+': '+(leaves[0]||{}).c);});});
+  TH=THEMES.space;leaves=[];windowDrift(true,0,296,14,50);ok(!leaves.length,'the space station lets things in');TH=THEMES[keepTheme];Math.random=rndW;leaves=[];
   // avatars: the first one in is the plain Claude, the rest are drawn, and a refresh changes nobody
   const lookKey=()=>everyDesk.map(d=>{const l=looksFor(String(d.id));return d.id+'='+l.c+':'+l.style;}).join();
   const lookRules=why=>{const pairs=everyDesk.map(d=>{const l=looksFor(String(d.id));return l.c+':'+l.style;});ok(new Set(pairs).size===pairs.length,why+': two sessions share an avatar');
@@ -28,6 +81,50 @@ setTimeout(()=>{
   ok(lookMem.get(far).c===lookMem.get(d1).c,'the same colour was refused on another floor');
   const s3=lookMem.get(d3).s;Object.assign(lookMem.get(d3),{c:lookMem.get(d1).c});settleLooks(everyDesk);
   ok(lookMem.get(d3).s===s3&&lookMem.get(d3).c!==lookMem.get(d1).c,'a colour clash cost it its accessory');lookRules('colour clash on a floor');
+  // an accessory chosen on the card survives a colour clash and a refresh; a twin's is refused
+  const pick=[...LOOKS.keys()].find(s=>s!==lookMem.get(d2).s&&!accessoryTaken(d2,s));setAccessory(d2,pick);
+  Object.assign(lookMem.get(d2),{c:lookMem.get(d1).c});settleLooks(everyDesk);
+  ok(lookMem.get(d2).s===pick&&lookMem.get(d2).c!==lookMem.get(d1).c,'a chosen accessory was lost to a colour clash');lookRules('chosen accessory');
+  ok(refresh()===lookKey()&&lookMem.get(d2).pin,'a refresh lost the chosen accessory');
+  Object.assign(lookMem.get(far),{c:lookMem.get(d3).c,s:(lookMem.get(d3).s+1)%10});
+  ok(accessoryTaken(far,lookMem.get(d3).s),'an accessory that makes a twin was offered');settleLooks(everyDesk);lookRules('twin refused');
+  // the card's arrows: a free accessory is worn at once, a taken one greys and changes nothing
+  openCard(d1);cardTab='look';renderCard();const was=looksFor(d1).style,nx=(was+1)%VARIANTS.length,other=everyDesk.find(d=>String(d.id)!==d1&&lookMem.get(String(d.id)).c===lookMem.get(d1).c);
+  if(other)lookMem.get(String(other.id)).s=-1;
+  const twin=lookMem.get(d2),keep={c:twin.c,s:twin.s};Object.assign(twin,{c:lookMem.get(d1).c,s:nx});
+  card.querySelector('[data-pick="acc"][data-step="1"]').click();
+  ok(looksFor(d1).style===was&&card.querySelector('.acc .off'),'the card wore a taken accessory');
+  Object.assign(twin,keep);if(other)lookMem.get(String(other.id)).s=looksFor(String(other.id)).style;
+  card.querySelector('[data-pick="acc"][data-step="-1"]').click();card.querySelector('[data-pick="acc"][data-step="1"]').click();
+  ok(looksFor(d1).style===nx&&lookMem.get(d1).pin&&!card.querySelector('.acc .off'),'the card did not wear a free accessory');
+  closeCard();settleLooks(everyDesk);lookRules('after the card');
+  // the card: four tabs, Work first; a Claude whose card is open is on hold where it stands, and let go when it closes
+  {const id=d1,ch=chars.get(id);openCard(id);const tabs=[...card.querySelectorAll('[role=tab]')].map(b=>b.dataset.tab);
+  ok(tabs.join()==='work,session,look,hist'&&card.querySelector('[aria-selected=true]').dataset.tab==='work','card tabs: '+tabs.join());
+  ok(ch.spot&&poseFor(ch,performance.now()+1)!=='walk','a Claude with its card open is not on hold');
+  ch.path=[{x:ch.x+40,y:ch.y}];const x0=ch.x;stepEntity(ch,.1);ok(ch.x===x0&&ch.path.length===1,'a Claude with its card open walked on');
+  showTab('hist');ok(card.querySelector('[aria-selected=true]').dataset.tab==='hist','the History tab did not open');
+  closeCard();ok(!ch.spot,'a closed card left its Claude on hold');ch.path=[];
+  openCard(id);ok(card.querySelector('[aria-selected=true]').dataset.tab==='work','a card does not open on Work');closeCard();}
+  // the card shows what the office costs in tokens: the estimated total, its parts, the schemas apart
+  {const dt=everyDesk.find(d=>d.tokens);ok(dt,'no fake desk has a token count');if(dt){openCard(String(dt.id));showTab('session');const tk=card.querySelector('.tok');
+  ok(tk&&/Office tokens\s*~1\.9k/.test(tk.textContent)&&/hint ~82 · tool calls ~1\.5k · commands ~315/.test(tk.textContent)&&/Tool schemas 610 \(exact, apart, loaded on demand\)/.test(tk.textContent),'the card token count reads wrong: '+(tk&&tk.textContent));closeCard();}}
+  // the arrows stay under the pointer through every accessory, a hat of any height and a greyed name
+  openCard(d1);cardTab='look';renderCard();const arrow=()=>card.querySelector('[data-pick="acc"][data-step="1"]'),arrowAt=Math.round(arrow().getBoundingClientRect().top),chD1=chars.get(d1),head=chD1.headTop;
+  for(let i=0;i<VARIANTS.length;i++){arrow().click();chD1.headTop=head-i;renderCard();ok(Math.round(arrow().getBoundingClientRect().top)===arrowAt,'the card moved on accessory step '+i);}
+  chD1.headTop=head;closeCard();settleLooks(everyDesk);lookRules('after going round the accessories');
+  // the colour: one on the floor is skipped, the next free one is worn and stays
+  const c0=lookMem.get(d1).c,c2=lookMem.get(d2).c,nextC=()=>card.querySelector('[data-pick="col"][data-step="1"]').click();
+  lookMem.get(d2).c=(c0+1)%LOOKS.length;openCard(d1);cardTab='look';renderCard();nextC();
+  const freeC=lookMem.get(d1).c;
+  ok(freeC!==c0&&freeC!==(c0+1)%LOOKS.length&&looksFor(d1).c===LOOKS[freeC].c&&lookMem.get(d1).pinC&&!card.querySelector('.acc .off'),'the card did not skip a taken colour for the next free one');
+  lookMem.get(d2).c=c2;closeCard();settleLooks(everyDesk);saveLooks();
+  ok(refresh()===lookKey()&&lookMem.get(d1).c===freeC,'a refresh lost the chosen colour');lookRules('chosen colour');
+  // a drawn colour gives way to a chosen one; of two chosen, the later arrival gives way and loses its pin
+  const c4=String(floorDesks(0)[3].id);Object.assign(lookMem.get(d2),{c:freeC,pinC:false});settleLooks(everyDesk);
+  ok(lookMem.get(d1).c===freeC&&lookMem.get(d2).c!==freeC,'a chosen colour gave way to a drawn one');lookRules('chosen against drawn');
+  Object.assign(lookMem.get(c4),{c:freeC,pinC:true,at:lookMem.get(d1).at+1});settleLooks(everyDesk);
+  ok(lookMem.get(d1).c===freeC&&lookMem.get(c4).c!==freeC&&!lookMem.get(c4).pinC,'two chosen colours: the later arrival kept it');lookRules('two chosen colours');
   const first=ids().join();
   floorsEl.querySelector('[data-f="1"]').click();
   ok(curFloor===1&&ids().join()!==first,'clicking a floor did not change it');
@@ -52,12 +149,12 @@ setTimeout(()=>{
   ok(!cat.away&&cat.x>0,'the cat is not back in its room');ok(JSON.parse(localStorage.getItem('office.rooms'))[1].some(f=>f.name==='upstairs.js'),'shelves not remembered per floor');
   // the cat walks out by the door, and comes in by it
   const runCat=(n)=>{let t=performance.now();for(let i=0;i<n&&!cat.away;i++){t+=16;updateCat(.016,t);}return t;};
-  const jobless=()=>{cat.job=null;cat.air=null;cat.path=[];cat.z=0;cat.state='sit';cat.until=1e12;catBall=null;};
+  const jobless=()=>{cat.gate=null;cat.job=null;cat.air=null;cat.path=[];cat.z=0;cat.state='sit';cat.until=1e12;catBall=null;};
   jobless();cat.nextTrip=0;cat.nextJob=1e12;runCat(1);ok(cat.job&&cat.job.kind==='trip','the cat did not set off');
-  let nearDoor=false;{let t=performance.now();for(let i=0;i<4000&&!cat.away;i++){t+=16;const x=cat.x,y=cat.y;updateCat(.016,t);if(Math.hypot(x-DOOR.x,y-DOOR.y)<4)nearDoor=true;}}
+  let nearDoor=false;{let t=performance.now();for(let i=0;i<4000&&!cat.away;i++){t+=16;const x=cat.x,y=cat.y;doorAmt=cat.gate&&cat.gate.step==='shut'?0:1;updateCat(.016,t);if(Math.hypot(x-DOOR.x,y-DOOR.y)<4)nearDoor=true;}}
   ok(cat.away&&cat.floor!==0&&nearDoor,'the cat did not leave by the door: floor '+cat.floor+' away '+cat.away);
   cat.floor=1;cat.nextTrip=0;const rnd=Math.random;Math.random=()=>0;updateCat(.016,performance.now());Math.random=rnd;
-  ok(!cat.away&&cat.floor===0&&Math.hypot(cat.x-DOOR.x,cat.y-DOOR.y)<1&&cat.job&&cat.job.kind==='arrive','the cat did not come in by the door');
+  ok(!cat.away&&cat.floor===0&&cat.gate&&cat.gate.dir==='in'&&Math.hypot(cat.x-GATE.x,cat.y-GATE.y)<1&&cat.job&&cat.job.kind==='arrive','the cat did not come in by the door');
   jobless();cat.nextTrip=1e12;
   // moving a desk: a full floor refuses, a new floor takes it and its Claude leaves by the door
   const id=ids()[0],xs=deskXs(4),at=x=>st.left+x/W*st.width,fire=(t,x,y)=>stage.dispatchEvent(new PointerEvent(t,{bubbles:true,button:0,pointerId:1,clientX:x,clientY:y}));

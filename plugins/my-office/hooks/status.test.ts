@@ -1,12 +1,14 @@
 import { expect, test } from 'claude-code/testing'
 
-import { lastQuestion, pausePlan, rateOf, resumePlan, todoSteps, newDesk } from './core'
-import { register } from './register'
+import { bashTask, branchOf, lastQuestion, pausePlan, rateOf, resumePlan, todoSteps, newDesk } from './core'
+import { register, resetCheck } from './register'
+import { toolFlash } from './core'
 
 // A tiny in-memory engine: enough of the engine to run one session's hooks and read its desk file back.
 // The module keeps its desk and its setup across tests (as across a session), so each test sets up
 // what it relies on instead of counting on the order the tests run in.
 function engine(files = new Map<string, string>()) {
+  const submitted: string[] = []
   const handlers: { ev: string, filter?: any, fn: any }[] = []
   let now = 1_000_000
   const $: any = {
@@ -18,6 +20,7 @@ function engine(files = new Map<string, string>()) {
     command: { register: async () => undefined },
     plugin: { root: '/plugin' },
     audio: { play: async () => undefined },
+    prompt: { submit: async (x: any) => { submitted.push(x.text) } },
     fs: {
       read: async (p: string) => { if (!files.has(p)) throw new Error('missing'); return files.get(p) },
       write: async (p: string, s: string) => { files.set(p, s) },
@@ -32,7 +35,7 @@ function engine(files = new Map<string, string>()) {
     return run(0, e)
   }
   const deskNow = () => JSON.parse(files.get('/home/.claude/my-office/desks/s1.json') ?? '{}')
-  return { fire, deskNow }
+  return { fire, deskNow, $, submitted }
 }
 
 test('a question keeps the Claude waiting at its desk until it is answered', async () => {
@@ -72,6 +75,141 @@ test('a turn that ends on a question waits for the reply, and the plan pauses me
   await o.fire('prompt.submit', {})
   expect(o.deskNow().waiting).toBeUndefined()
   expect(o.deskNow().eta.paused).toBeUndefined()
+})
+
+test('a turn that ends without a question ticks the steps left and finishes the plan', async () => {
+  const o = engine()
+  await o.fire('session.start', {})
+  await o.fire('prompt.submit', {})
+  await o.fire('turn.start', {})
+  await o.fire('tool.call', { tool: 'mcp__my-office__plan', steps: [{ label: 'One', minutes: 5 }, { label: 'Two', minutes: 5 }] })
+  await o.fire('turn.complete', { answer: 'All done.', isAborted: false })
+  const d = o.deskNow()
+  expect(d.steps.every((s: any) => s.doneMs)).toBe(true)
+  expect(d.pausedMs).toBeUndefined()
+  expect(d.eta.allDone).toBe(true)
+  expect(d.stopped).toBeUndefined()
+})
+
+test('an interrupted turn keeps its steps, frozen until the next prompt', async () => {
+  const o = engine()
+  await o.fire('session.start', {})
+  await o.fire('prompt.submit', {})
+  await o.fire('turn.start', {})
+  await o.fire('tool.call', { tool: 'mcp__my-office__plan', steps: [{ label: 'One', minutes: 5 }, { label: 'Two', minutes: 5 }] })
+  await o.fire('turn.complete', { answer: '', isAborted: true })
+  const d = o.deskNow()
+  expect(d.stopped.kind).toBe('interrupted')
+  expect(d.steps.some((s: any) => s.doneMs)).toBe(false)
+  await o.fire('prompt.submit', {})
+  expect(o.deskNow().stopped).toBeUndefined()
+  expect(o.deskNow().eta.paused).toBeUndefined()
+})
+
+test('an error keeps the steps left and reads as no success', async () => {
+  const o = engine()
+  await o.fire('session.start', {})
+  await o.fire('prompt.submit', {})
+  await o.fire('turn.start', {})
+  await o.fire('tool.call', { tool: 'mcp__my-office__plan', steps: [{ label: 'One', minutes: 5 }, { label: 'Two', minutes: 5 }] })
+  const line = o.deskNow().doneLine
+  await o.fire('classic.StopFailure', { error: 'server_error' })
+  await o.fire('turn.complete', { answer: '', isAborted: false })
+  const d = o.deskNow()
+  expect(d.stopped.kind).toBe('error')
+  expect(d.steps.some((s: any) => s.doneMs)).toBe(false)
+  expect(d.doneLine).toBe(line)
+})
+
+test('a shell command is read as tests, a build, a commit or a push, and how it went', () => {
+  expect(bashTask('bun run test')).toBe('tests')
+  expect(bashTask('npm run build')).toBe('build')
+  expect(bashTask('git add -A && git commit -m x')).toBe('commit')
+  expect(bashTask('npm test && git push')).toBe('push')
+  expect(bashTask('ls')).toBeUndefined()
+  expect(branchOf('git worktree add ../x -b more-states')).toBe('more-states')
+  expect(branchOf('git switch main')).toBe('main')
+  expect(toolFlash('tests', true, 'boom', 1)?.text).toBe('TESTS FAILED')
+  expect(toolFlash('push', false, '', 1)?.kind).toBe('ship')
+  expect(toolFlash(undefined, false, '', 1)).toBeUndefined()
+  expect(toolFlash(undefined, true, 'The user doesn\'t want to proceed', 1)?.kind).toBe('denied')
+})
+
+test('a turn that leaves a background job waits for it instead of finishing the plan', async () => {
+  const o = engine()
+  await o.fire('session.start', {})
+  await o.fire('prompt.submit', {})
+  await o.fire('turn.start', {})
+  await o.fire('tool.call', { tool: 'mcp__my-office__plan', steps: [{ label: 'One', minutes: 5 }] })
+  await o.fire('tool.call', { tool: 'Bash', command: 'sleep 100', run_in_background: true, tool_use_id: 'b1' })
+  await o.fire('turn.complete', { answer: 'Started it.', isAborted: false })
+  expect(o.deskNow().activity).toBe('wait')
+  expect(o.deskNow().bg.kind).toBe('job')
+  expect(o.deskNow().steps[0].doneMs).toBeUndefined()
+  await o.fire('turn.start', {})
+  expect(o.deskNow().bg).toBeUndefined()
+})
+
+test('a named error shows even with no plan, and compacting comes and goes', async () => {
+  const o = engine()
+  await o.fire('session.start', {})
+  await o.fire('prompt.submit', {})
+  await o.fire('turn.start', {})
+  await o.fire('classic.StopFailure', { error: 'overloaded' })
+  await o.fire('turn.complete', { answer: '', isAborted: false })
+  expect(o.deskNow().stopped.error).toBe('overloaded')
+  await o.fire('prompt.submit', {})
+  expect(o.deskNow().stopped).toBeUndefined()
+  await o.fire('session.compact', { trigger: 'auto' })
+  expect(o.deskNow().task).toBeUndefined()
+  expect(o.deskNow().log.some((l: any) => l.kind === 'compact')).toBe(true)
+})
+
+const limitedDesk = async (rateLimits: any[]) => {
+  const o = engine()
+  await o.fire('session.start', {})
+  await o.fire('prompt.submit', {})
+  await o.fire('session.measure', { changed: ['rateLimits'], rateLimits })
+  await o.fire('turn.start', {})
+  await o.fire('classic.StopFailure', { error: 'rate_limit' })
+  await o.fire('turn.complete', { answer: '', isAborted: false })
+  return o
+}
+const PAST = '1970-01-01T00:00:01Z', LATER = '2999-01-01T00:00:00Z'
+
+test('at the reset a session the limit stopped takes up its work by itself', async () => {
+  const o = await limitedDesk([{ kind: 'five_hour', percentUsed: 100, resetsAt: PAST }])
+  expect(o.deskNow().limited.resetsAt).toBe(PAST)
+  o.$.session.usage = async () => ({ rateLimits: [{ kind: 'five_hour', percentUsed: 100, resetsAt: PAST }] })
+  await resetCheck(o.$)
+  expect(o.deskNow().limited).toBeUndefined()
+  expect(o.submitted.length).toBe(1)
+  expect(o.deskNow().rate.fiveHour).toBe(0)
+  await resetCheck(o.$)
+  expect(o.submitted.length).toBe(1)
+})
+
+test('a session stays stopped while the week is empty, whatever the five hours do', async () => {
+  const limits = [{ kind: 'five_hour', percentUsed: 30, resetsAt: PAST }, { kind: 'seven_day', percentUsed: 100, resetsAt: LATER }]
+  const o = await limitedDesk(limits)
+  expect(o.deskNow().limited.resetsAt).toBe(LATER)
+  o.$.session.usage = async () => ({ rateLimits: limits })
+  await resetCheck(o.$)
+  expect(o.deskNow().limited.resetsAt).toBe(LATER)
+  expect(o.submitted.length).toBe(0)
+})
+
+test('the plan hint goes out once a session, and again after a compaction', async () => {
+  const o = engine()
+  await o.fire('session.start', {})
+  const seen = (r: any) => (r.context ?? []).some((c: string) => c.startsWith('OFFICE'))
+  await o.fire('session.compact', { trigger: 'auto' })
+  const first = await o.fire('prompt.submit', {})
+  const second = await o.fire('prompt.submit', {})
+  await o.fire('session.compact', { trigger: 'auto' })
+  const third = await o.fire('prompt.submit', {})
+  const fourth = await o.fire('prompt.submit', {})
+  expect([first, second, third, fourth].map(seen)).toEqual([true, false, true, false])
 })
 
 test('the usage limit knocks the session out until its next prompt or restart', async () => {

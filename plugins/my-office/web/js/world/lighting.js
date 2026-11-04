@@ -27,6 +27,7 @@ function collectLights(tp,n,doorOpen){
   if(T.signGlow&&!LABELS)signSlots().forEach(l=>Ls.push({x:l.x+l.w/2,y:33,r:5,a:.85,c:hexRgb(l.c).join(',')})); // the door sign's lights
   if(cat&&!cat.away&&CAT_LOOKS[T.catLook]&&CAT_LOOKS[T.catLook].holo)Ls.push({x:cat.x,y:cat.y-cat.z-5,r:10,a:.7,c:'45,226,230'}); // the hologram cat glows
   if(T.liveLights)T.liveLights(Ls,tp);
+  chars.forEach(ch=>{if(!ch.hidden&&ch.screen&&!ch.seated)Ls.push({x:ch.screen.x,y:ch.screen.y,r:ch.screen.r+5,a:.35,c:ch.screen.c});}); // a screen in hand lights the dark round it
   chars.forEach(ch=>{if(!ch.hidden&&ch.look.style===2&&ch.headTop!=null)Ls.push({x:ch.x,y:ch.headTop+2,r:9,a:.7,c:'255,216,74'});});
   return Ls;
 }

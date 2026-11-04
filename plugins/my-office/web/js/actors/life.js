@@ -3,7 +3,8 @@
 // Mascot life: springs, moods, the idle brain, emotes and sound effects.
 const BREATHE=new Set(['sit','stand','sip','look','talk','sleep','read']);
 function animChar(ch,tp,dt,now){
-  if(!ch.removed&&ch.idle&&!ch.errand)thinkIdle(ch,tp,now);
+  sceneFrame(ch,dt,tp); // actors/scenes.js
+  if(!ch.removed&&ch.idle&&!ch.errand&&!ch.spot)thinkIdle(ch,tp,now); // a Claude with its card open is on hold (actors/spotlight.js)
   if(ch.hidden)return;
   // squash and stretch: a damped spring that pokes, jumps and landings kick
   ch.sqv+=(-ch.sq*260-ch.sqv*16)*dt; ch.sq+=ch.sqv*dt;
@@ -46,7 +47,7 @@ function gazeOf(ch,tp){
   if(hoverCh===ch&&ptr.in){const d=ptr.x-ch.x;return Math.abs(d)<3?0:Math.sign(d);}
   if(ch.lookDoor>tp&&!ch.path.length)return -1; // someone knocked: everyone looks round at the door
   // Claudes near the cursor follow it with their eyes
-  if(ptr.in&&!ch.held&&!ch.path.length){const d=ptr.x-ch.x;if(Math.abs(d)<70&&Math.abs(ptr.y-ch.y)<50)return Math.abs(d)<3?0:Math.sign(d);}
+  if(ptr.in&&!ch.held&&!ch.path.length){const d=ptr.x-ch.x;if(ch.act==='idle'||(Math.abs(d)<70&&Math.abs(ptr.y-ch.y)<50))return Math.abs(d)<3?0:Math.sign(d);}
   // at work, a glance to one side every few seconds
   if(ch.seated&&!ch.path.length&&ch.act!=='idle'){const k=(tp/1000+ch.blinkT*2)%6.5;if(k>5.6)return k>6.05?1:-1;}
   if(ch.path.length)return ch.face||0;
