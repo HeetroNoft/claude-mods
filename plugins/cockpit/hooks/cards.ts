@@ -26,7 +26,7 @@ export const clean = (s: string, n: number) => {
 
 export function updateCard(card: Card | null, id: string, cwd: string, prompt: string, nowMs: number): Card {
   const text = clean(prompt, 90)
-  const place = cwd.split('/').filter(Boolean).pop() ?? cwd
+  const place = cwd.split(/[\\/]/).filter(Boolean).pop() ?? cwd // Windows paths use backslashes
   if (!card) return { id, place, purpose: text, now: text, updatedMs: nowMs }
   // A prompt that was all pasted tags (a peer message, a reminder) cleans to nothing:
   // it must not blank the card, and the first real prompt still sets the purpose.

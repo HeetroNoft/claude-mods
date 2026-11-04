@@ -13,19 +13,13 @@
       "name": "my-office",
       "source": "./plugins/my-office",
       "description": "Bureau pixel-art local avec des variantes de la mascotte Claude (d'après l'office de charlie-free-mods)",
-      "version": "1.9.54"
+      "version": "1.9.55"
     },
     {
-      "name": "mission-control",
-      "source": "./plugins/mission-control",
-      "description": "Panneau de mission en direct : le plan en barre de progression, ce que fait Claude en français clair, vos demandes cochées (d’après mission-control de charlie-free-mods)",
-      "version": "0.3.6"
-    },
-    {
-      "name": "sessions-band",
-      "source": "./plugins/sessions-band",
-      "description": "Bandeau au-dessus du prompt : vos autres sessions ouvertes, ce que fait chacune et un bouton Ask (d'après sessions-band de charlie-free-mods)",
-      "version": "0.1.3"
+      "name": "cockpit",
+      "source": "./plugins/cockpit",
+      "description": "Un bandeau au-dessus du prompt sur toutes les surfaces : l'onglet Mission (le plan en barre de progression, ce que fait Claude, vos demandes cochées) et l'onglet Sessions (vos autres sessions, avec un bouton Ask). Fusion de mission-control et sessions-band, d'après charlie-free-mods",
+      "version": "0.4.0"
     }
   ]
 }

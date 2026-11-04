@@ -244,12 +244,12 @@ test('without an office plan the board follows Claude Code\'s task list, and the
   expect(d.planSource).toBe('todos')
   expect(d.steps.map((s: any) => Boolean(s.doneMs))).toEqual([true, false, false])
   await o.fire('tool.call', { tool: 'mcp__my-office__plan', steps: [{ label: 'A', minutes: 3 }, { label: 'B', minutes: 3 }] })
-  await o.fire('tool.call', { tool: 'mcp__mission-control__set_plan', steps: ['A', 'B'] })
+  await o.fire('tool.call', { tool: 'mcp__cockpit__set_plan', steps: ['A', 'B'] })
   await o.fire('tool.call', { tool: 'TodoWrite', todos: [{ content: 'Other', status: 'pending' }] })
   d = o.deskNow()
   expect(d.planSource).toBe('office')
   expect(d.steps.map((s: any) => s.label)).toEqual(['A', 'B'])
-  // the step ticked only on mission-control's panel is ticked here too, as both plans match
+  // the step ticked only on the cockpit's band is ticked here too, as both plans match; the older mission-control name still counts
   await o.fire('tool.call', { tool: 'mcp__mission-control__step_done', step: 1 })
   expect(Boolean(o.deskNow().steps[0].doneMs)).toBe(true)
 })
