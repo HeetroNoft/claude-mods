@@ -281,3 +281,16 @@ test('the plan folds its finished steps into one count and keeps the open ones i
   expect(r.open[0].status).toBe('now')
   expect(r.more).toBe(1)
 })
+
+test('/cockpit-layout names the two layouts, switches with no name, and refuses another', async ($, on) => {
+  clockOf(on)
+  on('command.register', async () => ({ value: undefined }) as any)
+  const run = async (args: string) => String(((await $.command.run({ command: 'cockpit-layout', args } as any)) as any).text)
+  expect(await run('stacked')).toContain('stacked')
+  expect(await run('')).toContain('tabs')
+  expect(await run('')).toContain('stacked')
+  const wrong = await run('grid')
+  expect(wrong).toContain('No layout "grid"')
+  expect(wrong).toContain('/cockpit-layout tabs')
+  expect(await run('TABS')).toContain('tabs')
+})
