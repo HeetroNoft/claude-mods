@@ -23,8 +23,8 @@ export type Mission = {
 
 /** The band's two tabs: this session's turn, and the other open sessions. */
 export type Tab = 'mission' | 'sessions'
-/** A keeps the two tabs; B is one view with the other sessions as a strip under the mission. */
-export type Layout = 'a' | 'b'
+/** `tabs`: a Mission and a Sessions tab. `stacked`: one view, the other sessions under the mission. */
+export type Layout = 'tabs' | 'stacked'
 export type State = 'running' | 'done' | 'needs'
 /** One session's card in ~/.claude/session-cards/<id>.json, written by it, read by the others. */
 export type Card = {

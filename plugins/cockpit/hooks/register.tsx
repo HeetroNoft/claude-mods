@@ -23,8 +23,13 @@ const others = atom({ plugin: 'cockpit', key: 'others' } as const, [] as Card[])
 const isHidden = atom({ plugin: 'cockpit', key: 'isHidden' } as const, false)
 // The band folded to one line, like an accordion; kept for this session only ($.state).
 const folded = atom({ plugin: 'cockpit', key: 'folded' } as const, false)
-// Which layout the band draws: A with tabs, B with the other sessions as a strip (/cockpit-layout).
-const layout = atom({ plugin: 'cockpit', key: 'layout' } as const, 'a' as Layout)
+// Which layout the band draws, set by /cockpit-layout: `tabs` (Mission and Sessions tabs) or
+// `stacked` (one view, the other sessions stacked under the mission).
+const layout = atom({ plugin: 'cockpit', key: 'layout' } as const, 'tabs' as Layout)
+const LAYOUTS: Record<Layout, string> = {
+  tabs: 'tabs: a Mission and a Sessions tab',
+  stacked: 'stacked: one view, the other sessions under the mission',
+}
 const nowMs = atom({ plugin: 'cockpit', key: 'nowMs' } as const, 0)
 
 // How its own tool calls read in the transcript.
@@ -170,7 +175,7 @@ async function doSetup($: any) {
   await $.command.register({ name: 'cockpit', description: 'Clear the Mission tab of the cockpit' })
   await $.command.register({ name: 'cockpit-rows', description: 'Turn the plain-English tool rows on or off' })
   await $.command.register({ name: 'cockpit-fold', description: 'Fold the cockpit to one line, or open it again' })
-  await $.command.register({ name: 'cockpit-layout', description: 'Switch the cockpit between layout A (tabs) and B (sessions as a strip)' })
+  await $.command.register({ name: 'cockpit-layout', description: 'Switch the cockpit layout: tabs or stacked (no name switches to the other one)' })
   await $.command.register({ name: 'cockpit-sessions', description: 'List your other open sessions, and show or hide their tab' })
   // After a reload the clock's timer is gone while a turn may still run: start it again.
   if ((await read($, mission)).running) tickClock($)
@@ -202,8 +207,8 @@ async function doCards($: any) {
 }
 
 // ---- drawing ----
-// Two layouts, switched by a button while Heet tries them: A keeps a Mission and a Sessions
-// tab; B is one view, the other sessions a strip under the mission. Both open on one header
+// Two layouts, switched by /cockpit-layout: `tabs` keeps a Mission and a Sessions tab;
+// `stacked` is one view, the other sessions under the mission. Both open on one header
 // line (state, progress, time) and list the plan as: finished steps folded into one line, the
 // step under way with what Claude is doing beneath it, then the steps to come.
 
@@ -317,6 +322,7 @@ function TMission({ c, inner }: { c: Ctx; inner: number }) {
   if (plan.done) {
     const all = !plan.open.length
     rows.push(<Text key="done" color={all ? 'success' : 'inactive'}>{`${MARK.done} ${all ? `All ${plan.done} steps done` : `${plan.done} step${plan.done > 1 ? 's' : ''} done`}`}</Text>)
+    if (!all) rows.push(<Box key="gap-done" height={1} />)
   }
   for (const [i, st] of plan.open.entries()) {
     const t = stepTime(st, m.nowMs)
@@ -332,7 +338,11 @@ function TMission({ c, inner }: { c: Ctx; inner: number }) {
         {t && <Box width={TIME} flexShrink={0} justifyContent="flex-end"><Text color="inactive">{t}</Text></Box>}
       </Box>,
     )
-    if (now && act && (phase === 'working' || phase === 'waiting')) rows.push(<Text key="act" wrap="truncate-end" color={actColor} bold={phase === 'waiting'}>{`  └ ${act}`}</Text>)
+    if (now && act && (phase === 'working' || phase === 'waiting')) {
+      rows.push(<Text key="act" wrap="truncate-end" color={actColor} bold={phase === 'waiting'}>{`  └ ${act}`}</Text>)
+      // The step at work and its activity stand apart from the steps to come.
+      if (i < plan.open.length - 1 || plan.more) rows.push(<Box key="gap-act" height={1} />)
+    }
   }
   if (plan.more) rows.push(<Text key="more" color="inactive">{`… ${plan.more} more to come`}</Text>)
   // No plan, or the step at work is not listed: the activity stands on its own line.
@@ -386,7 +396,7 @@ function TSessions({ c, list, inner, max = 5 }: { c: Ctx; list: Card[]; inner: n
   return (
     <Box flexDirection="column" width={inner}>
       {list.slice(0, max).map(s => TSessionRow({ c, s, inner }))}
-      <Text color="inactive" wrap="truncate-end">{`${tallyLine(list)}${list.length > max ? ` · ${list.length - max} more: /cockpit-sessions` : ''}`}</Text>
+      <Box marginTop={1}><Text color="inactive" wrap="truncate-end">{`${tallyLine(list)}${list.length > max ? ` · ${list.length - max} more: /cockpit-sessions` : ''}`}</Text></Box>
     </Box>
   )
 }
@@ -462,13 +472,14 @@ function GMission({ c }: { c: Ctx }) {
   if (!shown && act && !(phase === 'done' && n)) rows.push(actLine('act', false))
 
   return (
-    <Box flexDirection="column" width="100%" gap="xs">
-      {n > 0 && <Svg source={progressSvg(m.steps, HEX[fillColor(phase)] ?? HEX.claude, TRACK)} alt={`Progress: ${doneCount(m)} of ${n} steps`} height={6} />}
-      {rows.length > 0 && <Box flexDirection="column" width="100%">{rows}</Box>}
+    <Box flexDirection="column" width="100%" gap="md">
+      {/* The bar is a block of its own, with room above and below it, at the picture's true height. */}
+      {n > 0 && <Box paddingY="xs" width="100%"><Svg source={progressSvg(m.steps, HEX[fillColor(phase)] ?? HEX.claude, TRACK)} alt={`Progress: ${doneCount(m)} of ${n} steps`} height={8} /></Box>}
+      {rows.length > 0 && <Box flexDirection="column" width="100%" gap="xs">{rows}</Box>}
       {m.asks.length > 0 && (
-        <Box flexDirection="row" flexWrap="nowrap" gap="sm" alignItems="flex-start" marginTop={rows.length ? 'xs' : 0}>
+        <Box flexDirection="row" flexWrap="nowrap" gap="sm" alignItems="flex-start">
           <Box flexShrink={0}><Text size="footnote" color="inactive" tabular>{`Asks ${m.asks.length - open.length}/${m.asks.length}`}</Text></Box>
-          <Box flexDirection="column" flexShrink={1} minWidth={0}>
+          <Box flexDirection="column" flexShrink={1} minWidth={0} gap="xs">
             {open.length === 0 && item('all', MARK.done, 'success', 'all done', 'success')}
             {open.slice(0, 3).map(a => item(`a${a.id}`, MARK.todo, 'inactive', a.text))}
             {open.length > 3 && item('amore', '+', 'inactive', `${open.length - 3} more`, 'inactive')}
@@ -500,7 +511,7 @@ function GSessionRow({ c, s }: { c: Ctx; s: Card }) {
 function GSessions({ c, list, max = 5 }: { c: Ctx; list: Card[]; max?: number }) {
   const { Box, Text } = c.el
   return (
-    <Box flexDirection="column" width="100%" gap="xs">
+    <Box flexDirection="column" width="100%" gap="sm">
       {list.slice(0, max).map(s => GSessionRow({ c, s }))}
       <Text size="footnote" color="inactive">{`${tallyLine(list)}${list.length > max ? ` · ${list.length - max} more: /cockpit-sessions` : ''}`}</Text>
     </Box>
@@ -546,10 +557,16 @@ export const register: Register = on => {
     return { text: (await read($, folded)) ? 'Cockpit folded to one line (c or /cockpit-fold opens it).' : 'Cockpit open.' }
   })
 
-  on('command.run', { command: 'cockpit-layout' }, async $ => {
+  on('command.run', { command: 'cockpit-layout' }, async ($, e: any) => {
     await setup($)
-    await update($, layout, l => (l === 'b' ? 'a' : 'b'))
-    return { text: (await read($, layout)) === 'b' ? 'Cockpit layout B: one view, the other sessions as a strip below.' : 'Cockpit layout A: Mission and Sessions tabs.' }
+    const asked = String(e.args ?? '').trim().toLowerCase()
+    if (asked && !(asked in LAYOUTS)) return { text: `No layout "${asked}". Pick one:\n${Object.values(LAYOUTS).map(l => `  /cockpit-layout ${l}`).join('\n')}` }
+    const was = (await read($, layout)) === 'stacked' ? 'stacked' : 'tabs'
+    const next: Layout = (asked as Layout) || (was === 'tabs' ? 'stacked' : 'tabs')
+    // A new layout opens on the mission, the list of the other sessions shut.
+    await update($, tab, () => 'mission' as Tab)
+    await update($, layout, () => next)
+    return { text: `Cockpit layout ${LAYOUTS[next]}.` }
   })
 
   on('command.run', { command: 'cockpit-sessions' }, async $ => {
@@ -708,36 +725,31 @@ export const register: Register = on => {
     const { Box, Text, Button } = el
     const c: Ctx = { el, m, phase: phaseOf(m), now, ask: s => () => void $.prompt.fill({ text: askText(s) }) }
     const has = hasContent(m)
-    const lay = await read($, layout)
+    // An older value ('a', 'b') or none reads as tabs.
+    const lay: Layout = (await read($, layout)) === 'stacked' ? 'stacked' : 'tabs'
     const picked = await read($, tab)
     // A: the Sessions tab exists only while another session is open; with no turn, it is the band.
     // B: no tabs; 'sessions' means the strip's list of the other sessions is open.
-    const current: Tab = lay === 'b' || !list.length ? 'mission' : !has ? 'sessions' : picked
-    const listOpen = lay === 'b' && (picked === 'sessions' || !has)
+    const current: Tab = lay === 'stacked' || !list.length ? 'mission' : !has ? 'sessions' : picked
+    const listOpen = lay === 'stacked' && (picked === 'sessions' || !has)
     const tally = summary(list)
     const needing = list.filter(s => s.state === 'needs')
     const pick = (t: Tab) => () => void update($, tab, () => t)
     const toggle = () => void update($, folded, f => !f)
-    // A new layout opens on the mission, the list of the others shut.
-    const swap = () => void update($, tab, () => 'mission' as Tab).then(() => update($, layout, l => (l === 'b' ? 'a' : 'b')))
     const terminal = e.surface === 'terminal'
     const isFolded = await read($, folded)
     const sessionsLabel = `Sessions ${list.length}${tally.needs ? ` · ⚑ ${tally.needs}` : ''}`
-    const swapLabel = lay === 'a' ? 'Try B' : 'Back to A'
 
     // The accordion's handle: ▾ folds the band, ▸ opens it; c presses it while the band has the focus.
     const handle = (open: boolean) => terminal
       ? <Button key="fold" plain hotkey="c" onPress={toggle}>{open ? '▾' : '▸'}</Button>
       : <Button key="fold" variant="secondary" hotkey="c" onPress={toggle}>{open ? '▾' : '▸'}</Button>
-    const swapBtn = terminal
-      ? <Button key="layout" plain hotkey="l" dimColor onPress={swap}>{swapLabel}</Button>
-      : <Button key="layout" variant="secondary" hotkey="l" onPress={swap}>{swapLabel}</Button>
 
     // Terminal tabs read as a row of words, the one shown at full strength. A page has native
     // buttons, so it gets one: the way to the other tab.
     const tabs: any[] = []
     let tabsW = 0
-    if (lay === 'a' && list.length) {
+    if (lay === 'tabs' && list.length) {
       if (terminal) {
         tabs.push(<Button key="tab-mission" plain hotkey="1" dimColor={current !== 'mission'} onPress={pick('mission')}>Mission</Button>)
         tabs.push(<Button key="tab-sessions" plain hotkey="2" dimColor={current !== 'sessions'} onPress={pick('sessions')}>{sessionsLabel}</Button>)
@@ -756,8 +768,8 @@ export const register: Register = on => {
 
     if (!terminal) {
       if (isFolded) return GHeader({ c, handle: handle(false), buttons: [], tail: foldTail(m, c.phase, list) })
-      const strip = lay === 'b' && list.length > 0 && (
-        <Box flexDirection="column" width="100%" gap="xs" marginTop="xs">
+      const strip = lay === 'stacked' && list.length > 0 && (
+        <Box flexDirection="column" width="100%" gap="sm" marginTop="sm">
           {needing.slice(0, 3).map(s => GSessionRow({ c, s }))}
           {rest.length > 0 && (
             <Box flexDirection="row" flexWrap="nowrap" alignItems="center" justifyContent="space-between" gap="sm" width="100%">
@@ -769,16 +781,15 @@ export const register: Register = on => {
         </Box>
       )
       return (
-        <Box flexDirection="column" width="100%" gap="sm">
-          {GHeader({ c, handle: handle(true), buttons: [...tabs, swapBtn] })}
+        <Box flexDirection="column" width="100%" gap="md">
+          {GHeader({ c, handle: handle(true), buttons: tabs })}
           {current === 'sessions' ? GSessions({ c, list }) : has && GMission({ c })}
           {strip}
         </Box>
       )
     }
 
-    const width = Math.max(30, Math.min(current === 'sessions' || lay === 'b' ? 100 : 80, p.bodyColumns ?? 80))
-    const swapW = `l: ${swapLabel}`.length + 2
+    const width = Math.max(30, Math.min(current === 'sessions' || lay === 'stacked' ? 100 : 80, p.bodyColumns ?? 80))
     if (isFolded) return THeader({ c, width, handle: handle(false), buttons: [], buttonsW: 0, tail: foldTail(m, c.phase, list) })
     const inner = width - 4
 
@@ -792,7 +803,7 @@ export const register: Register = on => {
         : [current2 && c.phase !== 'done' ? `› ${current2.label}` : '', act, asks].filter(Boolean).join('  ·  ')
       return (
         <Box flexDirection="column" width={width}>
-          {THeader({ c, width, handle: handle(true), buttons: [...tabs, swapBtn], buttonsW: tabsW + swapW })}
+          {THeader({ c, width, handle: handle(true), buttons: tabs, buttonsW: tabsW })}
           <Text wrap="truncate-end" color={c.phase === 'waiting' ? 'warning' : 'inactive'}>{line}</Text>
         </Box>
       )
@@ -801,18 +812,18 @@ export const register: Register = on => {
     const needsYou = c.phase === 'waiting' || tally.needs > 0
     return (
       <Box flexDirection="column" borderStyle="round" borderColor={needsYou ? 'warning' : 'promptBorder'} borderDimColor={!needsYou} paddingX={1} width={width}>
-        {THeader({ c, width: inner, handle: handle(true), buttons: [...tabs, swapBtn], buttonsW: tabsW + swapW })}
+        {THeader({ c, width: inner, handle: handle(true), buttons: tabs, buttonsW: tabsW })}
         {(current === 'sessions' || has) && (
           <Box marginTop={1}>
             {current === 'sessions' ? TSessions({ c, list, inner }) : TMission({ c, inner })}
           </Box>
         )}
-        {lay === 'b' && list.length > 0 && (
+        {lay === 'stacked' && list.length > 0 && (
           <Box flexDirection="column" marginTop={has ? 1 : 0}>
             {has && <Text color="subtle" dimColor>{'─'.repeat(inner)}</Text>}
             {needing.slice(0, 3).map(s => TSessionRow({ c, s, inner }))}
             {rest.length > 0 && (
-              <Box flexDirection="row" justifyContent="space-between" width={inner}>
+              <Box flexDirection="row" justifyContent="space-between" width={inner} marginTop={needing.length ? 1 : 0}>
                 <Text color="inactive" wrap="truncate-end">{`Others · ${tallyLine(rest)}`}</Text>
                 {othersBtn(listOpen ? '▾ hide' : '▸ show')}
               </Box>

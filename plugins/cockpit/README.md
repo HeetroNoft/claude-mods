@@ -23,10 +23,10 @@ In auto mode, and in the bypass and don't-ask modes, a permission is answered wi
 
 ## Two layouts
 
-The **Try B** / **Back to A** button, the `l` key or `/cockpit-layout` switches between them. Switching always goes back to the mission.
+`/cockpit-layout tabs` or `/cockpit-layout stacked` picks one; `/cockpit-layout` alone switches to the other. The choice lasts for the session, and a switch always goes back to the mission.
 
-- **A (the default)**: two tabs, **Mission** (this turn) and **Sessions** (your other open sessions). The Sessions tab appears only while another session runs the cockpit; with no turn running here, the band opens on it. In the terminal the tabs read `1: Mission  2: Sessions 3 · ⚑ 1`; in VS Code, the desktop app and the web, one button leads to the other tab.
-- **B**: one view and no tabs. Under the mission, a session waiting on you always shows with its Ask button; the others are summed up on one line (`Others · 2 working · 1 finished`), and **Show** lists them.
+- **tabs (the default)**: two tabs, **Mission** (this turn) and **Sessions** (your other open sessions). The Sessions tab appears only while another session runs the cockpit; with no turn running here, the band opens on it. In the terminal the tabs read `1: Mission  2: Sessions 3 · ⚑ 1`; in VS Code, the desktop app and the web, one button leads to the other tab.
+- **stacked**: one view and no tabs. Under the mission, a session waiting on you always shows with its Ask button; the others are summed up on one line (`Others · 2 working · 1 finished`), and **Show** lists them.
 
 ## Other sessions
 
@@ -45,9 +45,9 @@ Keys work while the band has the focus (ctrl+x tab, or a click).
 | Key | Command | Does |
 | --- | --- | --- |
 | `c` | `/cockpit-fold` | Folds the band to one line, or opens it |
-| `l` | `/cockpit-layout` | Switches between layout A and B |
-| `1` / `2` | | Mission / Sessions tab (layout A) |
-| `s` | | Shows or hides the other sessions (layout B) |
+| | `/cockpit-layout [tabs\|stacked]` | Picks the layout, or switches to the other one |
+| `1` / `2` | | Mission / Sessions tab (tabs layout) |
+| `s` | | Shows or hides the other sessions (stacked layout) |
 | | `/cockpit` | Clears the mission: plan, activity and asks |
 | | `/cockpit-sessions` | Lists your other sessions in the transcript, and hides or shows them on the band |
 | | `/cockpit-rows` | Switches the plain-English tool rows on or off |
