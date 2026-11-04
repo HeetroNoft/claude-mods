@@ -54,6 +54,14 @@ export function rowTime(c: Card, nowMs: number): string {
   return ''
 }
 
+// A row's state in words with its time: "working 0:24", "your turn 0:12", "finished 3m ago".
+export function rowWhen(c: Card, nowMs: number): string {
+  if (c.state === 'running') return `working ${mmss(nowMs - (c.startMs ?? c.updatedMs))}`
+  if (c.state === 'needs') return `your turn ${mmss(nowMs - c.updatedMs)}`
+  const a = ago(nowMs - (c.state === 'done' ? c.endMs ?? c.updatedMs : c.updatedMs))
+  return `${c.state === 'done' ? 'finished' : 'idle'} ${a === 'now' ? 'just now' : a}`
+}
+
 // A running row has no known length, so a short block slides back and forth along a dotted track.
 export function bar(c: Card, nowMs: number, cells: number): { before: string; block: string; after: string } {
   if (c.state === 'done') return { before: '', block: '█'.repeat(cells), after: '' }

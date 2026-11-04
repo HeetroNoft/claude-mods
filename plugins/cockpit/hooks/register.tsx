@@ -1,10 +1,10 @@
 import { atom, read, update } from 'claude-code'
 import type { Register } from 'claude-code'
 
-import type { Card, Mission, State, Tab } from '../types'
+import type { Card, Layout, Mission, State, Tab } from '../types'
 import { extractAsks } from './asks'
-import { ago, bar as slide, clean, liveOthers, order, rowTime, summary, updateCard } from './cards'
-import { applyTask, bar, clock, describe, finishStep, fromTodos, progressSvg, setPlan, stepTime, stepWindow, tick, timed } from './core'
+import { ago, clean, liveOthers, order, rowTime, rowWhen, summary, updateCard } from './cards'
+import { applyTask, bar, clock, describe, finishStep, fromTodos, planRows, progressSvg, setPlan, stepTime, tick, timed } from './core'
 
 // Cockpit: one band above the prompt, on every surface (terminal, VS Code, the desktop app, the
 // web). Its Mission tab is this turn: the plan fills as a progress bar, a line says what Claude
@@ -23,6 +23,8 @@ const others = atom({ plugin: 'cockpit', key: 'others' } as const, [] as Card[])
 const isHidden = atom({ plugin: 'cockpit', key: 'isHidden' } as const, false)
 // The band folded to one line, like an accordion; kept for this session only ($.state).
 const folded = atom({ plugin: 'cockpit', key: 'folded' } as const, false)
+// Which layout the band draws: A with tabs, B with the other sessions as a strip (/cockpit-layout).
+const layout = atom({ plugin: 'cockpit', key: 'layout' } as const, 'a' as Layout)
 const nowMs = atom({ plugin: 'cockpit', key: 'nowMs' } as const, 0)
 
 // How its own tool calls read in the transcript.
@@ -168,6 +170,7 @@ async function doSetup($: any) {
   await $.command.register({ name: 'cockpit', description: 'Clear the Mission tab of the cockpit' })
   await $.command.register({ name: 'cockpit-rows', description: 'Turn the plain-English tool rows on or off' })
   await $.command.register({ name: 'cockpit-fold', description: 'Fold the cockpit to one line, or open it again' })
+  await $.command.register({ name: 'cockpit-layout', description: 'Switch the cockpit between layout A (tabs) and B (sessions as a strip)' })
   await $.command.register({ name: 'cockpit-sessions', description: 'List your other open sessions, and show or hide their tab' })
   // After a reload the clock's timer is gone while a turn may still run: start it again.
   if ((await read($, mission)).running) tickClock($)
@@ -199,6 +202,10 @@ async function doCards($: any) {
 }
 
 // ---- drawing ----
+// Two layouts, switched by a button while Heet tries them: A keeps a Mission and a Sessions
+// tab; B is one view, the other sessions a strip under the mission. Both open on one header
+// line (state, progress, time) and list the plan as: finished steps folded into one line, the
+// step under way with what Claude is doing beneath it, then the steps to come.
 
 type Phase = 'idle' | 'working' | 'waiting' | 'done' | 'stopped' | 'error' | 'refusal'
 
@@ -219,62 +226,210 @@ const LOOK: Record<Phase, { glyph: string; label: string; color: string }> = {
   refusal: { glyph: '✕', label: 'Refused by the model', color: 'error' },
 }
 
-const MARK = { done: '✓', now: '›', todo: '○' } as const
-// In a proportional face › is a sliver beside ✓ and ○; ● pairs with ○ at the same size.
-const GMARK = { done: '✓', now: '●', todo: '○' } as const
+// ● pairs with ✓ and ○ at the same size, in a monospaced run and in a proportional face.
+const MARK = { done: '✓', now: '●', todo: '○' } as const
 
 // The bar's fill: the accent while work goes on, green once done, the state's own colour when
 // it needs you or went wrong. The rest of the track is the same line, faint.
 const fillColor = (p: Phase) => (p === 'working' ? 'claude' : p === 'done' || p === 'idle' ? 'success' : LOOK[p].color)
-
-function Progress({ el, m, phase, cells, label = true }: { el: any; m: Mission; phase: Phase; cells: number; label?: boolean }) {
-  const { Text } = el
-  const b = bar(m.steps, cells)
-  return (
-    <Text wrap="truncate-end">
-      <Text color={fillColor(phase)}>{b.fill + b.tip}</Text>
-      <Text color="subtle" dimColor>{b.empty}</Text>
-      {label && <Text bold>{`  ${b.label}`}</Text>}
-    </Text>
-  )
-}
-
-// What the "Now" row says.
-function activity(m: Mission, phase: Phase) {
-  if (phase === 'waiting') return m.waiting ?? ''
-  if (phase !== 'working' && phase !== 'idle') return m.doneBanner
-  return m.feed[0] ?? (m.running ? 'Thinking…' : 'Nothing running')
-}
 
 // An SVG cannot read the person's theme, so the bar takes fixed colours chosen to read on a
 // light and a dark editor alike, one per theme key the text uses.
 const HEX: Record<string, string> = { claude: '#D97757', success: '#3FA266', warning: '#D9A021', error: '#E5534B', inactive: '#8B949E' }
 const TRACK = 'rgba(139,148,158,0.28)'
 
-// The panel for surfaces that draw text in a proportional face and lay boxes out like a page
-// (VS Code, the desktop app, mobile). Nothing here is counted in character cells: rows flex to
-// the pane's width, the bar is a picture, and each section has its own caption above it.
-function GraphicPanel({ el, m }: { el: any; m: Mission }) {
-  const { Box, Text, Svg } = el
-  const phase = phaseOf(m)
+// The line under the step at work: the tool running, what you are asked, or how the turn ended.
+function activity(m: Mission, phase: Phase) {
+  if (phase === 'waiting') return m.waiting ?? ''
+  if (phase === 'working') return m.feed[0] ?? 'Thinking…'
+  if (phase === 'idle') return m.feed[0] ?? ''
+  return m.doneBanner
+}
+
+const turnTime = (m: Mission) => (m.startedMs ? clock(m.nowMs - m.startedMs) : '')
+const doneCount = (m: Mission) => m.steps.filter(s => s.status === 'done').length
+
+// ---- the other sessions, shared by both layouts ----
+
+const SESSION_LOOK: Record<string, { glyph: string; color: string }> = {
+  running: { glyph: '▸', color: 'claude' },
+  needs: { glyph: '⚑', color: 'warning' },
+  done: { glyph: '✓', color: 'success' },
+}
+const IDLE_LOOK = { glyph: '·', color: 'inactive' }
+const cut = (s: string, n: number) => (s.length > n ? `${s.slice(0, Math.max(1, n - 1))}…` : s)
+const whatOf = (c: Card) => (c.state === 'needs' && c.waitingFor ? `asks: ${c.waitingFor}` : c.purpose || c.now || 'just started')
+// The Ask button only drafts a line in the prompt: the person sends it, or not.
+const askText = (c: Card) => `Ask the session in ${c.place} working on "${cut(c.purpose || c.now, 60)}": `
+const tallyLine = (list: Card[]) => {
+  const t = summary(list)
+  return [t.needs ? `${t.needs} waiting on you` : '', `${t.running} working`, `${t.done} finished`].filter(Boolean).join(' · ')
+}
+
+type Ctx = { el: any; m: Mission; phase: Phase; now: number; ask: (c: Card) => () => void }
+
+// ---- terminal: laid out in character cells ----
+
+// The header: the state, the bar, the step count and the turn's time on the left, the buttons on
+// the right. The bar takes whatever room the rest leaves, and goes when too little is left.
+function THeader({ c, width, handle, buttons, buttonsW, tail }: { c: Ctx; width: number; handle: any; buttons: any[]; buttonsW: number; tail?: { text: string; color: string } }) {
+  const { Box, Text } = c.el
+  const { m, phase } = c
   const look = LOOK[phase]
   const n = m.steps.length
-  const done = m.steps.filter(s => s.status === 'done').length
-  const right = m.running ? clock(m.nowMs - m.startedMs) : m.startedMs ? `in ${clock(m.nowMs - m.startedMs)}` : ''
-  const win = stepWindow(m.steps, 7)
-  const asks = [...m.asks.filter(a => !a.done).slice(0, 4), ...m.asks.filter(a => a.done).slice(-2)]
-  const caption = (t: string) => <Text size="caption" weight="medium" color="inactive">{t.toUpperCase()}</Text>
-  // One list row. The mark and the label are one Text, so they can never land on two lines
-  // (VS Code wrapped a two-column row, the mark above its label: 29/10/2026); the mark is a
-  // monospaced run, so ✓ ● ○ take the same width and every label starts at the same x.
-  // A time sits on the right in a row that may not wrap, the label shrinking for it.
-  // The mark inherits the line's weight: VS Code lays a nested run of another weight out as a
-  // block of its own, which put a semibold label under its mark (29/10/2026).
-  const item = (key: string, mark: string, markColor: string, label: string, look: { color?: string; weight?: string } = {}, time?: string) => {
+  const count = n ? `  ${doneCount(m)}/${n}` : ''
+  const time = turnTime(m)
+  const fixed = 5 + look.label.length + 2 + 2 + count.length + (time ? time.length + 2 : 0) + buttonsW + (tail ? tail.text.length + 5 : 0)
+  const cells = n ? Math.min(24, width - fixed) : 0
+  const b = bar(m.steps, Math.max(1, cells))
+  return (
+    <Box flexDirection="row" justifyContent="space-between" width={width}>
+      <Box flexDirection="row" gap={1} flexShrink={1}>
+        {handle}
+        <Text wrap="truncate-end">
+          <Text bold color={look.color}>{`${look.glyph} ${look.label}`}</Text>
+          {cells >= 6 && <Text color={fillColor(phase)}>{`  ${b.fill}${b.tip}`}</Text>}
+          {cells >= 6 && <Text color="subtle" dimColor>{b.empty}</Text>}
+          {count && <Text bold>{count}</Text>}
+          {time && <Text color="inactive">{`  ${time}`}</Text>}
+          {tail && <Text color={tail.color}>{`  ·  ${tail.text}`}</Text>}
+        </Text>
+      </Box>
+      {buttons.length > 0 && <Box flexDirection="row" gap={2} flexShrink={0}>{buttons}</Box>}
+    </Box>
+  )
+}
+
+// The mission: the plan, the step at work with its activity beneath, then your asks.
+function TMission({ c, inner }: { c: Ctx; inner: number }) {
+  const { Box, Text } = c.el
+  const { m, phase } = c
+  const look = LOOK[phase]
+  const plan = planRows(m.steps, 4)
+  const act = activity(m, phase)
+  const actColor = phase === 'waiting' ? 'warning' : phase === 'working' || phase === 'idle' ? 'inactive' : look.color
+  const TIME = 9
+  const open = m.asks.filter(a => !a.done)
+  const asksDone = m.asks.length - open.length
+  const ASK = 10
+  const rows: any[] = []
+
+  if (plan.done) {
+    const all = !plan.open.length
+    rows.push(<Text key="done" color={all ? 'success' : 'inactive'}>{`${MARK.done} ${all ? `All ${plan.done} steps done` : `${plan.done} step${plan.done > 1 ? 's' : ''} done`}`}</Text>)
+  }
+  for (const [i, st] of plan.open.entries()) {
+    const t = stepTime(st, m.nowMs)
+    const now = st.status === 'now'
+    rows.push(
+      <Box key={`s${i}`} flexDirection="row">
+        <Box flexGrow={1} flexShrink={1}>
+          <Text wrap="truncate-end" color={now ? look.color : 'text'} bold={now}>
+            <Text color={now ? look.color : 'inactive'}>{`${MARK[st.status]} `}</Text>
+            {st.label}
+          </Text>
+        </Box>
+        {t && <Box width={TIME} flexShrink={0} justifyContent="flex-end"><Text color="inactive">{t}</Text></Box>}
+      </Box>,
+    )
+    if (now && act && (phase === 'working' || phase === 'waiting')) rows.push(<Text key="act" wrap="truncate-end" color={actColor} bold={phase === 'waiting'}>{`  └ ${act}`}</Text>)
+  }
+  if (plan.more) rows.push(<Text key="more" color="inactive">{`… ${plan.more} more to come`}</Text>)
+  // No plan, or the step at work is not listed: the activity stands on its own line.
+  const shown = plan.open.some(s => s.status === 'now') && (phase === 'working' || phase === 'waiting')
+  if (!shown && act && !(phase === 'done' && m.steps.length)) rows.push(<Text key="act" wrap="truncate-end" color={actColor} bold={phase === 'waiting'}>{`${phase === 'waiting' ? '⚑' : '›'} ${act}`}</Text>)
+
+  return (
+    <Box flexDirection="column" width={inner}>
+      {rows}
+      {m.asks.length > 0 && (
+        <Box flexDirection="row" marginTop={rows.length ? 1 : 0}>
+          <Box width={ASK} flexShrink={0}><Text color="inactive">{`Asks ${asksDone}/${m.asks.length}`}</Text></Box>
+          <Box flexDirection="column" flexShrink={1}>
+            {open.length === 0 && <Text color="success">{`${MARK.done} all done`}</Text>}
+            {open.slice(0, 3).map(a => (
+              <Text key={`a${a.id}`} wrap="truncate-end">
+                <Text color="inactive">{`${MARK.todo} `}</Text>
+                {cut(a.text, Math.max(10, inner - ASK - 2))}
+              </Text>
+            ))}
+            {open.length > 3 && <Text color="inactive">{`+ ${open.length - 3} more`}</Text>}
+          </Box>
+        </Box>
+      )}
+    </Box>
+  )
+}
+
+// One session per row: its state, its place, what it does, how long, and Ask.
+function TSessionRow({ c, s, inner }: { c: Ctx; s: Card; inner: number }) {
+  const { Box, Text, Button } = c.el
+  const l = SESSION_LOOK[s.state ?? ''] ?? IDLE_LOOK
+  const needs = s.state === 'needs'
+  const PLACE = 14, WHEN = 18, ASK = 8
+  const whatW = Math.max(8, inner - 2 - PLACE - WHEN - ASK)
+  return (
+    <Box key={`row-${s.id}`} flexDirection="row">
+      <Text wrap="truncate-end">
+        <Text color={l.color} bold>{`${l.glyph} `}</Text>
+        <Text bold>{cut(s.place, PLACE - 1).padEnd(PLACE)}</Text>
+        <Text color={needs ? 'warning' : 'text'}>{cut(whatOf(s), whatW).padEnd(whatW)}</Text>
+        <Text color={needs ? 'warning' : 'inactive'}>{rowWhen(s, c.now).padStart(WHEN)}</Text>
+      </Text>
+      <Box marginLeft={1}><Button key={`ask-${s.id}`} label="Ask" variant={needs ? 'primary' : undefined} onPress={c.ask(s)} /></Box>
+    </Box>
+  )
+}
+
+function TSessions({ c, list, inner, max = 5 }: { c: Ctx; list: Card[]; inner: number; max?: number }) {
+  const { Box, Text } = c.el
+  return (
+    <Box flexDirection="column" width={inner}>
+      {list.slice(0, max).map(s => TSessionRow({ c, s, inner }))}
+      <Text color="inactive" wrap="truncate-end">{`${tallyLine(list)}${list.length > max ? ` · ${list.length - max} more: /cockpit-sessions` : ''}`}</Text>
+    </Box>
+  )
+}
+
+// ---- VS Code, the desktop app, the web: laid out like a page ----
+// Nothing here is counted in cells: rows flex to the pane's width and the bar is a picture.
+// A Text never nests a run of another weight: VS Code puts such a run on a line of its own
+// (29/10/2026), so every change of weight is a Box of its own.
+
+function GHeader({ c, handle, buttons, tail }: { c: Ctx; handle: any; buttons: any[]; tail?: { text: string; color: string } }) {
+  const { Box, Text } = c.el
+  const { m, phase } = c
+  const look = LOOK[phase]
+  const n = m.steps.length
+  const meta = [n ? `${doneCount(m)}/${n} steps` : '', turnTime(m)].filter(Boolean).join(' · ')
+  return (
+    <Box flexDirection="row" flexWrap="nowrap" alignItems="center" justifyContent="space-between" gap="sm" width="100%">
+      <Box flexDirection="row" flexWrap="nowrap" alignItems="center" gap="sm" flexShrink={1} minWidth={0}>
+        {handle}
+        <Box flexShrink={0}><Text weight="semibold" color={look.color}>{`${look.glyph} ${look.label}`}</Text></Box>
+        {meta && <Box flexShrink={0}><Text size="footnote" color="inactive" tabular>{meta}</Text></Box>}
+        {tail && <Box flexShrink={1} minWidth={0}><Text size="footnote" wrap="truncate-end" color={tail.color}>{`· ${tail.text}`}</Text></Box>}
+      </Box>
+      {buttons.length > 0 && <Box flexDirection="row" flexWrap="nowrap" gap="xs" flexShrink={0}>{buttons}</Box>}
+    </Box>
+  )
+}
+
+function GMission({ c }: { c: Ctx }) {
+  const { Box, Text, Svg } = c.el
+  const { m, phase } = c
+  const look = LOOK[phase]
+  const n = m.steps.length
+  const plan = planRows(m.steps, 4)
+  const act = activity(m, phase)
+  const actColor = phase === 'waiting' ? 'warning' : phase === 'working' || phase === 'idle' ? 'inactive' : look.color
+  const open = m.asks.filter(a => !a.done)
+  // One list row: the mark rides in the label's own Text, so the two never land on two lines.
+  const item = (key: string, mark: string, markColor: string, label: string, color = 'text', weight = 'regular', time?: string) => {
     const line = (
-      <Text wrap="truncate-end" color={look.color ?? 'text'} weight={look.weight ?? 'regular'}>
-        <Text mono color={markColor}>{`${mark} `}</Text>
-        {` ${label}`}
+      <Text wrap="truncate-end" color={color} weight={weight}>
+        <Text mono color={markColor}>{`${mark} `}</Text>
+        {` ${label}`}
       </Text>
     )
     if (!time) return <Box key={key}>{line}</Box>
@@ -285,268 +440,82 @@ function GraphicPanel({ el, m }: { el: any; m: Mission }) {
       </Box>
     )
   }
-
-  return (
-    <Box flexDirection="column" width="100%">
-      {item('head', look.glyph, look.color, look.label, { color: look.color, weight: 'semibold' }, right)}
-
-      {n > 0 && (
-        <Box flexDirection="column" marginTop={1}>
-          <Svg source={progressSvg(m.steps, HEX[fillColor(phase)] ?? HEX.claude, TRACK)} alt={`Progress: ${done} of ${n} steps`} height={8} />
-          <Text size="footnote" color="inactive" tabular>{`${done} of ${n} steps · ${Math.round((done / n) * 100)}%`}</Text>
-        </Box>
-      )}
-
-      {n > 0 && (
-        <Box flexDirection="column" marginTop={1}>
-          {caption('Steps')}
-          {win.before > 0 && item('before', GMARK.done, 'success', `${win.before} step${win.before > 1 ? 's' : ''} done`, { color: 'inactive' })}
-          {win.shown.map((st, i) => {
-            const color = st.status === 'done' ? 'inactive' : st.status === 'now' ? look.color : 'text'
-            return item(`s${win.before + i}`, GMARK[st.status], st.status === 'done' ? 'success' : st.status === 'now' ? look.color : 'inactive',
-              st.label, { color, weight: st.status === 'now' ? 'semibold' : 'regular' }, stepTime(st, m.nowMs))
-          })}
-          {win.after > 0 && item('after', '…', 'inactive', `${win.after} more to come`, { color: 'inactive' })}
-        </Box>
-      )}
-
-      <Box flexDirection="column" marginTop={1}>
-        {caption('Now')}
-        <Text wrap="truncate-end" color={phase === 'waiting' ? 'warning' : phase === 'working' ? 'text' : look.color} weight={phase === 'waiting' ? 'semibold' : 'regular'}>
-          {activity(m, phase)}
-        </Text>
-      </Box>
-
-      {asks.length > 0 && (
-        <Box flexDirection="column" marginTop={1}>
-          {caption(`Asks · ${m.asks.filter(a => a.done).length}/${m.asks.length}`)}
-          {asks.map(a => item(`a${a.id}`, a.done ? GMARK.done : GMARK.todo, a.done ? 'success' : 'inactive',
-            a.text, { color: a.done ? 'inactive' : 'text' }))}
-          {m.asks.length > asks.length && item('more', '+', 'inactive', `${m.asks.length - asks.length} more`, { color: 'inactive' })}
-        </Box>
-      )}
-    </Box>
-  )
-}
-
-// The full panel: state and time, progress, the steps, what is happening now, your asks.
-// Every section has a label in the same left column, so the eye finds each one at once.
-function Panel({ el, m, width, framed }: { el: any; m: Mission; width: number; framed: boolean }) {
-  const { Box, Text } = el
-  const phase = phaseOf(m)
-  const look = LOOK[phase]
-  const inner = framed ? width - 4 : width
-  const n = m.steps.length
-  const done = m.steps.filter(s => s.status === 'done').length
-  const right = m.running ? clock(m.nowMs - m.startedMs) : m.startedMs ? `in ${clock(m.nowMs - m.startedMs)}` : ''
-  const win = stepWindow(m.steps, 6)
-  const asks = [...m.asks.filter(a => !a.done).slice(0, 3), ...m.asks.filter(a => a.done).slice(-2)]
-  const asksDone = m.asks.filter(a => a.done).length
-  // Section titles share one left column, so each section starts where the eye expects it.
-  const LABEL = 13
-  const TIME = 11 // "12 min 05 s"
-  const title = (t: string) => <Box width={LABEL} flexShrink={0}><Text color="inactive">{t}</Text></Box>
-
-  const body = (
-    <Box flexDirection="column" width={inner}>
-      {/* State on the left, the turn's time on the right. */}
-      <Box flexDirection="row" justifyContent="space-between">
-        <Text>
-          <Text bold color={look.color}>{`${look.glyph} ${look.label}`}</Text>
-          <Text color="inactive">{'   Mission'}</Text>
-        </Text>
-        <Text color="inactive">{right}</Text>
-      </Box>
-
-      {n > 0 && (
-        <Box marginTop={1}>
-          {Progress({ el, m, phase, cells: Math.max(10, inner - `  ${done}/${n} · 100%`.length) })}
-        </Box>
-      )}
-
-      {/* The steps, each with how long it took, or has taken so far, on the right. */}
-      {n > 0 && (
-        <Box flexDirection="column" marginTop={1}>
-          {win.before > 0 && <Text color="inactive">{`✓ ${win.before} step${win.before > 1 ? 's' : ''} done`}</Text>}
-          {win.shown.map((st, i) => {
-            const t = stepTime(st, m.nowMs)
-            const color = st.status === 'done' ? 'inactive' : st.status === 'now' ? look.color : 'text'
-            return (
-              <Box key={`s${win.before + i}`} flexDirection="row">
-                <Box flexGrow={1} flexShrink={1}>
-                  <Text wrap="truncate-end" color={color} bold={st.status === 'now'}>
-                    <Text color={st.status === 'done' ? 'success' : color}>{`${MARK[st.status]} `}</Text>
-                    {st.label}
-                  </Text>
-                </Box>
-                {t && <Box width={TIME} flexShrink={0} justifyContent="flex-end"><Text color="inactive">{t}</Text></Box>}
-              </Box>
-            )
-          })}
-          {win.after > 0 && <Text color="inactive">{`… ${win.after} more to come`}</Text>}
-        </Box>
-      )}
-
-      <Box flexDirection="row" marginTop={1}>
-        {title('Now')}
-        <Text wrap="truncate-end" color={phase === 'waiting' ? 'warning' : phase === 'working' ? 'text' : look.color} bold={phase === 'waiting'}>
-          {activity(m, phase)}
-        </Text>
-      </Box>
-
-      {asks.length > 0 && (
-        <Box flexDirection="row">
-          {title(`Asks ${asksDone}/${m.asks.length}`)}
-          <Box flexDirection="column" flexShrink={1}>
-            {asks.map(a => (
-              <Text key={`a${a.id}`} wrap="truncate-end" color={a.done ? 'inactive' : 'text'}>
-                <Text color={a.done ? 'success' : 'inactive'}>{a.done ? '✓ ' : '○ '}</Text>
-                {short(a.text, Math.max(10, inner - LABEL - 2))}
-              </Text>
-            ))}
-            {m.asks.length > asks.length && <Text color="inactive">{`+ ${m.asks.length - asks.length} more`}</Text>}
-          </Box>
-        </Box>
-      )}
-    </Box>
-  )
-
-  if (!framed) return body
-  // A quiet frame like the prompt's; it takes the state's colour only when you are needed.
-  return (
-    <Box borderStyle="round" borderColor={phase === 'waiting' ? 'warning' : 'promptBorder'} borderDimColor={phase !== 'waiting'} paddingX={1} width={width}>
-      {body}
-    </Box>
-  )
-}
-
-// A short window leaves the band 2 or 3 rows: the state with the bar, then what is happening.
-function Compact({ el, m, width }: { el: any; m: Mission; width: number }) {
-  const { Box, Text } = el
-  const phase = phaseOf(m)
-  const look = LOOK[phase]
-  const n = m.steps.length
-  const b = bar(m.steps, 1)
-  const current = m.steps.find(s => s.status === 'now')
-  const tail = [
-    m.asks.length ? `asks ${m.asks.filter(a => a.done).length}/${m.asks.length}` : '',
-    m.startedMs ? clock(m.nowMs - m.startedMs) : '',
-  ].filter(Boolean).join('  ·  ')
-  return (
-    <Box flexDirection="column" width={width}>
-      <Text wrap="truncate-end">
-        <Text bold color={look.color}>{`${look.glyph} ${look.label}  `}</Text>
-        {n > 0 && Progress({ el, m, phase, cells: Math.max(8, Math.min(20, width - 60)), label: false })}
-        {n > 0 && <Text>{`  ${b.label}`}</Text>}
-        {current && phase !== 'done' && <Text color={look.color}>{`  › ${current.label}`}</Text>}
-      </Text>
-      <Text wrap="truncate-end">
-        <Text color="inactive">{'Now  '}</Text>
-        <Text color={phase === 'waiting' ? 'warning' : 'text'}>{activity(m, phase)}</Text>
-        {tail && <Text color="inactive">{`  ·  ${tail}`}</Text>}
+  const actLine = (key: string, indent: boolean) => (
+    <Box key={key} paddingLeft={indent ? 'lg' : 0}>
+      <Text wrap="truncate-end" size={indent ? 'footnote' : undefined} color={actColor} weight={phase === 'waiting' ? 'semibold' : 'regular'}>
+        {indent ? `↳ ${act}` : `${phase === 'waiting' ? '⚑' : '›'} ${act}`}
       </Text>
     </Box>
   )
-}
+  const rows: any[] = []
+  if (plan.done) {
+    const all = !plan.open.length
+    rows.push(item('done', MARK.done, 'success', all ? `All ${plan.done} steps done` : `${plan.done} step${plan.done > 1 ? 's' : ''} done`, all ? 'success' : 'inactive'))
+  }
+  for (const [i, st] of plan.open.entries()) {
+    const now = st.status === 'now'
+    rows.push(item(`s${i}`, MARK[st.status], now ? look.color : 'inactive', st.label, now ? look.color : 'text', now ? 'semibold' : 'regular', stepTime(st, m.nowMs)))
+    if (now && act && (phase === 'working' || phase === 'waiting')) rows.push(actLine('act', true))
+  }
+  if (plan.more) rows.push(item('more', '…', 'inactive', `${plan.more} more to come`, 'inactive'))
+  const shown = plan.open.some(s => s.status === 'now') && (phase === 'working' || phase === 'waiting')
+  if (!shown && act && !(phase === 'done' && n)) rows.push(actLine('act', false))
 
-// ---- the Sessions tab ----
-
-const SESSION_LOOK: Record<string, { word: string; glyph: string; color: string }> = {
-  running: { word: 'working', glyph: '▸', color: 'claude' },
-  needs: { word: 'your turn', glyph: '⚑', color: 'warning' },
-  done: { word: 'finished', glyph: '✓', color: 'success' },
-}
-const IDLE_LOOK = { word: 'idle', glyph: '·', color: 'inactive' }
-const cut = (s: string, n: number) => (s.length > n ? `${s.slice(0, Math.max(1, n - 1))}…` : s)
-const whatOf = (c: Card) => (c.state === 'needs' && c.waitingFor ? `asks: ${c.waitingFor}` : c.purpose || c.now || 'just started')
-// The Ask button only drafts a line in the prompt: the person sends it, or not.
-const askText = (c: Card) => `Ask the session in ${c.place} working on "${cut(c.purpose || c.now, 60)}": `
-const tallyLine = (list: Card[]) => {
-  const t = summary(list)
-  return `${t.running} working · ${t.done} finished${list.length > 5 ? ` · ${list.length - 5} more: /cockpit-sessions` : ''}`
-}
-
-// Terminal rows: state, place and purpose, a sliding block while it runs, its time, Ask.
-function Sessions({ ask, el, list, now, inner }: { ask: (c: Card) => () => void; el: any; list: Card[]; now: number; inner: number }) {
-  const { Box, Text, Button } = el
-  const cells = inner >= 72 ? 14 : 0 // a narrow band drops the sliding block first
-  const WORD = 12, TIME = 11, ASK = 8
-  const nameW = Math.max(10, inner - WORD - (cells ? cells + 1 : 0) - TIME - ASK)
   return (
-    <Box flexDirection="column" width={inner}>
-      {list.slice(0, 5).map(c => {
-        const l = SESSION_LOOK[c.state ?? ''] ?? IDLE_LOOK
-        const b = slide(c, now, cells)
-        return (
-          <Box key={c.id} flexDirection="row">
-            <Text wrap="truncate-end">
-              <Text color={l.color} bold={c.state === 'needs'}>{`${l.glyph} ${l.word}`.padEnd(WORD)}</Text>
-              <Text>{cut(`${c.place} · ${whatOf(c)}`, nameW).padEnd(nameW)}</Text>
-              {cells > 0 && <Text color="subtle" dimColor>{` ${b.before}`}</Text>}
-              {cells > 0 && <Text color={l.color}>{b.block}</Text>}
-              {cells > 0 && <Text color="subtle" dimColor>{b.after}</Text>}
-              <Text color={c.state === 'needs' ? 'warning' : 'inactive'}>{(rowTime(c, now) || ago(now - c.updatedMs)).padStart(TIME - 1)} </Text>
-            </Text>
-            <Button key={`ask-${c.id}`} label="Ask" onPress={ask(c)} />
+    <Box flexDirection="column" width="100%" gap="xs">
+      {n > 0 && <Svg source={progressSvg(m.steps, HEX[fillColor(phase)] ?? HEX.claude, TRACK)} alt={`Progress: ${doneCount(m)} of ${n} steps`} height={6} />}
+      {rows.length > 0 && <Box flexDirection="column" width="100%">{rows}</Box>}
+      {m.asks.length > 0 && (
+        <Box flexDirection="row" flexWrap="nowrap" gap="sm" alignItems="flex-start" marginTop={rows.length ? 'xs' : 0}>
+          <Box flexShrink={0}><Text size="footnote" color="inactive" tabular>{`Asks ${m.asks.length - open.length}/${m.asks.length}`}</Text></Box>
+          <Box flexDirection="column" flexShrink={1} minWidth={0}>
+            {open.length === 0 && item('all', MARK.done, 'success', 'all done', 'success')}
+            {open.slice(0, 3).map(a => item(`a${a.id}`, MARK.todo, 'inactive', a.text))}
+            {open.length > 3 && item('amore', '+', 'inactive', `${open.length - 3} more`, 'inactive')}
           </Box>
-        )
-      })}
-      <Text color="inactive" wrap="truncate-end">{tallyLine(list)}</Text>
+        </Box>
+      )}
     </Box>
   )
 }
 
-// Page-like rows for VS Code, the desktop app and the web: nothing counted in cells.
-function GraphicSessions({ ask, el, list, now }: { ask: (c: Card) => () => void; el: any; list: Card[]; now: number }) {
-  const { Box, Text, Button } = el
+// A session row; its Ask shows under the pointer, and always on a session that waits on you.
+function GSessionRow({ c, s }: { c: Ctx; s: Card }) {
+  const { Box, Text, Button } = c.el
+  const l = SESSION_LOOK[s.state ?? ''] ?? IDLE_LOOK
+  const needs = s.state === 'needs'
   return (
-    <Box flexDirection="column" width="100%" gap="sm">
-      {list.slice(0, 5).map(c => {
-        const l = SESSION_LOOK[c.state ?? ''] ?? IDLE_LOOK
-        return (
-          <Box key={c.id} flexDirection="row" flexWrap="nowrap" justifyContent="space-between" alignItems="center" gap="sm">
-            <Box flexDirection="column" flexShrink={1} minWidth={0}>
-              <Text wrap="truncate-end" weight="semibold" color={l.color}>
-                <Text mono color={l.color}>{`${l.glyph} `}</Text>
-                {` ${c.place}`}
-              </Text>
-              <Text wrap="truncate-end" size="footnote" color={c.state === 'needs' ? 'warning' : 'inactive'}>{`${l.word} · ${rowTime(c, now) || ago(now - c.updatedMs)} · ${whatOf(c)}`}</Text>
-            </Box>
-            <Box flexShrink={0}><Button key={`ask-${c.id}`} label="Ask" variant="secondary" onPress={ask(c)} /></Box>
-          </Box>
-        )
-      })}
-      <Text size="footnote" color="inactive">{tallyLine(list)}</Text>
+    <Box key={`row-${s.id}`} flexDirection="row" flexWrap="nowrap" alignItems="center" gap="sm" width="100%">
+      <Box flexShrink={0}><Text mono color={l.color}>{l.glyph}</Text></Box>
+      <Box flexShrink={0}><Text weight="semibold">{s.place}</Text></Box>
+      <Box flexShrink={1} flexGrow={1} minWidth={0}><Text wrap="truncate-end" color={needs ? 'warning' : 'inactive'}>{whatOf(s)}</Text></Box>
+      <Box flexShrink={0}><Text size="footnote" color={needs ? 'warning' : 'inactive'} tabular>{rowWhen(s, c.now)}</Text></Box>
+      <Box flexShrink={0} display={needs ? 'flex' : 'none'} hover={needs ? undefined : { display: 'flex' }}>
+        <Button key={`ask-${s.id}`} label="Ask" variant={needs ? 'primary' : 'secondary'} onPress={c.ask(s)} />
+      </Box>
     </Box>
   )
 }
 
-// The folded band: one line with the state, the bar, the step under way, the time and who needs you.
-function FoldedLine({ el, m, list, terminal, handle, width }: { el: any; m: Mission; list: Card[]; terminal: boolean; handle: any; width: number }) {
-  const { Box, Text } = el
-  const phase = phaseOf(m)
-  const look = LOOK[phase]
-  const n = m.steps.length
+function GSessions({ c, list, max = 5 }: { c: Ctx; list: Card[]; max?: number }) {
+  const { Box, Text } = c.el
+  return (
+    <Box flexDirection="column" width="100%" gap="xs">
+      {list.slice(0, max).map(s => GSessionRow({ c, s }))}
+      <Text size="footnote" color="inactive">{`${tallyLine(list)}${list.length > max ? ` · ${list.length - max} more: /cockpit-sessions` : ''}`}</Text>
+    </Box>
+  )
+}
+
+// The folded band's tail: the step under way, then who needs you among the other sessions.
+function foldTail(m: Mission, phase: Phase, list: Card[]) {
   const current = m.steps.find(s => s.status === 'now')
   const t = summary(list)
-  const tail = [
+  const text = [
     current && phase !== 'done' ? `› ${current.label}` : '',
-    m.startedMs ? clock(m.nowMs - m.startedMs) : '',
     t.needs ? `⚑ ${t.needs} waiting` : list.length ? `${list.length} other session${list.length > 1 ? 's' : ''}` : '',
   ].filter(Boolean).join('  ·  ')
-  return (
-    <Box flexDirection="row" flexWrap="nowrap" alignItems="center" gap={terminal ? 1 : 'sm'} width={terminal ? width : '100%'}>
-      {handle}
-      <Box flexShrink={1} minWidth={0}>
-        <Text wrap="truncate-end">
-          <Text bold color={look.color}>{`${look.glyph} ${look.label}  `}</Text>
-          {terminal && n > 0 && Progress({ el, m, phase, cells: 12, label: false })}
-          {n > 0 && <Text>{`  ${bar(m.steps, 1).label}`}</Text>}
-          {tail && <Text color={t.needs ? 'warning' : 'inactive'}>{`  ·  ${tail}`}</Text>}
-        </Text>
-      </Box>
-    </Box>
-  )
+  return text ? { text, color: t.needs ? 'warning' : 'inactive' } : undefined
 }
 
 const hasContent = (m: Mission) => m.running || !!m.doneBanner || m.steps.length > 0 || m.asks.length > 0 || m.feed.length > 0
@@ -575,6 +544,12 @@ export const register: Register = on => {
     await setup($)
     await update($, folded, f => !f)
     return { text: (await read($, folded)) ? 'Cockpit folded to one line (c or /cockpit-fold opens it).' : 'Cockpit open.' }
+  })
+
+  on('command.run', { command: 'cockpit-layout' }, async $ => {
+    await setup($)
+    await update($, layout, l => (l === 'b' ? 'a' : 'b'))
+    return { text: (await read($, layout)) === 'b' ? 'Cockpit layout B: one view, the other sessions as a strip below.' : 'Cockpit layout A: Mission and Sessions tabs.' }
   })
 
   on('command.run', { command: 'cockpit-sessions' }, async $ => {
@@ -727,73 +702,124 @@ export const register: Register = on => {
     const p = e.props as any
     const list = (await read($, isHidden)) ? [] : order(await read($, others))
     if (p.hasSurvey || (!hasContent(m) && !list.length)) return next(e)
-    await read($, nowMs) // redraws the sessions' timers and sliding blocks as the clock ticks
+    await read($, nowMs) // redraws the sessions' timers as the clock ticks
     const now = await $.clock.now()
     const el = $.ui.resolve(e)
-    // The Sessions tab exists only while another session is open; with none, the band is the mission alone.
-    const current: Tab = !list.length ? 'mission' : !hasContent(m) ? 'sessions' : await read($, tab)
-    const pick = (t: Tab) => () => void update($, tab, () => t)
-    const ask = (c: Card) => () => void $.prompt.fill({ text: askText(c) })
+    const { Box, Text, Button } = el
+    const c: Ctx = { el, m, phase: phaseOf(m), now, ask: s => () => void $.prompt.fill({ text: askText(s) }) }
+    const has = hasContent(m)
+    const lay = await read($, layout)
+    const picked = await read($, tab)
+    // A: the Sessions tab exists only while another session is open; with no turn, it is the band.
+    // B: no tabs; 'sessions' means the strip's list of the other sessions is open.
+    const current: Tab = lay === 'b' || !list.length ? 'mission' : !has ? 'sessions' : picked
+    const listOpen = lay === 'b' && (picked === 'sessions' || !has)
     const tally = summary(list)
-    const sessionsLabel = `Sessions ${list.length}${tally.needs ? ` · ⚑ ${tally.needs}` : ''}`
-    const isFolded = await read($, folded)
+    const needing = list.filter(s => s.state === 'needs')
+    const pick = (t: Tab) => () => void update($, tab, () => t)
     const toggle = () => void update($, folded, f => !f)
+    // A new layout opens on the mission, the list of the others shut.
+    const swap = () => void update($, tab, () => 'mission' as Tab).then(() => update($, layout, l => (l === 'b' ? 'a' : 'b')))
     const terminal = e.surface === 'terminal'
-    // The accordion's handle: ▾ folds the band, ▸ opens it; c presses it while the band has the focus.
-    const handle = (open: boolean) => {
-      const { Button } = el
-      return terminal
-        ? <Button key="fold" plain hotkey="c" onPress={toggle}>{open ? '▾' : '▸'}</Button>
-        : <Button key="fold" variant="secondary" hotkey="c" onPress={toggle}>{open ? '▾' : '▸'}</Button>
-    }
-    if (isFolded) return FoldedLine({ el, m, list, terminal, handle: handle(false), width: Math.max(30, Math.min(100, p.bodyColumns ?? 80)) })
+    const isFolded = await read($, folded)
+    const sessionsLabel = `Sessions ${list.length}${tally.needs ? ` · ⚑ ${tally.needs}` : ''}`
+    const swapLabel = lay === 'a' ? 'Try B' : 'Back to A'
 
-    // Only the terminal lays text out in cells; the others get the page-like layout.
-    if (e.surface !== 'terminal') {
-      const { Box, Button } = el
-      return (
-        <Box flexDirection="column" width="100%" gap="sm">
-          {(
-            <Box flexDirection="row" gap="sm" alignItems="center">
-              {handle(true)}
-              {list.length > 0 && <Button key="tab-mission" variant={current === 'mission' ? 'primary' : 'secondary'} hotkey="1" onPress={pick('mission')}>Mission</Button>}
-              {list.length > 0 && <Button key="tab-sessions" variant={current === 'sessions' ? 'primary' : 'secondary'} hotkey="2" onPress={pick('sessions')}>{sessionsLabel}</Button>}
+    // The accordion's handle: ▾ folds the band, ▸ opens it; c presses it while the band has the focus.
+    const handle = (open: boolean) => terminal
+      ? <Button key="fold" plain hotkey="c" onPress={toggle}>{open ? '▾' : '▸'}</Button>
+      : <Button key="fold" variant="secondary" hotkey="c" onPress={toggle}>{open ? '▾' : '▸'}</Button>
+    const swapBtn = terminal
+      ? <Button key="layout" plain hotkey="l" dimColor onPress={swap}>{swapLabel}</Button>
+      : <Button key="layout" variant="secondary" hotkey="l" onPress={swap}>{swapLabel}</Button>
+
+    // Terminal tabs read as a row of words, the one shown at full strength. A page has native
+    // buttons, so it gets one: the way to the other tab.
+    const tabs: any[] = []
+    let tabsW = 0
+    if (lay === 'a' && list.length) {
+      if (terminal) {
+        tabs.push(<Button key="tab-mission" plain hotkey="1" dimColor={current !== 'mission'} onPress={pick('mission')}>Mission</Button>)
+        tabs.push(<Button key="tab-sessions" plain hotkey="2" dimColor={current !== 'sessions'} onPress={pick('sessions')}>{sessionsLabel}</Button>)
+        tabsW = `1: Mission  2: ${sessionsLabel}  `.length
+      } else {
+        tabs.push(current === 'mission'
+          ? <Button key="tab-sessions" variant="secondary" hotkey="2" onPress={pick('sessions')}>{sessionsLabel}</Button>
+          : <Button key="tab-mission" variant="secondary" hotkey="1" onPress={pick('mission')}>Mission</Button>)
+      }
+    }
+    // B's strip: who waits on you, always; the rest behind a Show button.
+    const othersBtn = (label: string) => terminal
+      ? <Button key="others" plain hotkey="s" dimColor onPress={pick(listOpen ? 'mission' : 'sessions')}>{label}</Button>
+      : <Button key="others" variant="secondary" hotkey="s" onPress={pick(listOpen ? 'mission' : 'sessions')}>{label}</Button>
+    const rest = list.filter(s => s.state !== 'needs')
+
+    if (!terminal) {
+      if (isFolded) return GHeader({ c, handle: handle(false), buttons: [], tail: foldTail(m, c.phase, list) })
+      const strip = lay === 'b' && list.length > 0 && (
+        <Box flexDirection="column" width="100%" gap="xs" marginTop="xs">
+          {needing.slice(0, 3).map(s => GSessionRow({ c, s }))}
+          {rest.length > 0 && (
+            <Box flexDirection="row" flexWrap="nowrap" alignItems="center" justifyContent="space-between" gap="sm" width="100%">
+              <Box flexShrink={1} minWidth={0}><Text size="footnote" color="inactive" wrap="truncate-end">{`Others · ${tallyLine(rest)}`}</Text></Box>
+              <Box flexShrink={0}>{othersBtn(listOpen ? 'Hide' : 'Show')}</Box>
             </Box>
           )}
-          {current === 'mission' ? GraphicPanel({ el, m }) : GraphicSessions({ ask, el, list, now })}
+          {listOpen && rest.slice(0, 5).map(s => GSessionRow({ c, s }))}
+        </Box>
+      )
+      return (
+        <Box flexDirection="column" width="100%" gap="sm">
+          {GHeader({ c, handle: handle(true), buttons: [...tabs, swapBtn] })}
+          {current === 'sessions' ? GSessions({ c, list }) : has && GMission({ c })}
+          {strip}
         </Box>
       )
     }
 
-    const width = Math.max(30, Math.min(current === 'sessions' ? 100 : 80, p.bodyColumns ?? 80))
-    const short = (p.maxRows ?? 12) < 10
-    const { Box, Text, Button } = el
-    const tabs = (
-      <Box flexDirection="row" gap={2}>
-        {handle(true)}
-        {list.length > 0 && <Button key="tab-mission" plain hotkey="1" dimColor={current !== 'mission'} onPress={pick('mission')}>Mission</Button>}
-        {list.length > 0 && <Button key="tab-sessions" plain hotkey="2" dimColor={current !== 'sessions'} onPress={pick('sessions')}>{sessionsLabel}</Button>}
-        {!list.length && <Text color="inactive">Cockpit</Text>}
-      </Box>
-    )
-    // A short window leaves two or three rows: no frame, the tabs on top of the short form.
-    if (short) {
+    const width = Math.max(30, Math.min(current === 'sessions' || lay === 'b' ? 100 : 80, p.bodyColumns ?? 80))
+    const swapW = `l: ${swapLabel}`.length + 2
+    if (isFolded) return THeader({ c, width, handle: handle(false), buttons: [], buttonsW: 0, tail: foldTail(m, c.phase, list) })
+    const inner = width - 4
+
+    // A short window leaves two or three rows: no frame, the header and one line under it.
+    if ((p.maxRows ?? 12) < 10) {
+      const current2 = m.steps.find(s => s.status === 'now')
+      const act = activity(m, c.phase)
+      const asks = m.asks.length ? `Asks ${m.asks.filter(a => a.done).length}/${m.asks.length}` : ''
+      const line = current === 'sessions'
+        ? list.slice(0, 3).map(s => `${(SESSION_LOOK[s.state ?? ''] ?? IDLE_LOOK).glyph} ${s.place}`).join('   ')
+        : [current2 && c.phase !== 'done' ? `› ${current2.label}` : '', act, asks].filter(Boolean).join('  ·  ')
       return (
         <Box flexDirection="column" width={width}>
-          {tabs}
-          {current === 'mission' ? Compact({ el, m, width }) : (
-            <Text wrap="truncate-end" color="inactive">{list.slice(0, 2).map(c => `${c.state === 'needs' ? '⚑' : c.state === 'running' ? '▸' : '✓'} ${c.place}`).join('   ')}</Text>
-          )}
+          {THeader({ c, width, handle: handle(true), buttons: [...tabs, swapBtn], buttonsW: tabsW + swapW })}
+          <Text wrap="truncate-end" color={c.phase === 'waiting' ? 'warning' : 'inactive'}>{line}</Text>
         </Box>
       )
     }
-    const needsYou = phaseOf(m) === 'waiting' || tally.needs > 0
+
+    const needsYou = c.phase === 'waiting' || tally.needs > 0
     return (
       <Box flexDirection="column" borderStyle="round" borderColor={needsYou ? 'warning' : 'promptBorder'} borderDimColor={!needsYou} paddingX={1} width={width}>
-        {tabs}
-        <Box marginTop={1}>
-          {current === 'mission' ? Panel({ el, m, width: width - 4, framed: false }) : Sessions({ ask, el, list, now, inner: width - 4 })}
-        </Box>
+        {THeader({ c, width: inner, handle: handle(true), buttons: [...tabs, swapBtn], buttonsW: tabsW + swapW })}
+        {(current === 'sessions' || has) && (
+          <Box marginTop={1}>
+            {current === 'sessions' ? TSessions({ c, list, inner }) : TMission({ c, inner })}
+          </Box>
+        )}
+        {lay === 'b' && list.length > 0 && (
+          <Box flexDirection="column" marginTop={has ? 1 : 0}>
+            {has && <Text color="subtle" dimColor>{'─'.repeat(inner)}</Text>}
+            {needing.slice(0, 3).map(s => TSessionRow({ c, s, inner }))}
+            {rest.length > 0 && (
+              <Box flexDirection="row" justifyContent="space-between" width={inner}>
+                <Text color="inactive" wrap="truncate-end">{`Others · ${tallyLine(rest)}`}</Text>
+                {othersBtn(listOpen ? '▾ hide' : '▸ show')}
+              </Box>
+            )}
+            {listOpen && rest.slice(0, 5).map(s => TSessionRow({ c, s, inner }))}
+          </Box>
+        )}
       </Box>
     )
   })

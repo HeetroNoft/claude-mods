@@ -23,6 +23,8 @@ export type Mission = {
 
 /** The band's two tabs: this session's turn, and the other open sessions. */
 export type Tab = 'mission' | 'sessions'
+/** A keeps the two tabs; B is one view with the other sessions as a strip under the mission. */
+export type Layout = 'a' | 'b'
 export type State = 'running' | 'done' | 'needs'
 /** One session's card in ~/.claude/session-cards/<id>.json, written by it, read by the others. */
 export type Card = {
@@ -32,6 +34,6 @@ export type Card = {
 
 declare module 'claude-code' {
   interface PluginState {
-    cockpit: { mission: Mission; plainRows: boolean; tab: Tab; others: Card[]; isHidden: boolean; nowMs: number; folded: boolean }
+    cockpit: { mission: Mission; plainRows: boolean; tab: Tab; others: Card[]; isHidden: boolean; nowMs: number; folded: boolean; layout: Layout }
   }
 }

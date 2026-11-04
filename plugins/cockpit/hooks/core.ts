@@ -160,6 +160,13 @@ export function stepWindow(steps: readonly Step[], room: number): { shown: Step[
   return { shown: steps.slice(start, start + rows), before: start, after: steps.length - start - rows }
 }
 
+// The plan as the band lists it: finished steps fold into one count, then the open ones in
+// order (the one at work among them), at most `room` of them, with how many more are left.
+export function planRows(steps: readonly Step[], room: number): { done: number; open: Step[]; more: number } {
+  const open = steps.filter(s => s.status !== 'done')
+  return { done: steps.length - open.length, open: open.slice(0, room), more: Math.max(0, open.length - room) }
+}
+
 export function clock(ms: number): string {
   const s = Math.max(0, Math.round(ms / 1000))
   return s < 60 ? `${s}s` : `${Math.floor(s / 60)}m ${String(s % 60).padStart(2, '0')}s`

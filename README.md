@@ -5,7 +5,7 @@ Heet's Claude Code mods, published as the `heet-mods` marketplace.
 | Mod | What it does |
 | --- | --- |
 | [my-office](plugins/my-office/README.md) | A pixel-art office in a local web page: every Claude session is a mascot at its own desk, with its plan and a live "done by" time on a board above it |
-| cockpit | One band above the prompt, on every surface: this turn's plan as a progress bar, what Claude is doing in plain English, your asks ticked off and a sound when it is done, plus a tab listing your other open sessions with an Ask button |
+| [cockpit](plugins/cockpit/README.md) | One band above the prompt, on every surface: this turn's plan as a progress bar, what Claude is doing in plain English, your asks ticked off and a sound when it is done, plus your other open sessions with an Ask button, in a tab (layout A) or a strip (layout B) |
 
 ## Install
 
@@ -31,12 +31,13 @@ Then run `/reload-plugins` or start a new session.
 
 **my-office**: `/my-office` prints the page's address; open it in a browser. `/my-office-desk Writer` names your desk and `/my-office-who` lists who is in the office. The [office README](plugins/my-office/README.md) has every command and the page's keys.
 
-**cockpit** shows above the prompt in the terminal, VS Code, the desktop app and the web, with no setup. Its **Mission** tab is this turn; its **Sessions** tab, there while another session runs the cockpit, lists them with an Ask button that drafts a line in your prompt. `1` and `2` switch tabs while the band has the focus.
+**cockpit** shows above the prompt in the terminal, VS Code, the desktop app and the web, with no setup. One header line gives the state, the progress and the time; below it, the plan with what Claude is doing under the step at work, then your asks. Your other open sessions come in a **Sessions** tab (layout A) or a strip under the mission (layout B), each with an Ask button that drafts a line in your prompt.
 
-- `/cockpit` clears the Mission tab.
-- `/cockpit-fold` folds the band to one line like an accordion, or opens it again; so do its ▾/▸ button and `c`. It stays as you left it for the session.
-- `/cockpit-rows` switches the plain-English tool rows on or off.
-- `/cockpit-sessions` lists your other sessions and shows or hides their tab.
+- `/cockpit-layout` switches between layout A and B; so do its Try B / Back to A button and `l`.
+- `/cockpit-fold` folds the band to one line, or opens it again; so do its ▾/▸ button and `c`.
+- `/cockpit` clears the mission, `/cockpit-sessions` lists your other sessions, `/cockpit-rows` switches the plain-English tool rows.
+
+The [cockpit README](plugins/cockpit/README.md) has every state, key and command.
 
 ## Develop
 
@@ -46,6 +47,8 @@ Then run `/reload-plugins` or start a new session.
 claude plugin validate plugins/my-office   # manifest and hooks module
 claude plugin test plugins/my-office       # hooks unit tests
 tools/my-office/run.sh check               # page: layout checks and a screenshot per theme
+claude plugin validate plugins/cockpit     # cockpit: manifest and hooks module
+claude plugin test plugins/cockpit         # cockpit: hooks unit tests
 ```
 
 ## Credits
