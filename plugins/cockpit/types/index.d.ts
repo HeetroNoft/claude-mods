@@ -21,8 +21,17 @@ export type Mission = {
   waitingTool?: string
 }
 
+/** The band's two tabs: this session's turn, and the other open sessions. */
+export type Tab = 'mission' | 'sessions'
+export type State = 'running' | 'done' | 'needs'
+/** One session's card in ~/.claude/session-cards/<id>.json, written by it, read by the others. */
+export type Card = {
+  id: string; place: string; purpose: string; now: string; updatedMs: number
+  state?: State; startMs?: number; endMs?: number; waitingFor?: string
+}
+
 declare module 'claude-code' {
   interface PluginState {
-    'mission-control': { mission: Mission; plainRows: boolean }
+    cockpit: { mission: Mission; plainRows: boolean; tab: Tab; others: Card[]; isHidden: boolean; nowMs: number }
   }
 }

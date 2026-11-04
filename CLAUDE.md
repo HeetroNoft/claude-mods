@@ -5,7 +5,7 @@ Heet's Claude Code mods, published as the `heet-mods` marketplace (`.claude-plug
 | Plugin | Folder | What it is |
 | --- | --- | --- |
 | my-office | `plugins/my-office` | A pixel-art office page where every Claude session is a mascot at its own desk, with a live plan board |
-| mission-control | `plugins/mission-control` | A live panel of the current turn: plan bar, plain-language activity, ticked asks |
+| cockpit | `plugins/cockpit` | One band above the prompt on every surface: a Mission tab (plan bar, plain-English activity, ticked asks) and a Sessions tab (the other open sessions, with an Ask button) |
 
 `~/.claude/my-office/` is **output**, not source: desk files, `data.js` and a copy of the page that the office mod writes at session start. Never edit it by hand; edit `plugins/my-office/web/` and copy it over to preview (see Testing).
 

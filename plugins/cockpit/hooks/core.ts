@@ -1,4 +1,4 @@
-// The pure half of mission-control: plain-French activity lines, the plan, the progress bar.
+// The pure half of the cockpit's mission tab: plain-English activity lines, the plan, the progress bar.
 // Nothing here touches the engine, so every line the panel shows is tested.
 
 import type { Ask, Step } from '../types'
@@ -7,7 +7,7 @@ const base = (p: unknown) => String(p ?? '').split(/[\\/]/).filter(Boolean).pop(
 const cut = (s: string, n: number) => (s.length > n ? `${s.slice(0, n - 1)}…` : s)
 const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1)
 
-// Server names people recognise. Anything else is shown as "Une app connectée".
+// Server names people recognise. Anything else is shown as "A connected app".
 const APPS: Record<string, string> = {
   notion: 'Notion', claude_ai_Notion: 'Notion', claude_ai_Gmail: 'Gmail', claude_ai_Google_Drive: 'Google Drive',
   claude_ai_Google_Calendar: 'Google Calendar', figma: 'Figma', 'claude-in-chrome': 'Chrome', 'my-office': 'Office',
@@ -17,33 +17,33 @@ const APPS: Record<string, string> = {
 export function describe(tool: string, input: any = {}): string | null {
   const file = base(input.file_path ?? input.notebook_path ?? input.path)
   switch (tool) {
-    case 'Read': return file ? `Lecture de ${file}` : 'Lecture d’un fichier'
-    case 'Edit': case 'MultiEdit': return file ? `Modification de ${file}` : 'Modification d’un fichier'
-    case 'Write': return file ? `Écriture de ${file}` : 'Écriture d’un fichier'
-    case 'NotebookEdit': return `Modification de ${file || 'un notebook'}`
-    case 'Grep': return input.pattern ? `Recherche de « ${cut(String(input.pattern), 30)} » dans les fichiers` : 'Recherche dans les fichiers'
-    case 'Glob': return 'Recherche de fichiers'
-    case 'Bash': case 'PowerShell': return input.description ? cap(cut(String(input.description), 60)) : 'Exécution d’une commande'
-    case 'WebSearch': return input.query ? `Recherche web : « ${cut(String(input.query), 30)} »` : 'Recherche sur le web'
+    case 'Read': return file ? `Reading ${file}` : 'Reading a file'
+    case 'Edit': case 'MultiEdit': return file ? `Editing ${file}` : 'Editing a file'
+    case 'Write': return file ? `Writing ${file}` : 'Writing a file'
+    case 'NotebookEdit': return `Editing ${file || 'a notebook'}`
+    case 'Grep': return input.pattern ? `Searching files for “${cut(String(input.pattern), 30)}”` : 'Searching files'
+    case 'Glob': return 'Finding files'
+    case 'Bash': case 'PowerShell': return input.description ? cap(cut(String(input.description), 60)) : 'Running a command'
+    case 'WebSearch': return input.query ? `Web search: “${cut(String(input.query), 30)}”` : 'Searching the web'
     case 'WebFetch': {
       const host = String(input.url ?? '').match(/^https?:\/\/([^/]+)/)?.[1]
-      return host ? `Lecture d’une page sur ${host.replace(/^www\./, '')}` : 'Lecture d’une page web'
+      return host ? `Reading a page on ${host.replace(/^www\./, '')}` : 'Reading a web page'
     }
-    case 'Agent': case 'Task': return input.description ? `Délégation à un agent : ${cut(String(input.description), 40)}` : 'Délégation à un agent'
-    case 'Skill': return input.skill ? `Ouverture du skill ${String(input.skill).split(':').pop()}` : 'Ouverture d’un skill'
-    case 'SendMessage': return 'Message à une autre session'
-    case 'TodoWrite': case 'TaskCreate': case 'TaskUpdate': return 'Mise à jour du plan'
-    case 'AskUserQuestion': return 'Question pour vous'
+    case 'Agent': case 'Task': return input.description ? `Handing off to an agent: ${cut(String(input.description), 40)}` : 'Handing off to an agent'
+    case 'Skill': return input.skill ? `Opening the ${String(input.skill).split(':').pop()} skill` : 'Opening a skill'
+    case 'SendMessage': return 'Messaging another session'
+    case 'TodoWrite': case 'TaskCreate': case 'TaskUpdate': return 'Updating the plan'
+    case 'AskUserQuestion': return 'A question for you'
     case 'ToolSearch': case 'TaskList': case 'TaskGet': return null
   }
   const mcp = tool.match(/^mcp__(.+?)__(.+)$/)
   if (mcp) {
-    if (mcp[1] === 'mission-control') return null
-    const app = APPS[mcp[1]] ?? APPS[mcp[1].replace(/^claude_ai_/, '')] ?? 'Une app connectée'
+    if (mcp[1] === 'cockpit') return null
+    const app = APPS[mcp[1]] ?? APPS[mcp[1].replace(/^claude_ai_/, '')] ?? 'A connected app'
     const verb = mcp[2].replace(/^(notion|mcp)-/, '').replace(/[_-]+/g, ' ')
-    return `${app} : ${verb}`
+    return `${app}: ${verb}`
   }
-  return 'Travail en cours'
+  return 'Working'
 }
 
 // ---- the plan ----
@@ -118,7 +118,7 @@ export function bar(steps: readonly Step[], cells = 24): { fill: string; tip: st
     fill: '━'.repeat(full),
     tip,
     empty: '━'.repeat(cells - full - tip.length),
-    label: total ? `${done}/${total} · ${Math.round((done / total) * 100)} %` : 'pas de plan',
+    label: total ? `${done}/${total} · ${Math.round((done / total) * 100)}%` : 'no plan',
   }
 }
 
@@ -162,7 +162,7 @@ export function stepWindow(steps: readonly Step[], room: number): { shown: Step[
 
 export function clock(ms: number): string {
   const s = Math.max(0, Math.round(ms / 1000))
-  return s < 60 ? `${s} s` : `${Math.floor(s / 60)} min ${String(s % 60).padStart(2, '0')} s`
+  return s < 60 ? `${s}s` : `${Math.floor(s / 60)}m ${String(s % 60).padStart(2, '0')}s`
 }
 
 export function tick(asks: readonly Ask[], id: number, proof: string): { asks: Ask[]; found: boolean } {

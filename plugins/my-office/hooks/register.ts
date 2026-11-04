@@ -53,8 +53,8 @@ const rename = async ($: any, name: string) => {
 }
 
 // Keeps the board's plan in step with what the session really does. The office plan tool wins (it
-// has estimates); without one this turn, the board follows mission-control's plan or Claude Code's
-// own task list. A step ticked on mission-control's panel also ticks here when both plans match.
+// has estimates); without one this turn, the board follows the cockpit's plan (or the older mission-control's) or Claude Code's
+// own task list. A step ticked on the cockpit's band also ticks here when both plans match.
 async function followPlan($: any, e: any) {
   const officeNow = (d: Desk) => d.planSource === 'office' && d.planTurn === d.turnMs
   if (e.tool === 'TodoWrite') {
@@ -65,13 +65,13 @@ async function followPlan($: any, e: any) {
       if (d.planSource !== 'todos') { d.planMs = now; d.doneMs = 0 }
       d.steps = steps; d.planSource = 'todos'; d.pausedMs = undefined
     })
-  } else if (e.tool === 'mcp__mission-control__set_plan') {
+  } else if (e.tool === 'mcp__cockpit__set_plan' || e.tool === 'mcp__mission-control__set_plan') {
     await save($, (d, now) => {
       d.missionSteps = Array.isArray(e.steps) ? e.steps.length : 0
       if (officeNow(d)) return
       d.steps = planSteps(e.steps, now); d.planMs = now; d.doneMs = 0; d.planSource = 'mission'; d.pausedMs = undefined
     })
-  } else if (e.tool === 'mcp__mission-control__step_done') {
+  } else if (e.tool === 'mcp__cockpit__step_done' || e.tool === 'mcp__mission-control__step_done') {
     const n = Number(e.step)
     await save($, (d, now) => { if (d.planSource === 'mission' || d.missionSteps === d.steps.length) d.steps = finishStep(d.steps, n, now) })
   }
