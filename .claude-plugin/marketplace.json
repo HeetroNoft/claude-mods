@@ -19,7 +19,7 @@
       "name": "cockpit",
       "source": "./plugins/cockpit",
       "description": "Un bandeau au-dessus du prompt sur toutes les surfaces : l'onglet Mission (le plan en barre de progression, ce que fait Claude, vos demandes cochées) et l'onglet Sessions (vos autres sessions, avec un bouton Ask). Fusion de mission-control et sessions-band, d'après charlie-free-mods",
-      "version": "0.4.0"
+      "version": "0.4.1"
     }
   ]
 }

@@ -34,6 +34,7 @@ Then run `/reload-plugins` or start a new session.
 **cockpit** shows above the prompt in the terminal, VS Code, the desktop app and the web, with no setup. Its **Mission** tab is this turn; its **Sessions** tab, there while another session runs the cockpit, lists them with an Ask button that drafts a line in your prompt. `1` and `2` switch tabs while the band has the focus.
 
 - `/cockpit` clears the Mission tab.
+- `/cockpit-fold` folds the band to one line like an accordion, or opens it again; so do its ▾/▸ button and `c`. It stays as you left it for the session.
 - `/cockpit-rows` switches the plain-English tool rows on or off.
 - `/cockpit-sessions` lists your other sessions and shows or hides their tab.
 

@@ -251,3 +251,24 @@ test('tool rows read in plain English, with no folder path and no tool name', as
     await early.unmount()
   }
 })
+
+test('the band folds like an accordion to one line, and opens again', async ($, on) => {
+  clockOf(on)
+  on('ui.render', async () => null as any)
+  on('command.register', async () => ({ value: undefined }) as any)
+  await $.tool.call({ tool: 'mcp__cockpit__set_plan', steps: ['Copy it', 'Test it'] } as any)
+  for (const surface of ['terminal', 'vscode'] as const) {
+    const ui = await $.ui.mount({ plugin: 'cockpit', surface, component: 'AbovePrompt', props: { hasSurvey: false, isWorking: true, maxRows: 16, bodyColumns: 80 } } as any)
+    expect(await ui.find({ type: 'Text', text: /Copy it/ })).toBeDefined()
+    await ui.press({ key: 'fold' })
+    // Folded: the state, the progress and the step under way, on one line; the step list is gone.
+    expect(await ui.find({ type: 'Text', text: /Copy it/ })).toBeDefined()
+    expect(await ui.find({ type: 'Text', text: /Test it/ })).toBeUndefined()
+    expect(JSON.stringify(await ui.drawn())).toContain('0/2')
+    await ui.press({ key: 'fold' })
+    expect(await ui.find({ type: 'Text', text: /Test it/ })).toBeDefined()
+    await ui.unmount()
+  }
+  const r: any = await $.command.run({ command: 'cockpit-fold', args: '' } as any)
+  expect(String(r.text)).toContain('folded')
+})
