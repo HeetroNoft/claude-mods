@@ -20,6 +20,12 @@
       "source": "./plugins/mission-control",
       "description": "Panneau de mission en direct : le plan en barre de progression, ce que fait Claude en français clair, vos demandes cochées (d’après mission-control de charlie-free-mods)",
       "version": "0.3.5"
+    },
+    {
+      "name": "sessions-band",
+      "source": "./plugins/sessions-band",
+      "description": "Bandeau au-dessus du prompt : vos autres sessions ouvertes, ce que fait chacune et un bouton Ask (d'après sessions-band de charlie-free-mods)",
+      "version": "0.1.3"
     }
   ]
 }

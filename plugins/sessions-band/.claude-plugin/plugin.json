@@ -1,0 +1,1 @@
+{ "name": "sessions-band", "version": "0.1.3", "author": { "name": "Heet" }, "description": "A band above the prompt listing your other open Claude Code sessions, what each one is for, and an Ask button. Based on the sessions-band mod from charlie-free-mods.", "types": "./types/index.d.ts" }

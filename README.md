@@ -6,6 +6,7 @@ Heet's Claude Code mods, published as the `heet-mods` marketplace.
 | --- | --- |
 | [my-office](plugins/my-office/README.md) | A pixel-art office in a local web page: every Claude session is a mascot at its own desk, with its plan and a live "done by" time on a board above it |
 | mission-control | A live panel of the current turn: the plan as a progress bar, what Claude is doing in plain French, your asks ticked off, and a sound when it is done |
+| sessions-band | A band above the prompt listing your other open sessions, what each one is for, and an Ask button |
 
 ## Install
 
@@ -15,6 +16,7 @@ From a clone of this repository:
 claude plugin marketplace add /path/to/claude-mods
 claude plugin install my-office@heet-mods
 claude plugin install mission-control@heet-mods
+claude plugin install sessions-band@heet-mods
 ```
 
 From GitHub, with an account that can read this repository:
@@ -23,6 +25,7 @@ From GitHub, with an account that can read this repository:
 claude plugin marketplace add HeetroNoft/claude-mods
 claude plugin install my-office@heet-mods
 claude plugin install mission-control@heet-mods
+claude plugin install sessions-band@heet-mods
 ```
 
 Then run `/reload-plugins` or start a new session.
@@ -37,6 +40,8 @@ Then run `/reload-plugins` or start a new session.
 - `/mission-panel` opens the panel in a side pane.
 - `/mission-rows` switches the plain-French tool rows on or off.
 
+**sessions-band** shows above the prompt when other sessions run this mod. `/sessions` lists them and shows or hides the band.
+
 ## Develop
 
 [CLAUDE.md](CLAUDE.md) has the file map, the rules for working with several sessions at once and how to test:
@@ -49,7 +54,7 @@ tools/my-office/run.sh check               # page: layout checks and a screensho
 
 ## Credits
 
-Both mods are based on the mods of the same name in [charlie-free-mods](https://github.com/charlie947/mod-maker).
+These mods are based on mods from [charlie-free-mods](https://github.com/charlie947/mod-maker).
 
 ## License
 
