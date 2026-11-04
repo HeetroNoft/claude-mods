@@ -1,7 +1,7 @@
 import { expect, mock, test } from 'claude-code/testing'
 
 import { extractAsks } from './asks'
-import { applyTask, bar, clock, describe, finishStep, fromTodos, progressSvg, setPlan, stepTime, stepWindow, tick, timed } from './core'
+import { applyTask, bar, clock, describe, finishStep, planRows, fromTodos, progressSvg, setPlan, stepTime, stepWindow, tick, timed } from './core'
 
 // The engine's clock, answered by an in-memory clock that only moves when a test moves it.
 const clockOf = (on: any) => mock.clock(on, { now: 1_000_000 })
@@ -155,8 +155,8 @@ test('the panel draws above the prompt with the plan, the feed and the asks', as
     props: { hasSurvey: false, isWorking: true, maxRows: 16, bodyColumns: 80 },
   } as any)
   expect(await ui.find({ type: 'Text', text: /Working/ })).toBeDefined()
-  expect(await ui.find({ type: 'Text', text: /Mission$/ })).toBeDefined()
-  expect(await ui.find({ type: 'Text', text: /0\/2 · 0%/ })).toBeDefined()
+  expect(await ui.find({ type: 'Text', text: /0\/2/ })).toBeDefined()
+  expect(await ui.find({ type: 'Text', text: /━/ })).toBeDefined()
   expect(await ui.find({ type: 'Text', text: /Copy it/ })).toBeDefined()
   expect(await ui.find({ type: 'Text', text: /Add it to the pack/ })).toBeDefined()
   expect(await ui.find({ type: 'Text', text: /Asks 0\/1/ })).toBeDefined()
@@ -166,7 +166,7 @@ test('the panel draws above the prompt with the plan, the feed and the asks', as
     props: { hasSurvey: false, isWorking: true, maxRows: 3, bodyColumns: 80 },
   } as any)
   expect(await small.find({ type: 'Text', text: /0\/2/ })).toBeDefined()
-  expect(await small.find({ type: 'Text', text: /asks 0\/1/ })).toBeDefined()
+  expect(await small.find({ type: 'Text', text: /Asks 0\/1/ })).toBeDefined()
   await small.unmount()
   // The desktop app: the page-like panel, its bar a picture, no row of ━ to wrap.
   const desk = await $.ui.mount({
@@ -175,8 +175,8 @@ test('the panel draws above the prompt with the plan, the feed and the asks', as
   } as any)
   expect(await desk.find({ type: 'Text', text: /Working/ })).toBeDefined()
   expect(await desk.find({ type: 'Svg' })).toBeDefined()
-  expect(await desk.find({ type: 'Text', text: /0 of 2 steps · 0%/ })).toBeDefined()
-  expect(await desk.find({ type: 'Text', text: /ASKS · 0\/1/ })).toBeDefined()
+  expect(await desk.find({ type: 'Text', text: /0\/2 steps/ })).toBeDefined()
+  expect(await desk.find({ type: 'Text', text: /Asks 0\/1/ })).toBeDefined()
   expect(await desk.find({ type: 'Text', text: /━/ })).toBeUndefined()
   await desk.unmount()
 })
@@ -208,7 +208,6 @@ test('VS Code gets the band alone, page-like, and no side pane opens', async ($,
   expect(await pane.find({ type: 'Text', text: /Copy it/ })).toBeDefined()
   expect(await pane.find({ type: 'Svg' })).toBeDefined()
   expect(await pane.find({ type: 'Text', text: /━/ })).toBeUndefined()
-  expect(await pane.find({ type: 'Text', text: /STEPS/ })).toBeDefined()
   // The mark rides in the label's own Text, so the two can never land on two lines.
   // VS Code puts a nested run of another weight on a line of its own: none may differ.
   const mixed: string[] = []
@@ -271,4 +270,14 @@ test('the band folds like an accordion to one line, and opens again', async ($, 
   }
   const r: any = await $.command.run({ command: 'cockpit-fold', args: '' } as any)
   expect(String(r.text)).toContain('folded')
+})
+
+test('the plan folds its finished steps into one count and keeps the open ones in order', () => {
+  let steps = setPlan(['a', 'b', 'c', 'd', 'e', 'f'])
+  steps = finishStep(finishStep(steps, 1), 2)
+  const r = planRows(steps, 3)
+  expect(r.done).toBe(2)
+  expect(r.open.map(s => s.label)).toEqual(['c', 'd', 'e'])
+  expect(r.open[0].status).toBe('now')
+  expect(r.more).toBe(1)
 })

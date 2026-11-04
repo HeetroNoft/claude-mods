@@ -62,4 +62,21 @@ test('a waiting session jumps to the top, says what it asks, and is named once',
     await ui.press({ key: 'tab-sessions' })
     await ui.unmount()
   }
+  // Layout B: no tabs, the session waiting on you in the strip with its Ask, the rest behind Show.
+  for (const surface of ['terminal', 'vscode'] as const) {
+    const ui = await $.ui.mount({ plugin: 'cockpit', surface, component: 'AbovePrompt', props: { hasSurvey: false, isWorking: true, maxRows: 14, bodyColumns: 92 } } as any)
+    await ui.press({ key: 'layout' })
+    let tree = JSON.stringify(await ui.drawn())
+    expect(tree).not.toContain('tab-sessions')
+    expect(tree).toContain('Reading x.md')
+    expect(tree).toContain('ask-d')
+    expect(tree).not.toContain('ask-b')
+    await ui.press({ key: 'others' })
+    tree = JSON.stringify(await ui.drawn())
+    expect(tree).toContain('ask-b')
+    await ui.press({ key: 'layout' })
+    // Back on A, on the Mission tab: a page offers the way to Sessions.
+    expect(JSON.stringify(await ui.drawn())).toContain('tab-sessions')
+    await ui.unmount()
+  }
 })
