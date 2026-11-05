@@ -5,7 +5,7 @@ Heet's Claude Code mods, published as the `heet-mods` marketplace.
 | Mod | What it does |
 | --- | --- |
 | [my-office](plugins/my-office/README.md) | A pixel-art office in a local web page: every Claude session is a mascot at its own desk, with its plan and a live "done by" time on a board above it |
-| [cockpit](plugins/cockpit/README.md) | One band above the prompt, on every surface: this turn's plan as a progress bar, what Claude is doing in plain English, your asks ticked off and a sound when it is done, plus your other open sessions with an Ask button, in a tab or stacked under the mission |
+| [cockpit](plugins/cockpit/README.md) | One band above the prompt, on every surface: this turn's plan as a progress bar, what Claude is doing in plain English, asks ticked off with proof and a sound when it is done, plus your other open sessions with an Ask button, in a tab or stacked under the mission |
 
 ## Install
 

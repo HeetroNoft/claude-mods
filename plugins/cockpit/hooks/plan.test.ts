@@ -42,10 +42,23 @@ test('a turn that ends well closes its plan, a question or an interruption does 
   expect(await drawn($)).toContain('2/2')
 })
 
-test('a new prompt during an unfinished plan keeps the plan', async ($, on) => {
+test('a typed prompt clears an unfinished plan, unless the last turn ended on a question', async ($, on) => {
   kit(on)
-  await $.tool.call({ tool: 'mcp__cockpit__set_plan', steps: ['Tidy notes.txt', 'Move the drafts'] } as any)
-  await $.tool.call({ tool: 'mcp__cockpit__step_done', step: 1 } as any)
-  await $.prompt.submit({ text: 'Go on.' } as any)
-  expect(await drawn($)).toContain('1/2')
+  on('turn.complete', async () => ({ text: '' }) as any)
+  const end = (answer: string) => ({ answer, durationMs: 1000, isAborted: false, turnId: 't1', reason: 'answer' }) as any
+  const plan = async () => {
+    await $.tool.call({ tool: 'mcp__cockpit__set_plan', steps: ['Tidy notes.txt', 'Move the drafts', 'Sort the photos'] } as any)
+    await $.tool.call({ tool: 'mcp__cockpit__step_done', step: 1 } as any)
+  }
+  // The turn asked you something: the plan waits on you, and your answer goes on with it.
+  await plan()
+  await $.turn.complete(end('Shall I move the drafts too?'))
+  const asked = await drawn($)
+  expect(asked).toContain('Your turn')
+  expect(asked).not.toContain('Done')
+  await $.prompt.submit({ text: 'Yes, go on.' } as any)
+  expect(await drawn($)).toContain('1/3')
+  // A new prompt mid-plan, no question asked: a new task, the old plan leaves.
+  await $.prompt.submit({ text: 'Now write the newsletter.' } as any)
+  expect(await drawn($)).not.toContain('Tidy notes.txt')
 })

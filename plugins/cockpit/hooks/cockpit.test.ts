@@ -1,6 +1,5 @@
 import { expect, mock, test } from 'claude-code/testing'
 
-import { extractAsks } from './asks'
 import { applyTask, bar, clock, describe, finishStep, planRows, fromTodos, progressSvg, setPlan, stepTime, stepWindow, tick, timed } from './core'
 
 // The engine's clock, answered by an in-memory clock that only moves when a test moves it.
@@ -101,19 +100,6 @@ test('an ask ticks only by id, and the timer reads like a clock', () => {
   expect(clock(83_000)).toBe('1m 23s')
 })
 
-test('asks come from what you typed, not from replies like "go"', () => {
-  expect(extractAsks('Build the hero mod. Can you send me the MP4 path?')).toEqual(['Build the hero mod.', 'Can you send me the MP4 path?'])
-  expect(extractAsks('go')).toEqual([])
-})
-
-test('French asks are picked up, French replies are not', () => {
-  expect(extractAsks('Toi tu vas t’occuper du design. Je veux que l’interface soit plus claire.\n\nAméliore la structure')).toEqual([
-    'Toi tu vas t’occuper du design.', 'Je veux que l’interface soit plus claire.', 'Améliore la structure',
-  ])
-  expect(extractAsks('Peux-tu vérifier le build ?')).toEqual(['Peux-tu vérifier le build ?'])
-  for (const reply of ['oui', 'vas-y', 'parfait !', 'merci', 'continue']) expect(extractAsks(reply)).toEqual([])
-})
-
 test('a plan set through its tool shows on the panel state', async ($, on) => {
   clockOf(on)
   const r: any = await $.tool.call({ tool: 'mcp__cockpit__set_plan', steps: ['One', 'Two'] } as any)
@@ -122,17 +108,17 @@ test('a plan set through its tool shows on the panel state', async ($, on) => {
   expect(String(d.result ?? '')).toContain('Step 1 done')
 })
 
-test('the same ask sent twice shows once', async ($, on) => {
+test('a typed prompt adds no ask, and the same ask added twice shows once', async ($, on) => {
   clockOf(on)
   on('ui.render', async () => null as any)
   on('prompt.submit', async (_$: any, e: any) => ({ text: e.text }) as any)
-  const prompt = { text: 'Ajoute une barre plus nette. Améliore l’interface.', origin: { kind: 'composer' } } as any
-  await $.prompt.submit(prompt)
-  await $.prompt.submit(prompt)
-  const a: any = await $.tool.call({ tool: 'mcp__cockpit__add_ask', text: 'ajoute une barre plus nette.' } as any)
+  await $.prompt.submit({ text: 'Ajoute une barre plus nette. Améliore l’interface.', origin: { kind: 'composer' } } as any)
+  const a: any = await $.tool.call({ tool: 'mcp__cockpit__add_ask', text: 'Ajoute une barre plus nette.' } as any)
   expect(String(a.result)).toContain('#1')
+  const b: any = await $.tool.call({ tool: 'mcp__cockpit__add_ask', text: 'ajoute une barre plus nette.' } as any)
+  expect(String(b.result)).toContain('#1')
   const ui = await $.ui.mount({ plugin: 'cockpit', surface: 'terminal', component: 'AbovePrompt', props: { hasSurvey: false, isWorking: true, maxRows: 16, bodyColumns: 80 } } as any)
-  expect(await ui.find({ type: 'Text', text: /Asks 0\/2/ })).toBeDefined()
+  expect(await ui.find({ type: 'Text', text: /Asks 0\/1/ })).toBeDefined()
   await ui.unmount()
 })
 

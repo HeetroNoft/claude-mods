@@ -15,9 +15,9 @@ One band above the prompt, on every surface (the terminal, VS Code, the desktop 
 
 In auto mode, and in the bypass and don't-ask modes, a permission is answered without you, so the band never says it is your turn for one.
 
-**The plan.** Steps already done fold into one line (`✓ 2 steps done`). The step at work is in bold, with what Claude is doing just beneath it in plain words (`└ Editing register.tsx`, `└ Allow: publish the post`). The next 4 steps follow, then `… N more to come`. Each step started shows how long it took or has taken so far. Claude sets the plan with the `set_plan` tool; the mod also follows Claude Code's own task list (TodoWrite, Tasks). A turn that ends well ticks the steps left, unless it ends on a question.
+**The plan.** Steps already done fold into one line (`✓ 2 steps done`). The step at work is in bold, with what Claude is doing just beneath it in plain words (`└ Editing register.tsx`, `└ Allow: publish the post`). The next 4 steps follow, then `… N more to come`. Each step started shows how long it took or has taken so far. Claude sets the plan with the `set_plan` tool on tasks of 3 steps or more, and ticks a step only as it starts the next one; the mod also follows Claude Code's own task list (TodoWrite, Tasks). A turn that ends well ticks the steps left, unless it ends on a question.
 
-**Your asks.** The requests in a prompt you type, in English or French ("can you…", "fix…", "peux-tu…", "ajoute…"), go on the band as asks. Claude ticks one off only with proof (`tick_ask`). `Asks 1/3` counts the ones done; only the open ones are listed.
+**Asks.** An ask goes on the band only through `add_ask`, for example one sent by another session; prompts you type are not scanned for asks any more, since ticking each one off cost Claude a tool call. Claude ticks an ask off only with proof (`tick_ask`). `Asks 1/3` counts the ones done; only the open ones are listed.
 
 **Without a plan**, the band shows a single line of what Claude is doing.
 
@@ -25,7 +25,7 @@ In auto mode, and in the bypass and don't-ask modes, a permission is answered wi
 
 `/cockpit-layout tabs` or `/cockpit-layout stacked` picks one; `/cockpit-layout` alone switches to the other. The choice lasts for the session, and a switch always goes back to the mission.
 
-- **tabs (the default)**: two tabs, **Mission** (this turn) and **Sessions** (your other open sessions). The Sessions tab appears only while another session runs the cockpit; with no turn running here, the band opens on it. In the terminal the tabs read `1: Mission  2: Sessions 3 · ⚑ 1`; in VS Code, the desktop app and the web, one button leads to the other tab.
+- **tabs (the default)**: two tabs, **Mission** (this turn) and **Sessions** (your other open sessions). The Sessions tab appears only while another session runs the cockpit; with no turn running here, the band opens on it. In the terminal the tabs read `1: Mission  2: Sessions 3 · ⚑ 1`; in VS Code, the desktop app and the web, one button leads to the other tab: **Show sessions [3] · ⚑ 1** or **Show Missions**.
 - **stacked**: one view and no tabs. Under the mission, a session waiting on you always shows with its Ask button; the others are summed up on one line (`Others · 2 working · 1 finished`), and **Show** lists them.
 
 ## Other sessions
@@ -65,11 +65,11 @@ In the transcript, tool calls read as plain lines: `Editing intro.md` instead of
 | `add_ask` | Puts an ask on the band that did not come from a typed prompt, such as one sent by another session |
 | `tick_ask` | Ticks an ask off, with the proof |
 
-Each prompt carries a short reminder telling Claude to use them, and listing the open asks.
+Each prompt carries a one-line reminder telling Claude to use them, plus the open asks (at most 4, cut to 40 characters). It is kept short on purpose: every word of it costs tokens on every prompt.
 
 ## Develop
 
-`hooks/register.tsx` draws the band and wires the events; `hooks/core.ts` (plan, progress bar, plain-English lines), `hooks/cards.ts` (session cards) and `hooks/asks.ts` (picking asks out of a prompt) are pure and tested. The terminal is laid out in character cells; VS Code, the desktop app and the web get a page-like layout with the bar drawn as a picture.
+`hooks/register.tsx` draws the band and wires the events; `hooks/core.ts` (plan, progress bar, plain-English lines) and `hooks/cards.ts` (session cards) are pure and tested. The terminal is laid out in character cells; VS Code, the desktop app and the web get a page-like layout with the bar drawn as a picture.
 
 ```bash
 claude plugin validate plugins/cockpit   # manifest and hooks module

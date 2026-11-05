@@ -126,24 +126,30 @@ export function bar(steps: readonly Step[], cells = 24): { fill: string; tip: st
 // Code, the desktop app), where a row of ━ never lands on the width it was counted for. One
 // rounded segment per step: done ones filled, the current one half-tinted, the rest a faint
 // track. Past 12 steps the segments would be slivers, so it is one continuous bar.
-export function progressSvg(steps: readonly Step[], fill: string, track: string): string {
-  const W = 400, H = 8, R = 3
+// `pad` is transparent room above and below the bar, in pixels: a page lays a Box's gaps out in
+// whole text rows, so the picture carries the finer space itself. The picture is BAR_H + 2 * pad tall.
+export const BAR_H = 8
+// `live`: the step at work is half-tinted only while a turn runs; once it is over, a step never
+// finished is plain track, so it cannot pass for a done one (a green tint read as done: 04/11/2026).
+export function progressSvg(steps: readonly Step[], fill: string, track: string, pad = 0, live = true): string {
+  const W = 400, H = BAR_H, R = 3
   const n = steps.length
   const rect = (x: number, w: number, color: string, opacity = 1) =>
-    `<rect x="${x.toFixed(1)}" y="0" width="${Math.max(0, w).toFixed(1)}" height="${H}" rx="${R}" fill="${color}"${opacity < 1 ? ` fill-opacity="${opacity}"` : ''}/>`
+    `<rect x="${x.toFixed(1)}" y="${pad}" width="${Math.max(0, w).toFixed(1)}" height="${H}" rx="${R}" fill="${color}"${opacity < 1 ? ` fill-opacity="${opacity}"` : ''}/>`
   let body = ''
   if (n && n <= 12) {
     const gap = n > 1 ? 4 : 0
     const w = (W - gap * (n - 1)) / n
     steps.forEach((s, i) => {
       const x = i * (w + gap)
-      body += s.status === 'done' ? rect(x, w, fill) : s.status === 'now' ? rect(x, w, track) + rect(x, w, fill, 0.45) : rect(x, w, track)
+      body += s.status === 'done' ? rect(x, w, fill) : s.status === 'now' && live ? rect(x, w, track) + rect(x, w, fill, 0.45) : rect(x, w, track)
     })
   } else {
     const done = steps.filter(s => s.status === 'done').length
     body = rect(0, W, track) + (n ? rect(0, (done / n) * W, fill) : '')
   }
-  return `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none">${body}</svg>`
+  const T = H + 2 * pad
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${T}" viewBox="0 0 ${W} ${T}" preserveAspectRatio="none">${body}</svg>`
 }
 
 // The steps to list when there are more than fit: a window that keeps the current step in
